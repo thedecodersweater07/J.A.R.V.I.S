@@ -1,0 +1,3 @@
+git add .
+git commit -m "Resolved conflicts"
+git push -u origin main
