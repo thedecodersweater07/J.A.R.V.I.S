@@ -1,201 +1,120 @@
 """
-Short Term Memory Implementation
-
-This module handles short-term memory functionality which includes:
-- Temporary storage of recent information
-- Quick access and retrieval
-- Limited capacity with automatic pruning
+Short-term memory implementation.
+Handles temporary storage of information with limited capacity and duration.
 """
-
 import time
 from collections import OrderedDict
-from typing import Dict, Any, List, Optional, Tuple
+import threading
+
 
 class ShortTermMemory:
-    def __init__(self, capacity: int = 100, retention_period: float = 3600):
+    def __init__(self, capacity=7, retention_time=300):
         """
-        Initialize short-term memory with configurable capacity and retention period
+        Initialize short-term memory with specified capacity and retention time.
         
         Args:
-            capacity: Maximum number of items to store
-            retention_period: Time in seconds before memories start to decay (default: 1 hour)
+            capacity (int): Maximum number of items to store (Miller's law suggests ~7)
+            retention_time (int): Time in seconds before items decay (default 5 minutes)
         """
         self.capacity = capacity
-        self.retention_period = retention_period
-        self.memories = OrderedDict()  # Uses insertion order for automatic LRU behavior
-        self.timestamps = {}  # Track when each memory was added
-        self.importance_scores = {}  # Score from 0-1 for each memory
+        self.retention_time = retention_time
+        self.memory_store = OrderedDict()
+        self.lock = threading.RLock()
+        
+        # Start the decay thread
+        self._start_decay_thread()
     
-    def store(self, key: str, value: Any, importance: float = 0.5) -> None:
-        """
-        Store a new memory item
-        
-        Args:
-            key: Unique identifier for the memory
-            value: The content to store
-            importance: Score from 0-1 indicating memory importance (higher = more important)
-        """
-        # If memory exists, update it
-        if key in self.memories:
-            self.memories.pop(key)  # Remove to re-add at the end (most recent)
-        
-        # Add new memory
-        self.memories[key] = value
-        self.timestamps[key] = time.time()
-        self.importance_scores[key] = importance
-        
-        # Prune if we exceed capacity
-        self._prune_if_needed()
-    
-    def retrieve(self, key: str) -> Optional[Any]:
-        """
-        Retrieve a memory item by key
-        
-        Args:
-            key: The identifier for the memory to retrieve
+    def store(self, key, value, importance=1):
+        """Store a new item in short-term memory."""
+        with self.lock:
+            # If we're at capacity, make room by removing least important or oldest item
+            if len(self.memory_store) >= self.capacity and key not in self.memory_store:
+                self._make_room()
             
-        Returns:
-            The memory value or None if not found or expired
-        """
-        if key in self.memories:
-            # Check if memory has expired
-            if self._is_memory_active(key):
-                # Move to end (most recently used)
-                value = self.memories.pop(key)
-                self.memories[key] = value
-                return value
-            else:
-                # Memory has expired, remove it
-                self._remove_memory(key)
-        
-        return None
-    
-    def get_recent_memories(self, limit: int = 10) -> List[Tuple[str, Any]]:
-        """
-        Get most recently added memories
-        
-        Args:
-            limit: Maximum number of memories to return
+            # Store the new item with timestamp and importance
+            self.memory_store[key] = {
+                'value': value,
+                'timestamp': time.time(),
+                'importance': min(max(importance, 1), 10),  # Clamp between 1-10
+                'access_count': 0
+            }
             
-        Returns:
-            List of (key, value) tuples of recent memories
-        """
-        result = []
-        count = 0
-        
-        # Start from the most recent (end of OrderedDict)
-        for key, value in reversed(self.memories.items()):
-            if count >= limit:
-                break
+            # Move to end to indicate it's the most recently used
+            self.memory_store.move_to_end(key)
+            return True
+    
+    def retrieve(self, key):
+        """Retrieve an item from short-term memory."""
+        with self.lock:
+            if key in self.memory_store:
+                item = self.memory_store[key]
                 
-            if self._is_memory_active(key):
-                result.append((key, value))
-                count += 1
-            else:
-                # Remove expired memories during retrieval
-                self._remove_memory(key)
-        
-        return result
-    
-    def search(self, query: str) -> List[Tuple[str, Any, float]]:
-        """
-        Simple search function for memory content
-        
-        Args:
-            query: Search string to look for in memory keys or values
-            
-        Returns:
-            List of (key, value, relevance) tuples matching the query
-        """
-        results = []
-        
-        for key, value in list(self.memories.items()):
-            # Skip expired memories
-            if not self._is_memory_active(key):
-                self._remove_memory(key)
-                continue
+                # Check if the item has expired
+                if time.time() - item['timestamp'] > self.retention_time:
+                    self.memory_store.pop(key)
+                    return None
                 
-            relevance = 0.0
-            
-            # Check if query appears in key
-            if isinstance(key, str) and query.lower() in key.lower():
-                relevance = 0.8
-            
-            # Check if query appears in value
-            if isinstance(value, str) and query.lower() in value.lower():
-                relevance = max(relevance, 0.9)
-            
-            # Add relevance boost based on importance and recency
-            if relevance > 0:
-                age_factor = self._get_age_factor(key)
-                importance = self.importance_scores.get(key, 0.5)
-                final_relevance = relevance * (0.7 * age_factor + 0.3 * importance)
-                results.append((key, value, final_relevance))
-        
-        # Sort by relevance (highest first)
-        results.sort(key=lambda x: x[2], reverse=True)
-        return results
-    
-    def clear(self) -> None:
-        """Clear all short-term memories"""
-        self.memories.clear()
-        self.timestamps.clear()
-        self.importance_scores.clear()
-    
-    def _is_memory_active(self, key: str) -> bool:
-        """Check if a memory is still active based on its age and importance"""
-        if key not in self.timestamps:
-            return False
-            
-        age = time.time() - self.timestamps[key]
-        importance = self.importance_scores.get(key, 0.5)
-        
-        # Important memories last longer
-        adjusted_retention = self.retention_period * (0.5 + importance)
-        
-        return age < adjusted_retention
-    
-    def _get_age_factor(self, key: str) -> float:
-        """Calculate age factor (1.0 = new, 0.0 = expired)"""
-        if key not in self.timestamps:
-            return 0.0
-            
-        age = time.time() - self.timestamps[key]
-        importance = self.importance_scores.get(key, 0.5)
-        adjusted_retention = self.retention_period * (0.5 + importance)
-        
-        # Linear decay from 1.0 to 0.0 as memory ages
-        age_factor = 1.0 - min(1.0, age / adjusted_retention)
-        return max(0.0, age_factor)
-    
-    def _remove_memory(self, key: str) -> None:
-        """Remove a memory and its metadata"""
-        if key in self.memories:
-            self.memories.pop(key)
-        if key in self.timestamps:
-            self.timestamps.pop(key)
-        if key in self.importance_scores:
-            self.importance_scores.pop(key)
-    
-    def _prune_if_needed(self) -> None:
-        """Prune memories if capacity is exceeded"""
-        while len(self.memories) > self.capacity:
-            # First remove any expired memories
-            for key in list(self.memories.keys()):
-                if not self._is_memory_active(key):
-                    self._remove_memory(key)
-                    if len(self.memories) <= self.capacity:
-                        return
-                        
-            if len(self.memories) <= self.capacity:
-                return
+                # Update access metrics and move to end (most recently used)
+                item['access_count'] += 1
+                item['timestamp'] = time.time()  # Reset decay timer on access
+                self.memory_store.move_to_end(key)
                 
-            # If still over capacity, remove LRU item with lowest importance
-            candidates = list(self.memories.keys())[:int(self.capacity * 0.2) + 1]
-            if candidates:
-                least_important = min(candidates, key=lambda k: self.importance_scores.get(k, 0))
-                self._remove_memory(least_important)
-            else:
-                # Fallback: remove oldest item
-                oldest_key = next(iter(self.memories))
-                self._remove_memory(oldest_key)
+                return item['value']
+            return None
+    
+    def get_all(self):
+        """Return all non-expired items in short-term memory."""
+        with self.lock:
+            current_time = time.time()
+            active_items = {}
+            
+            for key, item in list(self.memory_store.items()):
+                if current_time - item['timestamp'] <= self.retention_time:
+                    active_items[key] = item['value']
+                else:
+                    self.memory_store.pop(key)
+                    
+            return active_items
+    
+    def _make_room(self):
+        """Remove the least important or oldest item to make room for new items."""
+        if not self.memory_store:
+            return
+            
+        # Find the item with lowest importance
+        min_importance = float('inf')
+        min_key = None
+        
+        for key, item in self.memory_store.items():
+            if item['importance'] < min_importance:
+                min_importance = item['importance']
+                min_key = key
+        
+        # If all items have same importance, remove the oldest (first in the OrderedDict)
+        if min_key is None:
+            min_key = next(iter(self.memory_store))
+            
+        self.memory_store.pop(min_key)
+    
+    def _start_decay_thread(self):
+        """Start a background thread to handle memory decay."""
+        def decay_process():
+            while True:
+                time.sleep(10)  # Check every 10 seconds
+                self._decay_old_items()
+        
+        thread = threading.Thread(target=decay_process, daemon=True)
+        thread.start()
+    
+    def _decay_old_items(self):
+        """Remove items that have exceeded retention time."""
+        with self.lock:
+            current_time = time.time()
+            keys_to_remove = []
+            
+            for key, item in self.memory_store.items():
+                if current_time - item['timestamp'] > self.retention_time:
+                    keys_to_remove.append(key)
+            
+            for key in keys_to_remove:
+                self.memory_store.pop(key)
