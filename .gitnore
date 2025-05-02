@@ -8,5 +8,9 @@ git pull --rebase origin main
 # Daarna:
 git push -u origin main
 
+git stash
+git pull --rebase origin main
+git stash pop
+
 
 git push -f origin main
