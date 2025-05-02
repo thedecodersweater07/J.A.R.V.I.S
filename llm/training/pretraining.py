@@ -12,6 +12,9 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import logging
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel
+from torch.cuda.amp import autocast, GradScaler
 
 # Configure logging
 logging.basicConfig(
@@ -38,6 +41,9 @@ class PretrainingConfig:
         max_grad_norm=1.0,
         save_steps=10000,
         seed=42,
+        use_mixed_precision=True,
+        distributed_training=False,
+        local_rank=-1,
         **kwargs
     ):
         self.model_size = model_size
@@ -52,6 +58,9 @@ class PretrainingConfig:
         self.max_grad_norm = max_grad_norm
         self.save_steps = save_steps
         self.seed = seed
+        self.use_mixed_precision = use_mixed_precision
+        self.distributed_training = distributed_training
+        self.local_rank = local_rank
         
         # Add any additional kwargs as attributes
         for key, value in kwargs.items():
@@ -75,6 +84,11 @@ class PreTrainer:
         self.optimizer = self._get_optimizer()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
+        
+        # Initialize mixed precision and distributed training
+        self.scaler = GradScaler() if config.use_mixed_precision else None
+        if config.distributed_training:
+            self.model = DistributedDataParallel(model, device_ids=[config.local_rank])
         
         logger.info(f"Using device: {self.device}")
     
@@ -115,13 +129,18 @@ class PreTrainer:
                 # Move batch to device
                 batch = {k: v.to(self.device) for k, v in batch.items()}
                 
-                # Forward pass
-                outputs = self.model(**batch)
-                loss = outputs.loss
+                # Forward pass with mixed precision
+                with autocast(enabled=self.config.use_mixed_precision):
+                    outputs = self.model(**batch)
+                    loss = outputs.loss
                 
                 # Normalize loss for gradient accumulation
                 loss = loss / self.config.gradient_accumulation_steps
-                loss.backward()
+                
+                if self.scaler is not None:
+                    self.scaler.scale(loss).backward()
+                else:
+                    loss.backward()
                 
                 epoch_loss += loss.item()
                 
@@ -133,7 +152,12 @@ class PreTrainer:
                     )
                     
                     # Optimizer step
-                    self.optimizer.step()
+                    if self.scaler is not None:
+                        self.scaler.step(self.optimizer)
+                        self.scaler.update()
+                    else:
+                        self.optimizer.step()
+                    
                     self.optimizer.zero_grad()
                     global_step += 1
                 
