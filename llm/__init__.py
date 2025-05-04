@@ -1,23 +1,16 @@
 """
-Language Learning Model (LLM) module for the Jarvis AI system.
-This module provides core LLM functionality.
+LLM (Language Learning Model) module
+Provides continuous learning and knowledge integration capabilities
 """
 
-from .architecture import *
+from .core import LLMCore
+from .learning import LearningManager
+from .knowledge import KnowledgeManager
+from .inference import InferenceEngine
 
 __all__ = [
-    # Transformer components
-    'Transformer',
-    'ScaledDotProductAttention',
-    'MultiHeadAttention',
-    'SelfAttention',
-    'CrossAttention',
-    'FeedForward',
-    'EncoderLayer',
-    'DecoderLayer', 
-    'Encoder',
-    'Decoder',
-    'PositionalEncoding',
-    'TokenEmbedding',
-    'InputEmbedding'
+    'LLMCore',
+    'LearningManager', 
+    'KnowledgeManager',
+    'InferenceEngine'
 ]

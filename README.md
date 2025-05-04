@@ -145,6 +145,38 @@ Jarvis biedt uitgebreide configuratiemogelijkheden om het systeem aan te passen 
 }
 ```
 
+## LLM Systeem
+Het LLM (Language Learning Model) systeem van JARVIS is ontworpen voor continue zelfverbetering:
+
+### Componenten
+- Automatisch leren van internet & interacties
+- Real-time kennisintegratie
+- Multi-source data aggregatie
+- Gedistribueerd trainingsysteem
+
+### Configuratie
+```json
+{
+  "llm": {
+    "learning": {
+      "auto_learn": true,
+      "data_sources": [
+        "internet",
+        "user_interactions",
+        "system_logs"
+      ],
+      "learning_rate": 0.001,
+      "batch_size": 32
+    },
+    "knowledge_integration": {
+      "real_time": true,
+      "update_frequency": 3600,
+      "confidence_threshold": 0.85
+    }
+  }
+}
+```
+
 ### Configuratie Aanpassen
 
 #### Via configuratiebestanden
