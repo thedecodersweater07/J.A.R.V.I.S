@@ -2,9 +2,9 @@ import logging
 from typing import Dict, List, Any
 import torch
 import torch.nn as nn
-from ...knowledge import KnowledgeManager
-from ....ml.training.trainers import ModelTrainer
-from ....ml.feature_engineering import FeatureExtractor
+from llm.knowledge import KnowledgeManager
+from ml.training.trainers import ModelTrainer
+from ml.feature_engineering import FeatureExtractor
 
 logger = logging.getLogger(__name__)
 

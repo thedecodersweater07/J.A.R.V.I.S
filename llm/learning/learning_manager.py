@@ -2,10 +2,11 @@ import logging
 import asyncio
 from typing import Dict, Any, Optional, List
 import aiohttp
-from db.database import Database
 from datetime import datetime
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from db.database import Database
+from .pipelines.structured_learning import StructuredLearningPipeline
 
 logger = logging.getLogger(__name__)
 
@@ -42,22 +43,31 @@ class LearningManager:
     async def learn_from_interaction(self, input_text: str, response: str):
         """Learn from user interactions"""
         try:
-            # Store interaction
-            interaction_id = await self.db.get_client()['interactions'].insert_one({
-                'input': input_text,
-                'response': response,
-                'timestamp': datetime.utcnow(),
-                'analyzed': False,
-                'feedback': None,
-                'learned': False
-            }).inserted_id
-            
-            # Process for immediate learning if configured
-            if self.config.get('immediate_learning', True):
-                await self._process_interaction(interaction_id)
-                
+            if MONGO_AVAILABLE:
+                await self._store_mongo_interaction(input_text, response)
+            else:
+                await self._store_sqlite_interaction(input_text, response)
         except Exception as e:
-            logger.error(f"Failed to store/process interaction: {e}")
+            logger.error(f"Failed to store interaction: {e}")
+            
+    async def _store_mongo_interaction(self, input_text: str, response: str):
+        """Store interaction in MongoDB"""
+        await self.db.get_client()['interactions'].insert_one({
+            'input': input_text,
+            'response': response,
+            'timestamp': datetime.utcnow(),
+            'analyzed': False
+        })
+        
+    async def _store_sqlite_interaction(self, input_text: str, response: str):
+        """Store interaction in SQLite"""
+        conn = self.db.get_client()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO interactions (input, response, timestamp, analyzed)
+            VALUES (?, ?, ?, ?)
+        ''', (input_text, response, datetime.utcnow(), False))
+        conn.commit()
             
     async def _process_interaction(self, interaction_id):
         """Process a single interaction for learning"""
