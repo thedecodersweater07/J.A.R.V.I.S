@@ -12,9 +12,9 @@ from ui.visual.hologram_projector import HologramProjector
 from ui.input.voice_input import VoiceInput
 from ui.input.text_input import TextInput
 from security.authentication.identity_verifier import IdentityVerifier
-from core.ml.model_manager import ModelManager
-from core.nlp.language_processor import LanguageProcessor
-from core.nlp.conversation_handler import ConversationHandler
+from ml.model_manager import ModelManager  # Updated path
+from nlp.language_processor import LanguageProcessor  # Updated path
+from nlp.conversation.conversation_handler import ConversationHandler  # Updated path
 
 
 class JARVIS:
@@ -35,8 +35,8 @@ class JARVIS:
         self.text_input = TextInput()
         self.input_mode: Literal["voice", "text"] = "text"  # Default to text mode
         self.security = IdentityVerifier()
-        self.model_manager = ModelManager()
-        self.nlp = LanguageProcessor()
+        self.model_manager = ModelManager()  # Now works without parameters
+        self.nlp = LanguageProcessor(language=self.config.get("language", "nl"))
         self.llm = None  # Placeholder for LLM integration
         self.conversation = ConversationHandler(self.nlp)
         self._initialize_components()

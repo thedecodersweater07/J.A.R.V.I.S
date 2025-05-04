@@ -6,6 +6,21 @@ from config.database import DATABASE_PATHS
 
 logger = logging.getLogger(__name__)
 
+class KnowledgeGraphManager:
+    def __init__(self):
+        self.entities = {}
+        self.relationships = []
+        
+    def add_entity(self, entity_id: str, data: Dict[str, Any]):
+        self.entities[entity_id] = data
+        
+    def add_relationship(self, source: str, target: str, relationship_type: str):
+        self.relationships.append({
+            'source': source,
+            'target': target,
+            'type': relationship_type
+        })
+
 class KnowledgeBaseConnector:
     """Handles connections to various knowledge bases."""
     
