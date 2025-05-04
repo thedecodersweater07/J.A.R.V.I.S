@@ -6,17 +6,18 @@ import os
 import json
 import time
 import sqlite3
+from config.database import DATABASE_PATHS
 
 
 class LongTermMemory:
-    def __init__(self, db_path="memory_storage.db"):
+    def __init__(self, db_path=None):
         """
         Initialize long-term memory with a SQLite database for storage.
         
         Args:
-            db_path (str): Path to the SQLite database file
+            db_path (str): Optional custom path to the SQLite database file
         """
-        self.db_path = db_path
+        self.db_path = db_path or DATABASE_PATHS["memory"]
         self._initialize_db()
     
     def _initialize_db(self):

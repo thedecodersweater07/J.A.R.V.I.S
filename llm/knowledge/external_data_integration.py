@@ -3,6 +3,9 @@ from typing import Dict, List, Optional, Any
 import aiohttp
 import asyncio
 from datetime import datetime, timedelta
+import sqlite3
+import json
+from config.database import DATABASE_PATHS
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +17,8 @@ class ExternalDataIntegrator:
         self.cache = {}
         self.cache_expiry = {}
         self.session = None
+        self.db_path = DATABASE_PATHS["cache"]
+        self._init_db()
         
     async def initialize(self):
         """Initialize async HTTP session."""
@@ -81,9 +86,40 @@ class ExternalDataIntegrator:
         return datetime.now() < self.cache_expiry[key]
 
     def _update_cache(self, key: str, data: Dict, ttl: int):
-        """Update cache with new data."""
+        """Update cache with new data and persist to database."""
         self.cache[key] = data
         self.cache_expiry[key] = datetime.now() + timedelta(seconds=ttl)
+        
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+            INSERT OR REPLACE INTO api_cache (cache_key, data, expiry, source)
+            VALUES (?, ?, ?, ?)
+            ''', (key, json.dumps(data), self.cache_expiry[key].timestamp(), 
+                  key.split(':')[0]))
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Failed to persist cache to database: {e}")
+
+    def _init_db(self):
+        """Initialize the cache database."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS api_cache (
+            cache_key TEXT PRIMARY KEY,
+            data TEXT,
+            expiry REAL,
+            source TEXT
+        )''')
+        
+        conn.commit()
+        conn.close()
 
     def clear_cache(self, source: Optional[str] = None):
         """Clear cache for specific source or all sources."""

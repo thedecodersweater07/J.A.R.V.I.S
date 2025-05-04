@@ -18,17 +18,29 @@ logger = logging.getLogger(__name__)
 class CommandParser:
     """Parser voor het verwerken van opdrachten in het commandocentrum"""
     
-    def __init__(self, command_schema_file: str = "command_schema.json"):
+    def __init__(self, schema_path: str = "command_schema.json"):
         """
         Initialiseer de commandoparser
         
         Args:
-            command_schema_file: Pad naar het JSON-schema voor opdrachten
+            schema_path: Pad naar het JSON-schema voor opdrachten
         """
-        self.schema = self._load_schema(command_schema_file)
+        self.schema_path = schema_path
+        self.schema = self._load_schema(schema_path)
         self.command_patterns = self._compile_patterns()
         logger.info("CommandParser geïnitialiseerd")
     
+    def initialize(self):
+        """Initialize the command parser system"""
+        try:
+            self.schema = self._load_schema(self.schema_path)
+            self.command_patterns = self._compile_patterns()
+            logger.info("Command parser initialized successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize command parser: {e}")
+            return False
+
     def _load_schema(self, schema_file: str) -> Dict[str, Any]:
         """Laad het schema voor opdrachten"""
         try:

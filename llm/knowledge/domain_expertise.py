@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Any
 from dataclasses import dataclass
 import json
 
@@ -16,11 +16,27 @@ class DomainKnowledge:
 class DomainExpert:
     """Manages domain-specific knowledge and expertise."""
     
-    def __init__(self, domains_config: Optional[str] = None):
+    def __init__(self, domains_config: Optional[str] = None, knowledge_base=None):
         self.domains = {}
         self.active_domain = None
+        self.knowledge_base = knowledge_base
+        self.context_memory = []
+        self.inference_rules = self._load_inference_rules()
         if domains_config:
             self.load_domains(domains_config)
+
+    def _load_inference_rules(self) -> Dict[str, List[Dict]]:
+        """Load domain-specific inference rules"""
+        return {
+            "technology": [
+                {"if": "is_programming_language", "then": "has_syntax"},
+                {"if": "is_hardware", "then": "has_specifications"}
+            ],
+            "science": [
+                {"if": "is_chemical", "then": "has_molecular_structure"},
+                {"if": "is_physics", "then": "follows_laws"}
+            ]
+        }
 
     def load_domains(self, config_path: str) -> bool:
         """Load domain configurations from file."""
@@ -100,3 +116,32 @@ class DomainExpert:
             
         related = domain.relationships.get(concept, [])
         return related[:limit]
+
+    def infer_knowledge(self, concept: str) -> List[Dict[str, Any]]:
+        """Infer new knowledge using domain rules"""
+        if not self.active_domain:
+            return []
+
+        inferred = []
+        domain_rules = self.inference_rules.get(self.active_domain, [])
+        
+        concept_info = self.knowledge_base.advanced_query(
+            "entity_search", [concept]
+        )
+        
+        if concept_info:
+            for rule in domain_rules:
+                if self._evaluate_condition(concept_info, rule["if"]):
+                    inferred.append({
+                        "concept": concept,
+                        "inferred_property": rule["then"],
+                        "confidence": 0.85,
+                        "source": "rule_inference"
+                    })
+
+        return inferred
+
+    def _evaluate_condition(self, concept_info: Dict, condition: str) -> bool:
+        """Evaluate if a condition applies to a concept"""
+        # Add condition evaluation logic
+        return True  # Placeholder

@@ -1,0 +1,18 @@
+{
+    "version": "1.0",
+    "commands": {
+        "system": {
+            "start": {"params": []},
+            "stop": {"params": []},
+            "status": {"params": []}
+        },
+        "conversation": {
+            "ask": {"params": ["question"]},
+            "respond": {"params": ["message"]}
+        },
+        "task": {
+            "create": {"params": ["title", "description"]},
+            "complete": {"params": ["task_id"]}
+        }
+    }
+}

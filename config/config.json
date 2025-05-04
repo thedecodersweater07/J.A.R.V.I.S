@@ -1,0 +1,22 @@
+{
+    "ui": {
+        "resolution": [1920, 1080],
+        "refresh_rate": 60,
+        "projection_distance": 2.0,
+        "brightness": 0.8
+    },
+    "ml": {
+        "model_path": "models/",
+        "batch_size": 32,
+        "learning_rate": 0.001
+    },
+    "nlp": {
+        "language": "en",
+        "models": ["sentiment", "ner", "pos"]
+    },
+    "llm": {
+        "model": "gpt-3.5-turbo",
+        "temperature": 0.7,
+        "max_tokens": 150
+    }
+}
