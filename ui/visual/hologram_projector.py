@@ -1,5 +1,7 @@
 from typing import Dict, Tuple, Optional, Any
 import logging
+from ui.themes.stark_theme import StarkTheme
+from ui.themes.minimal_theme import MinimalTheme
 
 class DisplayManager:
     def __init__(self, config: Dict[str, Any]):
@@ -65,3 +67,16 @@ class HologramProjector:
                 self.active_holograms[hologram_id]["model"].update(new_data)
             return True
         return False
+
+    def cleanup(self) -> None:
+        """Cleanup hologram projector resources"""
+        try:
+            self.logger.info("Cleaning up hologram projector...")
+            self.active = False
+            self.active_holograms.clear()
+            self.display_buffer.clear()
+            if hasattr(self, 'display_manager'):
+                self.display_manager = None
+            self.logger.info("Hologram projector cleanup completed")
+        except Exception as e:
+            self.logger.error(f"Error during hologram cleanup: {e}")
