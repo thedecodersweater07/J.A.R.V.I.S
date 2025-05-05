@@ -1,0 +1,13 @@
+{
+    "outlook": {
+        "sync_interval": 300,
+        "reminder_default": 15,
+        "stakeholder_emails": "bruce.hendrickx@outlook.com",
+        "calendar_folder": "JARVIS Tasks",
+        "notification_preferences": {
+            "on_create": true,
+            "on_update": true,
+            "on_complete": true
+        }
+    }
+}

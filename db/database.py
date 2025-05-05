@@ -3,6 +3,8 @@ import os
 import sqlite3
 from typing import Optional, Union, Any
 from pathlib import Path
+import json
+from functools import lru_cache
 
 try:
     from pymongo import MongoClient
@@ -19,7 +21,18 @@ class Database:
         self.sqlite_connections = {}
         self.db_root = Path(__file__).parent.parent / "data" / "db"
         self.db_root.mkdir(parents=True, exist_ok=True)
+        self._init_connection_pool()
         
+    def _init_connection_pool(self):
+        """Initialize connection pool for better performance"""
+        if MONGO_AVAILABLE:
+            from pymongo import MongoClient
+            self.mongo_client = MongoClient(
+                maxPoolSize=50,
+                connectTimeoutMS=2000,
+                retryWrites=True
+            )
+    
     @classmethod
     def get_instance(cls):
         if cls._instance is None:
@@ -80,3 +93,22 @@ class Database:
         )''')
         
         conn.commit()
+    
+    @lru_cache(maxsize=1000)
+    def get_cached_query(self, query: str) -> Any:
+        """Cache frequently used query results"""
+        return self.execute_query(query)
+    
+    def execute_query(self, query: str, params: tuple = None) -> Any:
+        """Execute database query with connection pooling"""
+        conn = self.get_client()
+        try:
+            cursor = conn.cursor()
+            if params:
+                result = cursor.execute(query, params)
+            else:
+                result = cursor.execute(query)
+            return result.fetchall()
+        except Exception as e:
+            print(f"Query error: {e}")
+            return None

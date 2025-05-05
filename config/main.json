@@ -1,0 +1,23 @@
+{
+  "system": {
+    "name": "JARVIS",
+    "version": "2.5.0",
+    "language": "nl-NL",
+    "log_level": "INFO",
+    "memory_limit": "16G",
+    "gpu_enabled": true
+  },
+  "paths": {
+    "data_dir": "data/",
+    "models_dir": "models/",
+    "cache_dir": "cache/",
+    "log_dir": "logs/"
+  },
+  "optimization": {
+    "mode": "balanced",
+    "memory_target": "8G",
+    "thread_limit": 8,
+    "model_precision": "float16",
+    "enable_caching": true
+  }
+}
