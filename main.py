@@ -4,8 +4,17 @@ import json
 import traceback  # Add this import
 from typing import Optional, Literal, Dict, Any
 import logging
-import glfw
-from OpenGL import GL as gl  # OpenGL import for rendering
+from ui.screen import Screen  # This will now handle missing OpenGL gracefully
+
+# Conditional OpenGL import
+try:
+    import glfw
+    from OpenGL import GL as gl  # OpenGL import for rendering
+    OPENGL_AVAILABLE = True
+except ImportError:
+    OPENGL_AVAILABLE = False
+    logging.warning("OpenGL not available, falling back to text mode")
+
 import signal
 from pathlib import Path
 
@@ -17,10 +26,13 @@ from ui.visual.hologram_projector import HologramProjector
 from ui.input.voice_input import VoiceInput
 from ui.input.text_input import TextInput
 from security.authentication.identity_verifier import IdentityVerifier
-from ml.model_manager import ModelManager  # Updated path
+from ml.model_manager import ModelManager
+from llm.core import LLMCore
+from llm.learning import LearningManager
+from llm.knowledge import KnowledgeManager
+from llm.inference import InferenceEngine
 from nlp.language_processor import LanguageProcessor  # Using the updated version
 from nlp.conversation.conversation_handler import ConversationHandler  # Updated path
-from ui.screen import Screen
 from config.config_validator import ConfigValidator
 
 
@@ -54,6 +66,7 @@ class JARVIS:
         )
         self.error_count = 0
         self.max_errors = 3
+        self.config["use_opengl"] = OPENGL_AVAILABLE and self.config.get("use_opengl", True)
 
     def _load_config(self) -> Dict[str, Any]:
         """Load and validate configuration"""
@@ -175,12 +188,32 @@ class JARVIS:
             self.cleanup()
 
 
-if __name__ == "__main__":
+def get_chat_history():
+    """Return chat history"""
+    return []  # Initially return empty list
+
+def get_system_status():
+    """Return system status"""
+    return "Ready"  # Basic status
+
+def main():
+    screen = Screen()
+    logger = logging.getLogger(__name__)
+    if not screen.init():
+        logger.error("Failed to initialize display")
+        return
+    
     try:
-        jarvis = JARVIS()
-        jarvis.run()
+        while True:
+            screen.render({
+                "chat_history": get_chat_history(),
+                "status": get_system_status()
+            })
     except KeyboardInterrupt:
-        print("\nShutting down gracefully...")
-    except Exception as e:
-        print(f"Fatal error: {e}")
-        traceback.print_exc()
+        logger.info("Shutting down...")
+    finally:
+        screen.cleanup()
+
+
+if __name__ == "__main__":
+    main()

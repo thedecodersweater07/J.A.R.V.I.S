@@ -9,6 +9,12 @@ from db.database import Database
 from .pipelines.structured_learning import StructuredLearningPipeline
 from .pipelines.adaptive_learning import AdaptiveLearningPipeline
 
+try:
+    import pymongo
+    MONGO_AVAILABLE = True
+except ImportError:
+    MONGO_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 class LearningManager:
