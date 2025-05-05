@@ -1,0 +1,11 @@
+environment: development
+debug: true
+data_path: "data/"
+model_path: "models/saved/"
+logging:
+  level: DEBUG
+  file: "logs/dev.log"
+database:
+  host: localhost
+  port: 5432
+  name: ml_dev_db

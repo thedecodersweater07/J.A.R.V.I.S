@@ -14,6 +14,7 @@ from ui.themes.stark_theme import StarkTheme
 from ui.themes.minimal_theme import MinimalTheme
 from ui.themes.dark_theme import DarkTheme
 from ui.themes.light_theme import LightTheme
+from ui.screens.login_screen import LoginScreen
 
 class Screen:
     def __init__(self, width: int = 800, height: int = 600, title: str = "JARVIS Interface"):
@@ -48,6 +49,10 @@ class Screen:
         self.vao = None
         self.vbo = None
         self.imgui_initialized = False
+        self.auth_service = None
+        self.login_screen = None
+        self.is_authenticated = False
+        self.current_user = None
         self._setup_signal_handlers()
 
     def _setup_signal_handlers(self):
@@ -296,6 +301,18 @@ class Screen:
         if key == glfw.KEY_ESCAPE and action == glfw.PRESS:
             glfw.set_window_should_close(window, True)
 
+    def set_auth_service(self, auth_service):
+        self.auth_service = auth_service
+        self.login_screen = LoginScreen(auth_service)
+        self.login_screen.success_callback = self._handle_login_success
+
+    def _handle_login_success(self, token):
+        user_data = self.auth_service.verify_token(token)
+        if user_data:
+            self.is_authenticated = True
+            self.current_user = user_data
+            self.loading = False
+
     def render(self):
         if not self.is_initialized or not self.window:
             return
@@ -306,6 +323,10 @@ class Screen:
 
             glfw.poll_events()
             gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+
+            if not self.is_authenticated:
+                self.login_screen.render()
+                return
 
             if self.imgui_initialized and self.impl:
                 self.impl.process_inputs()

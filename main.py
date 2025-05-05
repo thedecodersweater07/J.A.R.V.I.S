@@ -7,6 +7,7 @@ import logging
 import glfw
 from OpenGL import GL as gl  # OpenGL import for rendering
 import signal
+from pathlib import Path
 
 # Import core components
 from core.brain.cerebrum import Cerebrum
@@ -20,6 +21,7 @@ from ml.model_manager import ModelManager  # Updated path
 from nlp.language_processor import LanguageProcessor  # Using the updated version
 from nlp.conversation.conversation_handler import ConversationHandler  # Updated path
 from ui.screen import Screen
+from config.config_validator import ConfigValidator
 
 
 class JARVIS:
@@ -28,10 +30,11 @@ class JARVIS:
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
         
-        # Load configs
+        # Load and validate configs
+        self.config_validator = ConfigValidator()
         self.config = self._load_config()
         
-        # Initialize components
+        # Initialize components with validated configs
         self.brain = Cerebrum()
         self.command_parser = CommandParser(schema_path="config/command_schema.json")
         self.executor = CommandExecutor()
@@ -41,35 +44,61 @@ class JARVIS:
         self.input_mode: Literal["voice", "text"] = "text"  # Default to text mode
         self.security = IdentityVerifier()
         self.model_manager = ModelManager()  # Now works without parameters
-        self.nlp = LanguageProcessor(language=self.config.get("language", "nl"))
+        self.nlp = LanguageProcessor(language=self.config.get("nlp", {}).get("language", "nl"))
         self.llm = None  # Placeholder for LLM integration
         self.conversation = ConversationHandler(self.nlp)
         self.screen = Screen(
-            width=1024,
-            height=768,
+            width=self.config.get("ui", {}).get("width", 1024),
+            height=self.config.get("ui", {}).get("height", 768),
             title="JARVIS - Advanced AI Interface"
         )
         self.error_count = 0
         self.max_errors = 3
 
     def _load_config(self) -> Dict[str, Any]:
-        """Load configuration from JSON file"""
+        """Load and validate configuration"""
         try:
-            config_path = os.path.join("config", "config.json")
-            if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
-                    return json.load(f)
-            self.logger.warning("Config file not found, using defaults")
-            return {
-                "language": "nl",
-                "ui": {
-                    "width": 1024,
-                    "height": 768
-                }
-            }
+            config_path = Path("config") / "config.json"
+            if not config_path.exists():
+                self.logger.warning("Config file not found, using defaults")
+                return self._get_default_config()
+                
+            with open(config_path) as f:
+                config = json.load(f)
+                
+            # Validate different config sections
+            for section in ["nlp", "llm", "ui"]:
+                if section in config:
+                    if not self.config_validator.validate(config[section], section):
+                        self.logger.warning(f"Invalid {section} config, using defaults")
+                        config[section] = self._get_default_config()[section]
+                        
+            return config
         except Exception as e:
             self.logger.error(f"Error loading config: {e}")
-            return {}
+            return self._get_default_config()
+            
+    def _get_default_config(self) -> Dict[str, Any]:
+        return {
+            "nlp": {
+                "language": "nl",
+                "models": {
+                    "sentiment": "default",
+                    "intent": "default"
+                }
+            },
+            "llm": {
+                "model": "gpt2",
+                "inference": {
+                    "max_length": 100,
+                    "temperature": 0.7
+                }
+            },
+            "ui": {
+                "width": 1024,
+                "height": 768
+            }
+        }
 
     def handle_input(self, text: str):
         """Handle user input with better error handling"""

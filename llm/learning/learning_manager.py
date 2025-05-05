@@ -1,26 +1,29 @@
 import logging
 import asyncio
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 import aiohttp
 from datetime import datetime
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from db.database import Database
 from .pipelines.structured_learning import StructuredLearningPipeline
+from .pipelines.adaptive_learning import AdaptiveLearningPipeline
 
 logger = logging.getLogger(__name__)
 
 class LearningManager:
-    """Manages continuous learning from various sources"""
+    """Manages continuous learning from various sources with improved error handling"""
     
-    def __init__(self, db: Database, config: Dict[str, Any]):
-        self.db = db
+    def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.session: Optional[aiohttp.ClientSession] = None
-        self.learning_tasks = []
+        self.batch_size = config.get('batch_size', 32)
+        self.retry_attempts = config.get('retry_attempts', 3)
         self.model = None
         self.tokenizer = None
-        
+        self.db = Database()
+        self.structured_pipeline = StructuredLearningPipeline()
+        self.adaptive_pipeline = AdaptiveLearningPipeline()
+
     async def initialize(self):
         """Initialize the learning system"""
         self.model = await self._load_model()
@@ -132,24 +135,36 @@ class LearningManager:
             logger.error(f"Error scraping source {source}: {e}")
             
     async def _perform_self_improvement(self):
-        """Continuous self-improvement loop"""
+        """Enhanced continuous self-improvement loop with batch processing"""
         while True:
             try:
-                # Analyze model performance
-                metrics = await self._evaluate_performance()
-                
-                # Identify areas for improvement
-                improvement_areas = self._identify_improvement_areas(metrics)
-                
-                # Generate and apply improvements
-                for area in improvement_areas:
-                    await self._improve_area(area)
-                    
-                await asyncio.sleep(self.config.get('self_improvement_interval', 86400))
-                
+                batch = await self._get_learning_batch()
+                if batch:
+                    results = await self._process_batch(batch)
+                    await self._store_results(results)
+                await asyncio.sleep(self.config.get('learning_interval', 60))
             except Exception as e:
-                logger.error(f"Self-improvement error: {e}")
-                await asyncio.sleep(3600)
+                logger.error(f"Self-improvement error: {str(e)}")
+                await self._handle_error(e)
+
+    async def _get_learning_batch(self) -> List[Dict[str, Any]]:
+        """Fetch a batch of items for learning"""
+        return await self.db.get_learning_queue(limit=self.batch_size)
+
+    async def _process_batch(self, batch: List[Dict[str, Any]]) -> List[Tuple[bool, Any]]:
+        """Process a batch of learning items with retry logic"""
+        results = []
+        for item in batch:
+            for attempt in range(self.retry_attempts):
+                try:
+                    result = await self._process_single_item(item)
+                    results.append((True, result))
+                    break
+                except Exception as e:
+                    if attempt == self.retry_attempts - 1:
+                        results.append((False, str(e)))
+                    await asyncio.sleep(1 * (attempt + 1))
+        return results
 
     async def _load_model(self):
         """Load the learning model"""
