@@ -534,5 +534,6 @@ jarvis/
 │   ├── code_generation.py             # Codegeneratie
 │   └── problem_solving.py             # Probleemoplossing
 │
+|--
 └── main.py                            # Hoofdtoegang tot het systeem
 ```
