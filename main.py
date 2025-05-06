@@ -60,11 +60,15 @@ class JARVIS:
         self.nlp = LanguageProcessor(language=self.config.get("nlp", {}).get("language", "nl"))
         self.llm = None  # Placeholder for LLM integration
         self.conversation = ConversationHandler(self.nlp)
-        self.screen = Screen(
-            width=self.config.get("ui", {}).get("width", 1024),
-            height=self.config.get("ui", {}).get("height", 768),
-            title="JARVIS - Advanced AI Interface"
-        )
+        try:
+            self.screen = Screen(
+                width=self.config.get("ui", {}).get("width", 1024),
+                height=self.config.get("ui", {}).get("height", 768),
+                title="JARVIS - Advanced AI Interface"
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to initialize screen: {e}")
+            raise
         self.error_count = 0
         self.max_errors = 3
         self.config["use_opengl"] = OPENGL_AVAILABLE and self.config.get("use_opengl", True)
@@ -172,13 +176,17 @@ class JARVIS:
             
             self.logger.info("JARVIS running in %s mode", self.input_mode)
             
-            # Main event loop
+            # Main event loop with improved error handling
             while not (self.screen.should_close() or self.screen.interrupt_received):
                 try:
-                    self.screen.render()
+                    with self.screen.frame():
+                        self.screen.render({
+                            "chat_history": self.conversation.get_history(),
+                            "status": self.get_system_status()
+                        })
                 except Exception as e:
                     self.error_count += 1
-                    self.logger.error(f"Render error: {e}\n{traceback.format_exc()}")
+                    self.logger.error(f"Render error: {e}")
                     if self.error_count >= self.max_errors:
                         self.logger.critical("Too many errors, shutting down")
                         break
@@ -202,6 +210,11 @@ def main():
     logger = logging.getLogger(__name__)
     logger.info("Starting JARVIS...")
     
+    # Configure database
+    if os.environ.get('DATABASE_URL'):
+        from sqlalchemy import create_engine
+        engine = create_engine(os.environ['DATABASE_URL'])
+        
     screen = Screen()
     if not screen.init():
         logger.error("Failed to initialize display")
