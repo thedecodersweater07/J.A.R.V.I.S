@@ -5,6 +5,7 @@ import traceback  # Add this import
 from typing import Optional, Literal, Dict, Any
 import logging
 from ui.screen import Screen  # This will now handle missing OpenGL gracefully
+from core.logging import setup_logging
 
 # Conditional OpenGL import
 try:
@@ -197,8 +198,11 @@ def get_system_status():
     return "Ready"  # Basic status
 
 def main():
-    screen = Screen()
+    setup_logging()
     logger = logging.getLogger(__name__)
+    logger.info("Starting JARVIS...")
+    
+    screen = Screen()
     if not screen.init():
         logger.error("Failed to initialize display")
         return
@@ -211,7 +215,10 @@ def main():
             })
     except KeyboardInterrupt:
         logger.info("Shutting down...")
+    except Exception as e:
+        logger.error(f"Fatal error: {e}", exc_info=True)
     finally:
+        logger.info("Shutting down JARVIS...")
         screen.cleanup()
 
 

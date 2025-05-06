@@ -1,6 +1,8 @@
 import logging
 from typing import Dict, Any
 import glfw
+import imgui
+from imgui.integrations.glfw import GlfwRenderer
 from OpenGL import GL as gl
 from .renderer_base import RendererBase
 
@@ -13,6 +15,7 @@ class OpenGLRenderer(RendererBase):
         self.height = config.get("height", 600)
         self.title = config.get("title", "JARVIS")
         self.window = None
+        self.imgui_renderer = None
         
     def init(self) -> bool:
         """Initialize OpenGL and create window"""
@@ -36,11 +39,18 @@ class OpenGLRenderer(RendererBase):
                 return False
                 
             glfw.make_context_current(self.window)
+            self.imgui_renderer = GlfwRenderer(self.window)
             return True
             
         except Exception as e:
             logger.error(f"OpenGL initialization failed: {e}")
             return False
+            
+    def begin_frame(self):
+        """Start frame rendering"""
+        if self.window and self.imgui_renderer:
+            self.imgui_renderer.process_inputs()
+            imgui.new_frame()
             
     def render(self, frame_data: Dict[str, Any]) -> None:
         """Render a frame using OpenGL"""
@@ -51,11 +61,18 @@ class OpenGLRenderer(RendererBase):
         
         # Add rendering logic here using frame_data
         
-        glfw.swap_buffers(self.window)
-        glfw.poll_events()
-        
+    def end_frame(self):
+        """Finish frame rendering"""
+        if self.window and self.imgui_renderer:
+            imgui.render()
+            self.imgui_renderer.render(imgui.get_draw_data())
+            glfw.swap_buffers(self.window)
+            glfw.poll_events()
+            
     def cleanup(self) -> None:
         """Clean up OpenGL resources"""
+        if hasattr(self, 'imgui_renderer') and self.imgui_renderer:
+            self.imgui_renderer.shutdown()
         if self.window:
             glfw.destroy_window(self.window)
         glfw.terminate()

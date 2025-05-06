@@ -1,15 +1,17 @@
 import imgui
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict, Any
 import logging
 from datetime import datetime, timedelta
 import socket
-from ...security.auth.auth_service import AuthService
-from ...ui.themes.theme_manager import ThemeManager
+from security.auth.auth_service import AuthService
+from ui.themes.theme_manager import ThemeManager
+from .base_screen import BaseScreen
 
 logger = logging.getLogger(__name__)
 
-class LoginScreen:
+class LoginScreen(BaseScreen):
     def __init__(self, auth_service: AuthService):
+        super().__init__()
         self.auth_service = auth_service
         self.username = ""
         self.password = ""
@@ -20,15 +22,11 @@ class LoginScreen:
         self.theme = ThemeManager()
         self._setup_styling()
         
-    def _setup_styling(self):
-        """Initialize custom styling for login screen"""
-        self.colors = {
-            "normal": (0.2, 0.6, 1.0, 1.0),
-            "error": (1.0, 0.3, 0.3, 1.0),
-            "success": (0.3, 0.8, 0.3, 1.0)
-        }
+    def init(self) -> bool:
+        self.initialized = True
+        return True
 
-    def render(self):
+    def render(self, frame_data: Dict[str, Any]) -> None:
         imgui.set_next_window_size(400, 200)
         imgui.set_next_window_centered()
         
@@ -49,6 +47,17 @@ class LoginScreen:
             
         finally:
             imgui.end()
+
+    def handle_input(self, input_data: Dict[str, Any]) -> None:
+        pass  # Login handled through imgui interface
+
+    def _setup_styling(self):
+        """Initialize custom styling for login screen"""
+        self.colors = {
+            "normal": (0.2, 0.6, 1.0, 1.0),
+            "error": (1.0, 0.3, 0.3, 1.0),
+            "success": (0.3, 0.8, 0.3, 1.0)
+        }
 
     def _check_lockout(self) -> bool:
         if self.locked_until and datetime.now() < self.locked_until:
