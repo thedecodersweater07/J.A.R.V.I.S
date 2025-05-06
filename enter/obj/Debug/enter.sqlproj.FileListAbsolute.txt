@@ -1,0 +1,12 @@
+c:\nova_industrie\jarvis\enter\bin\Debug\enter.dacpac
+c:\nova_industrie\jarvis\enter\bin\Debug\enter.deps.json
+c:\nova_industrie\jarvis\enter\bin\Debug\enter.dll
+c:\nova_industrie\jarvis\enter\bin\Debug\enter.pdb
+c:\nova_industrie\jarvis\enter\obj\Debug\enter.GeneratedMSBuildEditorConfig.editorconfig
+c:\nova_industrie\jarvis\enter\obj\Debug\enter.sourcelink.json
+c:\nova_industrie\jarvis\enter\obj\Debug\Model.xml
+c:\nova_industrie\jarvis\enter\obj\Debug\refactor.xml
+c:\nova_industrie\jarvis\enter\obj\Debug\postdeploy.sql
+c:\nova_industrie\jarvis\enter\obj\Debug\predeploy.sql
+c:\nova_industrie\jarvis\enter\obj\Debug\enter.dll
+c:\nova_industrie\jarvis\enter\obj\Debug\enter.pdb
