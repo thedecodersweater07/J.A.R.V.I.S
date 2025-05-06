@@ -21,10 +21,13 @@ class LoginScreen(BaseScreen):
         self.locked_until: Optional[datetime] = None
         self.theme = ThemeManager()
         self._setup_styling()
-        
+
     def init(self) -> bool:
         self.initialized = True
         return True
+    
+    def handle_input(self, input_data: Dict[str, Any]) -> None:
+        pass  # Login handled through imgui interface
 
     def render(self, frame_data: Dict[str, Any]) -> None:
         imgui.set_next_window_size(400, 200)
@@ -47,9 +50,6 @@ class LoginScreen(BaseScreen):
             
         finally:
             imgui.end()
-
-    def handle_input(self, input_data: Dict[str, Any]) -> None:
-        pass  # Login handled through imgui interface
 
     def _setup_styling(self):
         """Initialize custom styling for login screen"""

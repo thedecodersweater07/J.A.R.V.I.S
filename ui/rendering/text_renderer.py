@@ -40,3 +40,11 @@ class TextRenderer(RendererBase):
     def cleanup(self) -> None:
         """Clean up text display"""
         print("\033[2J\033[H")  # Clear screen
+        
+    def begin_frame(self):
+        """Start frame rendering"""
+        print("\033[H")  # Move cursor to home
+        
+    def end_frame(self):
+        """Finish frame rendering"""
+        print()  # Add newline after frame
