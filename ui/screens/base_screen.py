@@ -2,16 +2,18 @@ import tkinter as tk
 from tkinter import ttk
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
 class BaseScreen(ABC):
-    def __init__(self, container):
+    def __init__(self, container: Optional[Any] = None):
         self.container = container
-        self.frame = ttk.Frame(container)
+        self.frame = ttk.Frame(container) if container else None
         self.is_visible = False
         self.initialized = False
+        self.width = 800
+        self.height = 600
         self._setup_ui()
         
     def _setup_ui(self):

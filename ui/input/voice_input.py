@@ -2,29 +2,31 @@ import numpy as np
 import logging
 from typing import Optional, Callable
 
+logger = logging.getLogger(__name__)
+
 class VoiceInput:
+    """Handles voice input processing"""
+    
     def __init__(self):
-        self.listening = False
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.initialized = False
 
-    def initialize(self):
-        """Initialize the voice input system"""
+    def initialize(self) -> bool:
+        """Initialize voice input systems"""
         try:
-            # Add any required initialization code here
+            # Voice init implementation
             self.initialized = True
             return True
         except Exception as e:
-            logging.error(f"Error initializing voice input: {e}")
+            self.logger.error(f"Voice init error: {e}")
             return False
-        
-    def start(self):
-        self.listening = True
-        
-    def listen(self) -> Optional[str]:
-        if not self.listening:
-            self.start()
-        # Placeholder for actual voice input implementation
-        return input("Voice Input > ")
+
+    def get_input(self) -> Optional[str]:
+        """Get voice input if available"""
+        if not self.initialized:
+            return None
+        # Voice input implementation
+        return None
 
 class VoiceInputHandler:
     def __init__(self, sample_rate: int = 44100):

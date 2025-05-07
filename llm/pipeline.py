@@ -4,9 +4,11 @@ from pathlib import Path
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import numpy as np
+import pandas as pd
 from .config import ConfigManager
 from .templates import PromptTemplate
 from .processor import ResponseProcessor
+from data.manager import DataManager
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +22,7 @@ class LLMPipeline:
         self.config = ConfigManager()
         self.templates = PromptTemplate()
         self.processor = ResponseProcessor()
+        self.data_manager = DataManager()
         self._initialize_pipeline()
         
     def _initialize_pipeline(self):
@@ -48,6 +51,22 @@ class LLMPipeline:
         
         # Process response
         response = await self._get_llm_response(prompt, config)
+        
+        # Store interaction data
+        interaction_data = {
+            'input': user_input,
+            'context': context,
+            'response': response,
+            'template': template,
+            'timestamp': pd.Timestamp.now().isoformat()
+        }
+        
+        # Save to CSV for analysis
+        self.data_manager.save_csv(
+            [interaction_data], 
+            f"llm_interactions_{pd.Timestamp.now().strftime('%Y%m')}"
+        )
+        
         return self.processor.process_response(response)
     
     async def _get_llm_response(self, prompt: str, config):
@@ -70,3 +89,10 @@ class LLMPipeline:
             self.active_model = name
             return True
         return False
+    
+    def save_training_data(self, data: List[Dict]):
+        """Save new training data"""
+        self.data_manager.save_json(
+            {'training_examples': data},
+            f"training_data_{pd.Timestamp.now().strftime('%Y%m%d')}"
+        )

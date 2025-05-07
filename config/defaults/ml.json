@@ -1,0 +1,12 @@
+{
+    "model_path": "models/",
+    "training": {
+        "batch_size": 32,
+        "learning_rate": 0.001,
+        "epochs": 10
+    },
+    "evaluation": {
+        "test_size": 0.2,
+        "metrics": ["accuracy", "f1"]
+    }
+}

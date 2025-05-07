@@ -1,4 +1,0 @@
-tijdstip,gebruiker_vraag,jarvis_antwoord,context,sentiment,vervolgactie
-"2024-01-01 10:00:00","Dag Jarvis, hoe werkt een neurale netwerk?","Een neuraal netwerk werkt zoals de menselijke hersenen, met verschillende lagen van neuronen die informatie verwerken.","technisch_gesprek",positief,"extra_uitleg_gegeven"
-"2024-01-01 10:05:00","Kunt ge dat wat simpeler uitleggen?","Natuurlijk! Denk aan een netwerk van verbonden punten die samen patronen leren herkennen, net zoals uw hersenen dat doen.","vereenvoudiging",positief,"begrip_bevestigd"
-"2024-01-01 10:10:00","Ah zo, nu snap ik het!","Blij dat ik kon helpen! Hebt ge nog vragen over dit onderwerp?","bevestiging",zeer_positief,"gesprek_afgerond"

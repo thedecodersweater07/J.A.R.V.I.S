@@ -1,0 +1,24 @@
+{
+    "version": "2.5.0",
+    "project_name": "JARVIS",
+    "data_paths": {
+        "training": "data/processed/training",
+        "language": "data/language",
+        "models": "models/checkpoints"
+    },
+    "ml": {
+        "batch_size": 32,
+        "learning_rate": 0.0001,
+        "epochs": 100
+    },
+    "ui": {
+        "width": 1024,
+        "height": 768,
+        "theme": "dark",
+        "renderer": "opengl"
+    },
+    "logging": {
+        "level": "INFO",
+        "file": "logs/jarvis.log"
+    }
+}

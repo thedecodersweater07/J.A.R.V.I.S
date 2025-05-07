@@ -30,15 +30,15 @@ class TextInputHandler:
             return None
 
 class TextInput:
+    """Handles text input processing"""
+    
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
-        
-    def listen(self) -> str:
-        """Get input from text"""
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    def get_input(self) -> Optional[str]:
+        """Get text input from user"""
         try:
-            text = input("JARVIS > ")
-            return text.strip()
-        except EOFError:
-            return ""
-        except KeyboardInterrupt:
-            return ""
+            return input("> ")
+        except Exception as e:
+            self.logger.error(f"Input error: {e}")
+            return None

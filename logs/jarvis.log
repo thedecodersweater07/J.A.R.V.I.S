@@ -1,0 +1,208 @@
+2025-05-07T17:29:11.452080 | [95mCRITICAL[0m | [__main__:39] | Failed to initialize JARVIS: expected string or bytes-like object, got 'function'
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 27, in __init__
+    setup_logging(level="DEBUG" if "--debug" in sys.argv else "INFO")
+  File "c:\nova_industrie\jarvis\core\logging\logger.py", line 69, in setup_logging
+    logging.Formatter(lambda x: json.dumps({
+  File "C:\Python312\Lib\logging\__init__.py", line 614, in __init__
+    self._style.validate()
+  File "C:\Python312\Lib\logging\__init__.py", line 452, in validate
+    if not self.validation_pattern.search(self._fmt):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: expected string or bytes-like object, got 'function'
+2025-05-07T17:30:11.236326 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\database.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:30:11.237329 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\llm.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:30:11.237846 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ml.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:30:11.237846 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ui.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:30:11.241818 | [92mINFO[0m | [__main__:46] | Configuration system initialized
+2025-05-07T17:30:11.241818 | [91mERROR[0m | [__main__:59] | Core components initialization failed
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 55, in _init_core_components
+    self.llm = LLMCore(config=self.config_manager.get('llm'))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: LLMCore.__init__() got an unexpected keyword argument 'config'
+2025-05-07T17:30:11.243018 | [95mCRITICAL[0m | [__main__:39] | Failed to initialize JARVIS: LLMCore.__init__() got an unexpected keyword argument 'config'
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 31, in __init__
+    self._init_core_components()
+  File "c:\nova_industrie\jarvis\main.py", line 55, in _init_core_components
+    self.llm = LLMCore(config=self.config_manager.get('llm'))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: LLMCore.__init__() got an unexpected keyword argument 'config'
+2025-05-07T17:32:14.834260 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\database.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:32:14.834767 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\llm.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:32:14.835273 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ml.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:32:14.835273 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ui.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:32:14.838975 | [92mINFO[0m | [__main__:46] | Configuration system initialized
+2025-05-07T17:32:14.838975 | [91mERROR[0m | [__main__:59] | Core components initialization failed
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 55, in _init_core_components
+    self.llm = LLMCore(config=self.config_manager.get('llm'))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: LLMCore.__init__() got an unexpected keyword argument 'config'
+2025-05-07T17:32:14.839479 | [95mCRITICAL[0m | [__main__:39] | Failed to initialize JARVIS: LLMCore.__init__() got an unexpected keyword argument 'config'
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 31, in __init__
+    self._init_core_components()
+  File "c:\nova_industrie\jarvis\main.py", line 55, in _init_core_components
+    self.llm = LLMCore(config=self.config_manager.get('llm'))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: LLMCore.__init__() got an unexpected keyword argument 'config'
+2025-05-07T17:35:11.602200 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\database.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:35:11.603742 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\llm.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:35:11.603742 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ml.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:35:11.604428 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ui.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:35:11.608017 | [92mINFO[0m | [__main__:46] | Configuration system initialized
+2025-05-07T17:35:11.608017 | [91mERROR[0m | [__main__:59] | Core components initialization failed
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 55, in _init_core_components
+    self.llm = LLMCore(config=self.config_manager.get('llm'))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: LLMCore.__init__() got an unexpected keyword argument 'config'
+2025-05-07T17:35:11.608524 | [95mCRITICAL[0m | [__main__:39] | Failed to initialize JARVIS: LLMCore.__init__() got an unexpected keyword argument 'config'
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 31, in __init__
+    self._init_core_components()
+  File "c:\nova_industrie\jarvis\main.py", line 55, in _init_core_components
+    self.llm = LLMCore(config=self.config_manager.get('llm'))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: LLMCore.__init__() got an unexpected keyword argument 'config'
+2025-05-07T17:36:21.253120 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\database.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:36:21.253640 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\llm.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:36:21.254144 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ml.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:36:21.254651 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ui.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:36:21.258804 | [92mINFO[0m | [__main__:46] | Configuration system initialized
+2025-05-07T17:36:21.259304 | [91mERROR[0m | [__main__:59] | Core components initialization failed
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 55, in _init_core_components
+    self.llm = LLMCore(config=self.config_manager.get('llm'))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: LLMCore.__init__() got an unexpected keyword argument 'config'
+2025-05-07T17:36:21.259804 | [95mCRITICAL[0m | [__main__:39] | Failed to initialize JARVIS: LLMCore.__init__() got an unexpected keyword argument 'config'
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 31, in __init__
+    self._init_core_components()
+  File "c:\nova_industrie\jarvis\main.py", line 55, in _init_core_components
+    self.llm = LLMCore(config=self.config_manager.get('llm'))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: LLMCore.__init__() got an unexpected keyword argument 'config'
+2025-05-07T17:37:29.884019 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\database.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:37:29.884937 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\llm.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:37:29.885436 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ml.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:37:29.885436 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ui.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:37:29.889497 | [92mINFO[0m | [__main__:46] | Configuration system initialized
+2025-05-07T17:37:29.889497 | [91mERROR[0m | [__main__:59] | Core components initialization failed
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 55, in _init_core_components
+    self.llm = LLMCore(config=self.config_manager.get('llm'))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: LLMCore.__init__() got an unexpected keyword argument 'config'
+2025-05-07T17:37:29.890006 | [95mCRITICAL[0m | [__main__:39] | Failed to initialize JARVIS: LLMCore.__init__() got an unexpected keyword argument 'config'
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 31, in __init__
+    self._init_core_components()
+  File "c:\nova_industrie\jarvis\main.py", line 55, in _init_core_components
+    self.llm = LLMCore(config=self.config_manager.get('llm'))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: LLMCore.__init__() got an unexpected keyword argument 'config'
+2025-05-07T17:44:56.188278 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\database.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:44:56.189281 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\llm.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:44:56.189793 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ml.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:44:56.190296 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ui.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:44:56.195188 | [92mINFO[0m | [__main__:48] | Configuration system initialized
+2025-05-07T17:44:56.195188 | [93mWARNING[0m | [__main__:61] | No LLM config found, using defaults
+2025-05-07T17:44:56.195948 | [91mERROR[0m | [llm.core.llm_core:36] | Failed to initialize LLMCore: DatabaseManager.__init__() takes 1 positional argument but 2 were given
+2025-05-07T17:44:56.196448 | [91mERROR[0m | [__main__:75] | Core components initialization failed
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 70, in _init_core_components
+    self.llm = LLMCore(config=llm_config)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 29, in __init__
+    self.db = DatabaseManager(db_config)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: DatabaseManager.__init__() takes 1 positional argument but 2 were given
+2025-05-07T17:44:56.197988 | [95mCRITICAL[0m | [__main__:41] | Failed to initialize JARVIS: DatabaseManager.__init__() takes 1 positional argument but 2 were given
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 33, in __init__
+    self._init_core_components()
+  File "c:\nova_industrie\jarvis\main.py", line 70, in _init_core_components
+    self.llm = LLMCore(config=llm_config)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 29, in __init__
+    self.db = DatabaseManager(db_config)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: DatabaseManager.__init__() takes 1 positional argument but 2 were given
+2025-05-07T17:46:14.587053 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\llm.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:46:14.587554 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ml.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:46:14.588200 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ui.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:46:14.591264 | [92mINFO[0m | [__main__:48] | Configuration system initialized
+2025-05-07T17:46:14.591264 | [93mWARNING[0m | [__main__:61] | No LLM config found, using defaults
+2025-05-07T17:46:15.493731 | [91mERROR[0m | [llm.core.llm_core:76] | Model initialization failed: 'dict' object has no attribute 'attention_slicing'
+2025-05-07T17:46:15.494231 | [91mERROR[0m | [llm.core.llm_core:36] | Failed to initialize LLMCore: 'dict' object has no attribute 'attention_slicing'
+2025-05-07T17:46:15.494732 | [91mERROR[0m | [__main__:75] | Core components initialization failed
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 70, in _init_core_components
+    self.llm = LLMCore(config=llm_config)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 33, in __init__
+    self._initialize_model()
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 70, in _initialize_model
+    self.model = self.optimizer.optimize_inference(self.model)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\llm\optimization\llm_optimizer.py", line 26, in optimize_inference
+    if self.config.attention_slicing:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'dict' object has no attribute 'attention_slicing'
+2025-05-07T17:46:15.496732 | [95mCRITICAL[0m | [__main__:41] | Failed to initialize JARVIS: 'dict' object has no attribute 'attention_slicing'
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 33, in __init__
+    self._init_core_components()
+  File "c:\nova_industrie\jarvis\main.py", line 70, in _init_core_components
+    self.llm = LLMCore(config=llm_config)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 33, in __init__
+    self._initialize_model()
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 70, in _initialize_model
+    self.model = self.optimizer.optimize_inference(self.model)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\llm\optimization\llm_optimizer.py", line 26, in optimize_inference
+    if self.config.attention_slicing:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'dict' object has no attribute 'attention_slicing'
+2025-05-07T17:48:10.572214 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\llm.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:48:10.573550 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ml.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:48:10.573550 | [91mERROR[0m | [config.manager:44] | Failed to load config c:\nova_industrie\jarvis\config\defaults\ui.json: Expecting value: line 1 column 1 (char 0)
+2025-05-07T17:48:10.578223 | [92mINFO[0m | [__main__:48] | Configuration system initialized
+2025-05-07T17:48:10.578748 | [93mWARNING[0m | [__main__:61] | No LLM config found, using defaults
+2025-05-07T17:48:11.474745 | [91mERROR[0m | [llm.core.llm_core:76] | Model initialization failed: 'dict' object has no attribute 'attention_slicing'
+2025-05-07T17:48:11.474745 | [91mERROR[0m | [llm.core.llm_core:36] | Failed to initialize LLMCore: 'dict' object has no attribute 'attention_slicing'
+2025-05-07T17:48:11.475277 | [91mERROR[0m | [__main__:75] | Core components initialization failed
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 70, in _init_core_components
+    self.llm = LLMCore(config=llm_config)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 33, in __init__
+    self._initialize_model()
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 70, in _initialize_model
+    self.model = self.optimizer.optimize_inference(self.model)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\llm\optimization\llm_optimizer.py", line 26, in optimize_inference
+    if self.config.attention_slicing:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'dict' object has no attribute 'attention_slicing'
+2025-05-07T17:48:11.476276 | [95mCRITICAL[0m | [__main__:41] | Failed to initialize JARVIS: 'dict' object has no attribute 'attention_slicing'
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 33, in __init__
+    self._init_core_components()
+  File "c:\nova_industrie\jarvis\main.py", line 70, in _init_core_components
+    self.llm = LLMCore(config=llm_config)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 33, in __init__
+    self._initialize_model()
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 70, in _initialize_model
+    self.model = self.optimizer.optimize_inference(self.model)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\llm\optimization\llm_optimizer.py", line 26, in optimize_inference
+    if self.config.attention_slicing:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'dict' object has no attribute 'attention_slicing'

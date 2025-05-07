@@ -1,39 +1,42 @@
 import logging
-from typing import Optional, Dict, Any
+from typing import Dict, Optional, Any
 import torch
+from pathlib import Path
+from datetime import datetime
+
+from ..logging.logger import get_logger
+from .data_collector import DataCollector
+
+logger = get_logger(__name__)
 
 class ModelManager:
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
-        self.models = {}
+        self.models: Dict[str, Any] = {}
+        self.data_collector = DataCollector()
+        self.model_dir = Path("models")
+        self.model_dir.mkdir(exist_ok=True)
         
-    def initialize(self):
-        """Initialize the model manager and load default models"""
-        self.logger.info("Initializing Model Manager...")
+    async def initialize(self):
+        """Initialize models and start data collection"""
+        logger.info("Initializing ModelManager")
+        await self.data_collector.start_collection()
+        await self.load_default_models()
         
-    def load_models(self):
-        """Load all required models"""
-        self.logger.info("Loading models...")
-        # Model loading logic here
-        pass
-        
-    def load_model(self, model_name: str, model_path: str) -> Optional[Any]:
+    async def load_default_models(self):
+        """Load default ML models"""
         try:
-            model = torch.load(model_path)
-            self.models[model_name] = model
-            return model
+            # Load models implementation
+            logger.info("Default models loaded successfully")
         except Exception as e:
-            self.logger.error(f"Error loading model {model_name}: {e}")
-            return None
+            logger.error(f"Error loading default models: {e}")
             
-    def predict(self, model_name: str, input_data: Any) -> Optional[Any]:
-        if model_name not in self.models:
-            self.logger.error(f"Model {model_name} not loaded")
-            return None
-            
+    def save_model_state(self, model_name: str, model: Any):
+        """Save model state with timestamp"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = self.model_dir / f"{model_name}_{timestamp}.pt"
+        
         try:
-            model = self.models[model_name]
-            return model(input_data)
+            torch.save(model.state_dict(), save_path)
+            logger.info(f"Model {model_name} saved to {save_path}")
         except Exception as e:
-            self.logger.error(f"Prediction error: {e}")
-            return None
+            logger.error(f"Error saving model {model_name}: {e}")

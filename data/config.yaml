@@ -1,62 +1,87 @@
-data_paths:
-  raw: ./raw
-  processed: ./processed
-  interim: ./interim
-  external: ./external
+command_schema:
+  commands:
+    conversation:
+      ask:
+        params:
+        - question
+      respond:
+        params:
+        - message
+    system:
+      start:
+        params: []
+      status:
+        params: []
+      stop:
+        params: []
+    task:
+      complete:
+        params:
+        - task_id
+      create:
+        params:
+        - title
+        - description
+  version: '1.0'
+config:
   llm:
-    training: ./raw/llm_training.csv
-    feedback: ./raw/llm_feedback.csv
-    models: ./processed/llm_models
-
-file_formats:
-  csv_encoding: utf-8
-  date_format: "%Y-%m-%d"
-  timestamp_format: "%Y-%m-%d %H:%M:%S"
-  llm_data:
-    input_max_length: 512
-    batch_size: 32
-    validation_split: 0.2
-
-validation:
-  enable_type_checking: true
-  enable_range_validation: true
-  backup_before_processing: true
-
-processing:
-  batch_size: 1000
-  max_workers: 4
-  compression: gzip
-
-llm:
-  model:
-    name: "gpt2-medium"
-    max_length: 1024
-    batch_size: 16
+    max_tokens: 150
+    model: gpt-3.5-turbo
     temperature: 0.7
-    optimization:
-      fp16: true
-      attention_slicing: true
-      gradient_checkpointing: true
-
-  memory:
-    max_context_length: 2048
-    context_window: 10
-    cache_size: 1000
-    priority_threshold: 0.8
-
-  training:
-    learning_rate: 1e-5
-    epochs: 3
-    validation_split: 0.2
-    early_stopping_patience: 2
-
+  ml:
+    batch_size: 32
+    learning_rate: 0.001
+    model_path: models/
+  nlp:
+    language: en
+    models:
+    - sentiment
+    - ner
+    - pos
+  ui:
+    brightness: 0.8
+    projection_distance: 2.0
+    refresh_rate: 60
+    resolution:
+    - 1920
+    - 1080
+core:
+  brain:
+    concurrent_processes: 4
+    default_model: jarvis-base
+    memory:
+      long_term_limit: 32G
+      short_term_limit: 2G
+    response_time_limit: 500
+  command:
+    check_interval: 0.1
+    default_priority: 5
+    max_queue_size: 1000
 database:
-  connections:
-    sqlite:
-      path: "./data/db/main.db"
-      pool_size: 5
-      timeout: 30
-    mongo:
-      uri: "mongodb://localhost:27017"
-      db_name: "jarvis_llm"
-      collection: "conversations"
+  connection_timeout: 30
+  echo: false
+  max_overflow: 10
+  path: data/jarvis.db
+  pool_size: 5
+  type: sqlite
+llm: {}
+ml: {}
+optimization:
+  enable_caching: true
+  memory_target: 8G
+  mode: balanced
+  model_precision: float16
+  thread_limit: 8
+paths:
+  cache_dir: cache/
+  data_dir: data/
+  log_dir: logs/
+  models_dir: models/
+system:
+  gpu_enabled: true
+  language: nl-NL
+  log_level: INFO
+  memory_limit: 16G
+  name: JARVIS
+  version: 2.5.0
+ui: {}

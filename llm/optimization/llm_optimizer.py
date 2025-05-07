@@ -1,7 +1,10 @@
 import torch
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from dataclasses import dataclass
 from transformers import PreTrainedModel
+import logging
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class LLMOptimizationConfig:
@@ -12,22 +15,47 @@ class LLMOptimizationConfig:
     max_length: int = 512
     quantization: bool = False
     gradient_checkpointing: bool = False
+    
+    @classmethod
+    def from_dict(cls, config: Optional[Dict[str, Any]] = None) -> 'LLMOptimizationConfig':
+        if config is None:
+            return cls()
+        return cls(**{
+            k: v for k, v in config.items() 
+            if hasattr(cls, k)
+        })
 
 class LLMOptimizer:
     """Optimizes LLM inference and processing"""
     
-    def __init__(self, config: LLMOptimizationConfig):
-        self.config = config
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        """Initialize optimizer with configuration"""
+        self.config = LLMOptimizationConfig.from_dict(config)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        logger.info(f"Initializing LLMOptimizer with device: {self.device}")
         
-    def optimize_inference(self, model: Any) -> Any:
+    def optimize_inference(self, model: PreTrainedModel) -> PreTrainedModel:
         """Optimize model for inference"""
-        model = model.eval()
-        if self.config.attention_slicing:
-            model = self._enable_attention_slicing(model)
-        if self.config.kv_caching:
-            model = self._enable_kv_caching(model)
-        return model.to(self.device)
+        try:
+            logger.debug("Starting model optimization")
+            model = model.eval()
+            
+            if self.config.attention_slicing:
+                model = self._enable_attention_slicing(model)
+                
+            if self.config.kv_caching:
+                model = self._enable_kv_caching(model)
+                
+            if self.config.quantization:
+                model = self._apply_quantization(model)
+                
+            model = model.to(self.device)
+            logger.info("Model optimization completed successfully")
+            return model
+            
+        except Exception as e:
+            logger.error(f"Model optimization failed: {str(e)}")
+            raise
 
     def _enable_attention_slicing(self, model: Any) -> Any:
         """Enable attention slicing for memory efficiency"""

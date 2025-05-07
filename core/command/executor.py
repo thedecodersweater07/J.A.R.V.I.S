@@ -19,52 +19,24 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 class CommandExecutor:
-    """Uitvoerder van commando's binnen het commandocentrum"""
+    """Executes parsed commands"""
     
-    def __init__(self, config_file: str = "executor_config.json"):
-        """
-        Initialisatie van de uitvoerder
-        
-        Args:
-            config_file: Pad naar configuratiebestand
-        """
-        self.running_processes: Dict[str, Dict[str, Any]] = {}
-        self.max_concurrent_processes = 10
-        self.default_timeout = 60  # seconden
-        logger.info("CommandExecutor geïnitialiseerd")
-    
-    def execute(self, command_type: str, args: List[str]) -> Tuple[bool, str]:
-        """
-        Voer een gevalideerd commando uit
-        
-        Args:
-            command_type: Type van het commando
-            args: Argumenten voor het commando
-            
-        Returns:
-            Tuple met succes-indicator en resultaatbericht
-        """
-        logger.info(f"Uitvoeren commando: {command_type} met args: {args}")
-        
-        # Verwijs naar de juiste methode op basis van command_type
-        command_methods = {
-            "start": self._start_process,
-            "stop": self._stop_process,
-            "status": self._get_status,
-            "help": self._show_help
-        }
-        
-        # Controleer of we het commando kunnen uitvoeren
-        if command_type not in command_methods:
-            return False, f"Commando {command_type} wordt niet ondersteund"
-        
-        # Voer het commando uit met de opgegeven argumenten
+    def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.commands = {}
+
+    def execute(self, command: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a parsed command"""
         try:
-            return command_methods[command_type](*args)
+            cmd = command.get("command", "noop")
+            handler = self.commands.get(cmd)
+            if handler:
+                return handler(command)
+            return {"status": "error", "message": f"Unknown command: {cmd}"}
         except Exception as e:
-            logger.error(f"Fout bij uitvoeren van {command_type}: {e}")
-            return False, f"Fout bij uitvoeren: {str(e)}"
-    
+            self.logger.error(f"Command execution error: {e}")
+            return {"status": "error", "message": str(e)}
+
     def _start_process(self, process_name: str) -> Tuple[bool, str]:
         """
         Start een nieuw proces
