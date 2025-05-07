@@ -5,49 +5,26 @@ Core AI verwerking voor patroonherkenning en gegevensanalyse
 
 import numpy as np
 import logging
-from typing import Dict, List, Any, Union, Tuple
+from typing import Dict, List, Any
 
 logger = logging.getLogger(__name__)
 
 class NeuralLayer:
-    """Een enkele laag in het neurale netwerk"""
-    
     def __init__(self, input_size: int, output_size: int, activation: str = "relu"):
-        """
-        Initialiseer een neurale netwerklaag
-        
-        Args:
-            input_size: Aantal ingangsneuronen
-            output_size: Aantal uitgangsneuronen
-            activation: Activatiefunctie ("relu", "sigmoid", "tanh")
-        """
-        # Xavier/Glorot initialisatie voor gewichten
-        self.weights = np.random.randn(input_size, output_size) * np.sqrt(2 / (input_size + output_size))
-        self.biases = np.zeros(output_size)
-        self.activation_type = activation
-        self.last_input = None
-        self.last_output = None
+        self.weights = np.random.randn(input_size, output_size) * 0.01
+        self.bias = np.zeros((1, output_size))
+        self.activation = activation
         
     def forward(self, inputs: np.ndarray) -> np.ndarray:
-        """Voorwaartse passage door de laag"""
-        self.last_input = inputs
-        result = np.dot(inputs, self.weights) + self.biases
-        
-        # Activatiefunctie toepassen
-        if self.activation_type == "relu":
-            output = np.maximum(0, result)
-        elif self.activation_type == "sigmoid":
-            output = 1 / (1 + np.exp(-result))
-        elif self.activation_type == "tanh":
-            output = np.tanh(result)
-        else:
-            output = result  # Lineair/geen activatie
-            
-        self.last_output = output
-        return output
+        self.output = np.dot(inputs, self.weights) + self.bias
+        if self.activation == "relu":
+            return np.maximum(0, self.output)
+        elif self.activation == "sigmoid":
+            return 1 / (1 + np.exp(-self.output))
+        return self.output
 
 class NeuralNetwork:
-    """Neuraal netwerk voor patroonherkenning en gegevensverwerking"""
+    """Neural network for pattern recognition and data processing"""
     
     def __init__(self, hidden_layers: int = 3, neurons_per_layer: int = 128,
                  input_size: int = 64, output_size: int = 32):
@@ -66,29 +43,34 @@ class NeuralNetwork:
         self.neurons_per_layer = neurons_per_layer
         self.layers = []
         self.initialized = False
-        self.learning_rate = 0.001
         
-    def initialize(self) -> None:
+    def initialize(self) -> bool:
         """Bouw de netwerkstructuur op"""
-        if self.initialized:
-            return
+        try:
+            if self.initialized:
+                return True
+                
+            logger.info(f"Initializing neural network with {self.hidden_layers} hidden layers")
             
-        logger.info(f"Initialiseren neuraal netwerk met {self.hidden_layers} verborgen lagen")
-        
-        # Invoerlaag naar eerste verborgen laag
-        self.layers.append(NeuralLayer(self.input_size, self.neurons_per_layer))
-        
-        # Verborgen lagen
-        for i in range(self.hidden_layers - 1):
-            self.layers.append(NeuralLayer(self.neurons_per_layer, self.neurons_per_layer))
+            # Invoerlaag naar eerste verborgen laag
+            self.layers.append(NeuralLayer(self.input_size, self.neurons_per_layer))
             
-        # Laatste verborgen laag naar uitvoerlaag
-        self.layers.append(NeuralLayer(self.neurons_per_layer, self.output_size, "sigmoid"))
-        
-        self.initialized = True
-        logger.info("Neuraal netwerk succesvol geïnitialiseerd")
-        
-    def process(self, input_data: Any) -> np.ndarray:
+            # Verborgen lagen
+            for i in range(self.hidden_layers - 1):
+                self.layers.append(NeuralLayer(self.neurons_per_layer, self.neurons_per_layer))
+                
+            # Laatste verborgen laag naar uitvoerlaag
+            self.layers.append(NeuralLayer(self.neurons_per_layer, self.output_size, "sigmoid"))
+            
+            self.initialized = True
+            logger.info("Neuraal netwerk succesvol geïnitialiseerd")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize neural network: {e}")
+            return False
+            
+    def process(self, input_data: Any) -> Any:
         """
         Verwerk invoergegevens door het netwerk
         
@@ -99,17 +81,21 @@ class NeuralNetwork:
             Verwerkte gegevens als numpy array
         """
         if not self.initialized:
-            self.initialize()
+            if not self.initialize():
+                return None
+        try:
+            # Converteer invoer naar vector als dat nog niet is gebeurd
+            input_vector = self._prepare_input(input_data)
             
-        # Converteer invoer naar vector als dat nog niet is gebeurd
-        input_vector = self._prepare_input(input_data)
-        
-        # Voorwaartse propagatie door alle lagen
-        current_output = input_vector
-        for layer in self.layers:
-            current_output = layer.forward(current_output)
-            
-        return current_output
+            # Voorwaartse propagatie door alle lagen
+            current_output = input_vector
+            for layer in self.layers:
+                current_output = layer.forward(current_output)
+                
+            return current_output
+        except Exception as e:
+            logger.error(f"Processing error: {e}")
+            return None
     
     def _prepare_input(self, input_data: Any) -> np.ndarray:
         """Converteer verschillende invoertypen naar een geschikte vector"""

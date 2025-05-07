@@ -1,6 +1,6 @@
 from typing import Optional, Union, Any
 import sqlite3
-from .database import Database
+from .models.database import Database
 
 class DatabaseManager:
     def __init__(self):

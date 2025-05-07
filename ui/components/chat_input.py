@@ -1,5 +1,5 @@
 import imgui
-from typing import Optional
+from typing import Optional, List
 
 class ChatInput:
     def __init__(self):

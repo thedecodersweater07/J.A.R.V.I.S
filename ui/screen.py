@@ -8,15 +8,18 @@ from typing import Optional, Dict, Any
 from contextlib import contextmanager
 from pathlib import Path
 
-# Fix relative imports
-from ..base_screen import BaseScreen
-from ..login_screen import LoginScreen  
-from ..chat_screen import ChatScreen
-from ..settings_screen import SettingsScreen
-from ..data_screen import DataScreen
+# Import local modules
+from .components.chat_history import ChatHistory 
+from .components.chat_input import ChatInput
+from .components.status_bar import StatusBar
+from .themes.theme_manager import ThemeManager
 
+from .screens.base_screen import BaseScreen
+from .screens.login_screen import LoginScreen
+from .screens.chat_screen import ChatScreen
+from .screens.settings_screen import SettingsScreen
+from .screens.data_screen import DataScreen
 from ui.rendering import RendererFactory, RenderMode
-from ui.themes.theme_manager import ThemeManager
 from security.auth.auth_service import AuthService
 from security.config.security_config import SecurityConfig
 from core.session import SessionManager
@@ -33,12 +36,12 @@ class UIState:
         self.is_initialized = False
 
 class Screen:
-    def __init__(self, width: int = 800, height: int = 600, title: str = "JARVIS"):
+    def __init__(self, width: int = 800, height: int = 600, title: str = "JARVIS Interface", mode: str = "graphical"):
         self.width = width
         self.height = height
         self.title = title
-        self.theme_manager = ThemeManager()
-        self.renderer_manager = RendererFactory()
+        self.mode = mode
+        self.ui_state = UIState()
         self.auth_service = None
         self.session_manager = SessionManager()
         self.llm_pipeline = LLMPipeline()
@@ -47,29 +50,49 @@ class Screen:
         self.interrupt_received = False
         self.should_quit = False
         self.current_screen: Optional[BaseScreen] = None
-        self.is_initialized = False
 
-    def initialize(self) -> bool:
+    def init(self) -> bool:
         try:
-            self.renderer_manager.initialize(self.width, self.height, self.title)
-            self.theme_manager.load_themes()
-            self.theme_manager.apply_theme("dark")
-            self._init_screens()
-            self.is_initialized = True
+            self._init_imgui()
+            # Try OpenGL first
+            self.renderer = RendererFactory.create_renderer(
+                RenderMode.OPENGL,
+                {"width": self.width, "height": self.height, "title": self.title}
+            )
+            self.is_initialized = self.renderer.init()
+        except ImportError as e:
+            logger.warning(f"OpenGL not available: {e}, falling back to text mode")
+            self.render_mode = RenderMode.TEXT
+            self.renderer = RendererFactory.create_renderer(
+                RenderMode.TEXT,
+                {"width": self.width, "height": self.height}
+            )
+            self.is_initialized = self.renderer.init()
+        
+        self._init_security()
+        self._init_screens()
+        return self.is_initialized
+
+    def _init_imgui(self) -> bool:
+        """Initialize ImGui with proper error handling"""
+        try:
+            if not self.ui_state.imgui_initialized:
+                self.ui_state.context = imgui.create_context()
+                imgui.set_current_context(self.ui_state.context)
+                self.ui_state.imgui_initialized = True
             return True
         except Exception as e:
-            logger.error(f"Screen initialization failed: {e}")
-            return self._fallback_init()
-
-    def _fallback_init(self) -> bool:
-        """Fallback to basic text mode"""
-        try:
-            self.renderer_manager.initialize_text_mode()
-            self.is_initialized = True
-            return True
-        except Exception as e:
-            logger.critical(f"Fallback initialization failed: {e}")
+            logger.error(f"ImGui initialization failed: {e}")
             return False
+
+    def _init_security(self):
+        security_config = SecurityConfig(
+            jwt_secret=SECURITY["jwt_secret"],
+            token_expiry_hours=SECURITY["token_expiry_hours"],
+            max_login_attempts=SECURITY["max_login_attempts"],
+            lockout_duration_minutes=SECURITY["lockout_duration_minutes"]
+        )
+        self.auth_service = AuthService(security_config)
 
     def _init_screens(self):
         self.register_screen("login", LoginScreen(self.auth_service))

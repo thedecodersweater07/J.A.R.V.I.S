@@ -1,5 +1,5 @@
 from .base_screen import BaseScreen
-from db.database_manager import DatabaseManager
+from db import DatabaseManager
 import tkinter as tk
 from tkinter import ttk
 

@@ -1,11 +1,12 @@
 import jwt
-import bcrypt
 import logging
-from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-from security.config.security_config import SecurityConfig
-from db.database import Database
-from .auth_types import AuthResult, LoginResponse
+from datetime import datetime, timedelta
+import bcrypt
+from db.sql.models.database import Database
+from ..models.user import User
+from ..config.security_config import SecurityConfig
+from .auth_types import LoginResponse
 
 logger = logging.getLogger(__name__)
 
@@ -19,17 +20,20 @@ class AuthService:
         logger.info("AuthService initialized")
 
     def _init_auth_db(self):
-        conn = self.db._get_sqlite_connection("auth")
-        cursor = conn.cursor()
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS auth_attempts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT,
-            timestamp TIMESTAMP,
-            success BOOLEAN,
-            ip_address TEXT
-        )""")
-        conn.commit()
+        """Initialize auth tables"""
+        try:
+            conn = self.db.get_client()
+            cursor = conn.cursor()
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                username TEXT UNIQUE,
+                password TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )''')
+            conn.commit()
+        except Exception as e:
+            logger.error(f"Failed to setup auth database: {e}")
 
     def authenticate(self, username: str, password: str, ip_address: str = "") -> LoginResponse:
         """Authenticate user and return login response"""

@@ -1,66 +1,97 @@
 import os
 import sys
+import json
+import signal
 import traceback
 from pathlib import Path
+from typing import Dict, Any, Optional
 
 # Add project root to Python path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-# Now import core modules
-from core import setup_logging, Cerebrum
-from core.command import CommandParser, CommandExecutor
-from ui.screen import Screen
-from ui.visual import HologramProjector
-from ui.input import VoiceInput, TextInput
-from security.authentication import IdentityVerifier
-from ml.model_manager import ModelManager
+# Import core modules
+from core.logging.logger import setup_logging
+from core.brain.cognitive.cerebrum import Cerebrum
+from core.command.command_parser import CommandParser
+from core.command.executor import CommandExecutor
+
+# Import UI modules
+from ui.screens.base.screen import Screen
+from ui.input.voice_input import VoiceInput
+from ui.input.text_input import TextInput
+
+# Import security and ML modules
+from security.authentication.identity_verifier import IdentityVerifier
+from ml.models import ModelManager
 
 logger = setup_logging()
 
 class JARVIS:
     def __init__(self):
         try:
-            # Load configuration
+            # Load configuration first
             self.config = self._load_config()
             
-            # Initialize core components
-            self.brain = Cerebrum()
-            self.command_parser = CommandParser()
-            self.executor = CommandExecutor()
+            # Initialize core components with error handling
+            self._init_core_components()
             
-            # Initialize UI with fallback
-            self.screen = self._init_screen()
-            self.voice_input = VoiceInput() if self.config.get("use_voice", True) else None
-            self.text_input = TextInput()
+            # Initialize UI components with fallback
+            self._init_ui_components()
             
-            # Initialize other components  
-            self.security = IdentityVerifier()
-            self.model_manager = ModelManager()
+            # Initialize security and ML components
+            self._init_auxiliary_components()
             
-            self.error_count = 0
-            self.max_errors = 3
-            
-        except ModuleNotFoundError as e:
-            logger.critical(f"Missing module: {e}\nPlease check your Python path and module installation")
-            raise
         except Exception as e:
             logger.critical(f"Failed to initialize JARVIS: {e}\n{traceback.format_exc()}")
             raise
 
-    def _init_screen(self) -> Screen:
-        """Initialize screen with fallback options"""
+    def _init_core_components(self):
+        """Initialize core system components"""
         try:
-            return Screen(
+            self.brain = Cerebrum()
+            self.command_parser = CommandParser()
+            self.executor = CommandExecutor()
+        except Exception as e:
+            logger.error(f"Core components initialization failed: {e}")
+            raise
+
+    def _init_ui_components(self):
+        """Initialize UI with fallback options"""
+        try:
+            self.screen = Screen(
                 width=self.config.get("ui", {}).get("width", 1024),
                 height=self.config.get("ui", {}).get("height", 768),
                 title="JARVIS AI Interface"
             )
+            self.voice_input = VoiceInput() if self.config.get("use_voice", True) else None
+            self.text_input = TextInput()
         except Exception as e:
-            logger.warning(f"Failed to initialize graphical screen: {e}")
-            return Screen(mode="text")
+            logger.error(f"UI initialization failed: {e}")
+            self._fallback_to_basic_ui()
 
-    def _load_config(self) -> Dict:
+    def _init_auxiliary_components(self):
+        """Initialize security and ML components"""
+        try:
+            self.security = IdentityVerifier()
+            self.model_manager = ModelManager()
+            self.error_count = 0
+            self.max_errors = 3
+        except Exception as e:
+            logger.error(f"Auxiliary components initialization failed: {e}")
+            raise
+
+    def _fallback_to_basic_ui(self):
+        """Fall back to basic text UI if graphical UI fails"""
+        try:
+            self.screen = Screen(mode="text")
+            self.voice_input = None
+            self.text_input = TextInput()
+        except Exception as e:
+            logger.critical(f"Even basic UI failed: {e}")
+            raise
+
+    def _load_config(self) -> Dict[str, Any]:
         """Load configuration with fallback to defaults"""
         try:
             with open("config/main.json", "r") as f:
