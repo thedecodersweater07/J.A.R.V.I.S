@@ -1,4 +1,3 @@
-```
 woord,frequentie,woordsoort,lettergrepen,sentiment,categorie,lengte
 de,985,lidwoord,1,neutraal,algemeen,2
 en,846,voegwoord,1,neutraal,algemeen,2
@@ -14,12 +13,6 @@ zijn,372,werkwoord,1,neutraal,algemeen,4
 voor,359,voorzetsel,1,neutraal,algemeen,4
 met,341,voorzetsel,1,neutraal,algemeen,3
 niet,312,bijwoord,1,negatief,algemeen,4
-hij,297,voornaamwoord,1,neutraal,persoon,3
-ik,289,voornaamwoord,1,neutraal,persoon,2
-als,276,voegwoord,1,neutraal,algemeen,3
-maar,265,voegwoord,1,neutraal,algemeen,4
-om,258,voorzetsel,1,neutraal,algemeen,2
-aan,251,voorzetsel,1,neutraal,algemeen,3
 huis,186,zelfstandig naamwoord,1,neutraal,wonen,4
 liefde,121,zelfstandig naamwoord,2,positief,emotie,6
 computer,98,zelfstandig naamwoord,3,neutraal,technologie,8
@@ -47,7 +40,6 @@ internet,27,zelfstandig naamwoord,3,neutraal,technologie,8
 natuurlijk,26,bijwoord,3,positief,natuur,10
 belangrijk,25,bijvoeglijk naamwoord,3,neutraal,waarde,10
 onderwijs,24,zelfstandig naamwoord,3,neutraal,kennis,9
-taal,23,zelfstandig naamwoord,1,neutraal,communicatie,4
 geld,22,zelfstandig naamwoord,1,neutraal,economie,4
 tijd,21,zelfstandig naamwoord,1,neutraal,concept,4
 politiek,19,zelfstandig naamwoord,3,neutraal,samenleving,8
@@ -68,4 +60,3 @@ analyse,4,zelfstandig naamwoord,3,neutraal,onderzoek,7
 machine,3,zelfstandig naamwoord,2,neutraal,technologie,7
 leren,2,werkwoord,2,positief,kennis,5
 model,1,zelfstandig naamwoord,2,neutraal,concept,5
-```
