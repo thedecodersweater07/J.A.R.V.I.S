@@ -1,12 +1,9 @@
-from typing import Optional, Dict, Any
 import torch
 import logging
 from pathlib import Path
-import json
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from llm.memory.enhanced_memory import EnhancedMemoryManager
-from llm.optimization.llm_optimizer import LLMOptimizer, LLMOptimizationConfig
-from db.sql.database_manager import DatabaseManager
+import yaml
+import spacy
+from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -15,18 +12,13 @@ class LLMCore:
         """Initialize LLM Core"""
         try:
             # Load and validate config
-            self.config = config or {}
+            self.config = self._load_config(config)
             self._validate_config()
             
             # Extract configs
             model_config = self.config.get("model", {})
-            optimization_config = model_config.get("optimization", {})
             
             # Initialize components
-            self.db = DatabaseManager(config=self.config.get("database", {}))
-            self.memory = EnhancedMemoryManager(self.config.get("memory", {}))
-            self.optimizer = LLMOptimizer(config=optimization_config)
-            
             self._initialize_model()
             logger.info("LLMCore initialized successfully")
             
@@ -47,31 +39,28 @@ class LLMCore:
 
     def _load_config(self, config_path: Optional[Path]) -> Dict[str, Any]:
         """Load configuration from file"""
-        if config_path is None:
-            config_path = Path(__file__).parent.parent.parent / "config" / "defaults" / "llm.json"
+        default_config = {
+            "model": {
+                "name": "nl_core_news_lg",
+                "type": "spacy"
+            }
+        }
         
-        try:
+        if config_path and config_path.exists():
             with open(config_path) as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"Failed to load config from {config_path}: {str(e)}")
-            return {}
+                loaded_config = yaml.safe_load(f)
+                return {**default_config, **loaded_config}
+                
+        return default_config
 
     def _initialize_model(self) -> None:
-        """Initialize and optimize the model"""
+        """Initialize spaCy model"""
         try:
-            model_name = self.config.get("model", {}).get("name", "gpt2")
-            logger.info(f"Loading model: {model_name}")
-            
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModelForCausalLM.from_pretrained(model_name)
-            
-            # Apply optimizations
-            self.model = self.optimizer.optimize_inference(self.model)
-            logger.debug("Model optimization completed")
-            
+            model_name = self.config.get("model", {}).get("name", "nl_core_news_lg")
+            self.model = spacy.load(model_name)
+            logger.info(f"Loaded spaCy model: {model_name}")
         except Exception as e:
-            logger.error(f"Model initialization failed: {str(e)}", exc_info=True)
+            logger.error(f"Failed to load model: {e}")
             raise
 
     def generate_response(self, prompt: str, context: Optional[Dict] = None) -> str:
@@ -82,15 +71,8 @@ class LLMCore:
         enhanced_prompt = self._prepare_prompt(prompt, context_data)
         
         # Generate response
-        inputs = self.tokenizer(enhanced_prompt, return_tensors="pt")
-        outputs = self.model.generate(
-            inputs["input_ids"].to(self.model.device),
-            max_length=self.config["llm"]["model"]["max_length"],
-            temperature=self.config["llm"]["model"]["temperature"],
-            pad_token_id=self.tokenizer.eos_token_id
-        )
-        
-        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        doc = self.model(enhanced_prompt)
+        response = " ".join([token.text for token in doc])
         
         # Store interaction in memory
         self.memory.store_interaction(prompt, response, context_data)

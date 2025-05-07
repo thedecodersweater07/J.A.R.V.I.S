@@ -1,14 +1,11 @@
 import torch
 import spacy
 from typing import List, Dict, Any, Optional
-from transformers import AutoTokenizer, AutoModel
-from .processors import (
-    DutchTokenizer,
-    DutchParser,
-    DutchNER,
-    SentimentAnalyzer,
-    IntentClassifier
-)
+from .processors.dutch_tokenizer import DutchTokenizer
+from .processors.dutch_parser import DutchParser  
+from .processors.dutch_ner import DutchNER
+from .processors.sentiment_analyzer import SentimentAnalyzer
+from .processors.intent_classifier import IntentClassifier
 
 class NLPPipeline:
     def __init__(self):
@@ -21,11 +18,6 @@ class NLPPipeline:
         # Load specialized models
         self.sentiment = SentimentAnalyzer()
         self.intent = IntentClassifier()
-        
-        # Transformer model voor Nederlandse taal
-        self.model_name = "bert-base-dutch-cased"
-        self.bert_tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self.bert_model = AutoModel.from_pretrained(self.model_name)
         
     def get_tokenizer(self):
         return self.tokenizer
@@ -61,8 +53,6 @@ class NLPPipeline:
         }
         
     def _get_embeddings(self, text: str) -> torch.Tensor:
-        """Genereer contextuele embeddings"""
-        inputs = self.bert_tokenizer(text, return_tensors="pt", padding=True)
-        with torch.no_grad():
-            outputs = self.bert_model(**inputs)
-        return outputs.last_hidden_state
+        """Genereer contextuele embeddings met spaCy"""
+        doc = self.nlp(text)
+        return torch.tensor([token.vector for token in doc])

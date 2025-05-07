@@ -1,0 +1,12 @@
+model:
+  type: "spacy"
+  name: "nl_core_news_lg"
+  max_length: 100
+
+optimization:
+  device: "auto"  # "cpu", "cuda", or "auto"
+  batch_size: 1
+
+generation:
+  max_new_tokens: 50
+  no_repeat_ngram_size: 3
