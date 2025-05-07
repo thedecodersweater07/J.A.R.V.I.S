@@ -1,239 +1,128 @@
 import os
 import sys
-import json
-import traceback  # Add this import
-from typing import Optional, Literal, Dict, Any
-import logging
-from ui.screen import Screen  # This will now handle missing OpenGL gracefully
-from core.logging import setup_logging
-
-# Conditional OpenGL import
-try:
-    import glfw
-    from OpenGL import GL as gl  # OpenGL import for rendering
-    OPENGL_AVAILABLE = True
-except ImportError:
-    OPENGL_AVAILABLE = False
-    logging.warning("OpenGL not available, falling back to text mode")
-
-import signal
+import traceback
 from pathlib import Path
 
-# Import core components
-from core.brain.cerebrum import Cerebrum
-from core.command.command_parser import CommandParser
-from core.command.executor import CommandExecutor
-from ui.visual.hologram_projector import HologramProjector
-from ui.input.voice_input import VoiceInput
-from ui.input.text_input import TextInput
-from security.authentication.identity_verifier import IdentityVerifier
-from ml.model_manager import ModelManager
-from llm.core import LLMCore
-from llm.learning import LearningManager
-from llm.knowledge import KnowledgeManager
-from llm.inference import InferenceEngine
-from nlp.language_processor import LanguageProcessor  # Using the updated version
-from nlp.conversation.conversation_handler import ConversationHandler  # Updated path
-from config.config_validator import ConfigValidator
+# Add project root to Python path
+project_root = Path(__file__).parent
+sys.path.insert(0, str(project_root))
 
+# Now import core modules
+from core import setup_logging, Cerebrum
+from core.command import CommandParser, CommandExecutor
+from ui.screen import Screen
+from ui.visual import HologramProjector
+from ui.input import VoiceInput, TextInput
+from security.authentication import IdentityVerifier
+from ml.model_manager import ModelManager
+
+logger = setup_logging()
 
 class JARVIS:
     def __init__(self):
-        # Configure logging
-        logging.basicConfig(level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
-        
-        # Load and validate configs
-        self.config_validator = ConfigValidator()
-        self.config = self._load_config()
-        
-        # Initialize components with validated configs
-        self.brain = Cerebrum()
-        self.command_parser = CommandParser(schema_path="config/command_schema.json")
-        self.executor = CommandExecutor()
-        self.ui = HologramProjector(config=self.config.get("ui", {}))
-        self.voice_input = VoiceInput()
-        self.text_input = TextInput()
-        self.input_mode: Literal["voice", "text"] = "text"  # Default to text mode
-        self.security = IdentityVerifier()
-        self.model_manager = ModelManager()  # Now works without parameters
-        self.nlp = LanguageProcessor(language=self.config.get("nlp", {}).get("language", "nl"))
-        self.llm = None  # Placeholder for LLM integration
-        self.conversation = ConversationHandler(self.nlp)
         try:
-            self.screen = Screen(
+            # Load configuration
+            self.config = self._load_config()
+            
+            # Initialize core components
+            self.brain = Cerebrum()
+            self.command_parser = CommandParser()
+            self.executor = CommandExecutor()
+            
+            # Initialize UI with fallback
+            self.screen = self._init_screen()
+            self.voice_input = VoiceInput() if self.config.get("use_voice", True) else None
+            self.text_input = TextInput()
+            
+            # Initialize other components  
+            self.security = IdentityVerifier()
+            self.model_manager = ModelManager()
+            
+            self.error_count = 0
+            self.max_errors = 3
+            
+        except ModuleNotFoundError as e:
+            logger.critical(f"Missing module: {e}\nPlease check your Python path and module installation")
+            raise
+        except Exception as e:
+            logger.critical(f"Failed to initialize JARVIS: {e}\n{traceback.format_exc()}")
+            raise
+
+    def _init_screen(self) -> Screen:
+        """Initialize screen with fallback options"""
+        try:
+            return Screen(
                 width=self.config.get("ui", {}).get("width", 1024),
                 height=self.config.get("ui", {}).get("height", 768),
-                title="JARVIS - Advanced AI Interface"
+                title="JARVIS AI Interface"
             )
         except Exception as e:
-            self.logger.error(f"Failed to initialize screen: {e}")
-            raise
-        self.error_count = 0
-        self.max_errors = 3
-        self.config["use_opengl"] = OPENGL_AVAILABLE and self.config.get("use_opengl", True)
+            logger.warning(f"Failed to initialize graphical screen: {e}")
+            return Screen(mode="text")
 
-    def _load_config(self) -> Dict[str, Any]:
-        """Load and validate configuration"""
+    def _load_config(self) -> Dict:
+        """Load configuration with fallback to defaults"""
         try:
-            config_path = Path("config") / "config.json"
-            if not config_path.exists():
-                self.logger.warning("Config file not found, using defaults")
-                return self._get_default_config()
-                
-            with open(config_path) as f:
-                config = json.load(f)
-                
-            # Validate different config sections
-            for section in ["nlp", "llm", "ui"]:
-                if section in config:
-                    if not self.config_validator.validate(config[section], section):
-                        self.logger.warning(f"Invalid {section} config, using defaults")
-                        config[section] = self._get_default_config()[section]
-                        
-            return config
+            with open("config/main.json", "r") as f:
+                return json.load(f)
         except Exception as e:
-            self.logger.error(f"Error loading config: {e}")
-            return self._get_default_config()
-            
-    def _get_default_config(self) -> Dict[str, Any]:
-        return {
-            "nlp": {
-                "language": "nl",
-                "models": {
-                    "sentiment": "default",
-                    "intent": "default"
-                }
-            },
-            "llm": {
-                "model": "gpt2",
-                "inference": {
-                    "max_length": 100,
-                    "temperature": 0.7
-                }
-            },
-            "ui": {
-                "width": 1024,
-                "height": 768
-            }
-        }
-
-    def handle_input(self, text: str):
-        """Handle user input with better error handling"""
-        try:
-            if text.lower() in ["exit", "quit", "stop"]:
-                self.screen.add_message("Shutting down...", False)
-                self.screen.interrupt_received = True
-                return
-
-            self.screen.add_message(text, True)
-            
-            try:
-                response = self.conversation.process_input(text)
-                self.screen.add_message(response, False)
-                self.error_count = 0  # Reset error count on success
-            except Exception as e:
-                self.error_count += 1
-                self.logger.error(f"Error processing input: {e}\n{traceback.format_exc()}")
-                self.screen.add_message(
-                    "Sorry, I encountered an error. Could you rephrase that?", 
-                    False
-                )
-                
-        except Exception as e:
-            self.logger.error(f"Input handler error: {e}\n{traceback.format_exc()}")
-            self.screen.add_message("An internal error occurred.", False)
-
-    def cleanup(self):
-        """Cleanup resources properly"""
-        try:
-            self.logger.info("Starting cleanup...")
-            if hasattr(self, 'screen'):
-                self.screen.cleanup()
-            if hasattr(self, 'ui'):
-                self.ui.cleanup()
-            self.logger.info("Cleanup completed successfully")
-        except Exception as e:
-            self.logger.error(f"Error during cleanup: {e}\n{traceback.format_exc()}")
+            logger.warning(f"Failed to load config: {e}")
+            return {"use_voice": False, "ui": {"width": 1024, "height": 768}}
 
     def run(self):
-        """Main run loop with improved initialization and error handling"""
+        """Main run loop with improved error handling"""
         try:
-            self.logger.info("Starting JARVIS initialization...")
+            self._setup_signal_handlers()
+            self.screen.initialize()
             
-            # Initialize core components first
-            self.brain.initialize()
-            self.model_manager.initialize()
-            self.nlp.initialize()
-            
-            # Initialize UI components
-            self.ui.start()
-            if not self.screen.init():
-                raise RuntimeError("Failed to initialize screen interface")
-
-            self.screen.set_callback(self.handle_input)
-            self.screen.add_message("JARVIS initialized and ready.", False)
-            
-            self.logger.info("JARVIS running in %s mode", self.input_mode)
-            
-            # Main event loop with improved error handling
-            while not (self.screen.should_close() or self.screen.interrupt_received):
+            while not self.screen.should_exit():
                 try:
-                    with self.screen.frame():
-                        self.screen.render({
-                            "chat_history": self.conversation.get_history(),
-                            "status": self.get_system_status()
-                        })
+                    self.handle_input(self.text_input.get_input())
+                except KeyboardInterrupt:
+                    logger.info("Received interrupt signal")
+                    break
                 except Exception as e:
                     self.error_count += 1
-                    self.logger.error(f"Render error: {e}")
+                    logger.error(f"Error in main loop: {e}\n{traceback.format_exc()}")
                     if self.error_count >= self.max_errors:
-                        self.logger.critical("Too many errors, shutting down")
+                        logger.critical("Too many errors, shutting down")
                         break
-                    
+                        
         except Exception as e:
-            self.logger.error(f"Critical error: {e}\n{traceback.format_exc()}")
+            logger.critical(f"Fatal error: {e}\n{traceback.format_exc()}")
         finally:
             self.cleanup()
 
+    def _setup_signal_handlers(self):
+        """Setup signal handlers for graceful shutdown"""
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
 
-def get_chat_history():
-    """Return chat history"""
-    return []  # Initially return empty list
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals"""
+        logger.info(f"Received signal {signum}")
+        self.cleanup()
+        sys.exit(0)
 
-def get_system_status():
-    """Return system status"""
-    return "Ready"  # Basic status
-
-def main():
-    setup_logging()
-    logger = logging.getLogger(__name__)
-    logger.info("Starting JARVIS...")
-    
-    # Configure database
-    if os.environ.get('DATABASE_URL'):
-        from sqlalchemy import create_engine
-        engine = create_engine(os.environ['DATABASE_URL'])
-        
-    screen = Screen()
-    if not screen.init():
-        logger.error("Failed to initialize display")
-        return
-    
-    try:
-        while True:
-            screen.render({
-                "chat_history": get_chat_history(),
-                "status": get_system_status()
-            })
-    except KeyboardInterrupt:
-        logger.info("Shutting down...")
-    except Exception as e:
-        logger.error(f"Fatal error: {e}", exc_info=True)
-    finally:
-        logger.info("Shutting down JARVIS...")
-        screen.cleanup()
-
+    def cleanup(self):
+        """Cleanup resources"""
+        try:
+            logger.info("Starting cleanup...")
+            if hasattr(self, 'screen'):
+                self.screen.cleanup()
+            if hasattr(self, 'voice_input'):
+                self.voice_input.cleanup()
+            logger.info("Cleanup completed")
+        except Exception as e:
+            logger.error(f"Error during cleanup: {e}")
 
 if __name__ == "__main__":
-    main()
+    try:
+        jarvis = JARVIS()
+        jarvis.run()
+    except KeyboardInterrupt:
+        print("\nShutting down JARVIS...")
+        sys.exit(0)
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        sys.exit(1)

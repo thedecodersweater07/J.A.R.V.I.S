@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Data
+data/raw/*
+data/processed/*
+data/interim/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/interim/.gitkeep
+
+# Models
+llm/models/checkpoints/*
+ml/models/checkpoints/*
+!llm/models/checkpoints/.gitkeep
+!ml/models/checkpoints/.gitkeep
+
+# Configs
+config/secrets/*
+!config/secrets/.gitkeep
+
+# Logs
+*.log
+logs/*
+!logs/.gitkeep
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# Environment
+.env
+venv/
+env/

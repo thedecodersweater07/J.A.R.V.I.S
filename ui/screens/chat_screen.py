@@ -1,46 +1,39 @@
-import imgui
 from typing import List, Dict, Any
+import imgui
 from .base_screen import BaseScreen
-from llm.pipeline import LLMPipeline
+from ..components.chat_input import ChatInput
+from ..components.chat_history import ChatHistory
+from ..components.status_bar import StatusBar
 
 class ChatScreen(BaseScreen):
-    def __init__(self, llm_pipeline: LLMPipeline):
+    def __init__(self, llm_pipeline):
         super().__init__()
         self.llm = llm_pipeline
-        self.input_text = ""
-        self.chat_history: List[Dict[str, str]] = []
-        
-    def init(self) -> bool:
-        self.initialized = True
-        return True
+        self.chat_input = ChatInput()
+        self.chat_history = ChatHistory()
+        self.status_bar = StatusBar()
         
     def render(self, frame_data: Dict[str, Any]) -> None:
-        imgui.begin("JARVIS Chat", flags=imgui.WINDOW_NO_COLLAPSE)
+        imgui.set_next_window_size(self.width, self.height)
+        imgui.begin("JARVIS Chat", flags=imgui.WINDOW_NO_COLLAPSE | imgui.WINDOW_NO_RESIZE)
         
-        # Chat history
-        for msg in self.chat_history:
-            if msg["type"] == "user":
-                imgui.text_colored("You: " + msg["text"], 0.2, 0.7, 0.2)
-            else:
-                imgui.text_colored("JARVIS: " + msg["text"], 0.2, 0.2, 0.7)
+        # Chat history area with scrolling
+        self.chat_history.render()
         
-        # Input field
-        changed, self.input_text = imgui.input_text(
-            "Input", self.input_text, 1024,
-            flags=imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
-        )
-        
-        if changed and self.input_text.strip():
-            self._process_input(self.input_text)
-            self.input_text = ""
+        # Input area with auto-focus
+        if self.chat_input.render():
+            message = self.chat_input.get_text()
+            self._process_message(message)
             
+        # Status bar
+        self.status_bar.render(self.llm.get_status())
+        
         imgui.end()
-        
-    def _process_input(self, text: str):
-        self.chat_history.append({"type": "user", "text": text})
-        response = self.llm.process(text)
-        self.chat_history.append({"type": "assistant", "text": response})
-        
-    def handle_input(self, input_data: Dict[str, Any]) -> None:
-        if "text" in input_data:
-            self._process_input(input_data["text"])
+
+    def _process_message(self, message: str) -> None:
+        try:
+            self.chat_history.add_user_message(message)
+            response = self.llm.process(message)
+            self.chat_history.add_assistant_message(response)
+        except Exception as e:
+            self.status_bar.show_error(f"Error processing message: {e}")

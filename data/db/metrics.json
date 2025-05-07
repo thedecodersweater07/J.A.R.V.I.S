@@ -1,0 +1,14 @@
+{
+  "system_metrics": {
+    "response_times": [
+      {"timestamp": "2024-01-01T10:00:00", "value": 0.245},
+      {"timestamp": "2024-01-01T10:01:00", "value": 0.189},
+      {"timestamp": "2024-01-01T10:02:00", "value": 0.312}
+    ],
+    "accuracy_scores": [
+      {"timestamp": "2024-01-01T10:00:00", "value": 0.92},
+      {"timestamp": "2024-01-01T10:01:00", "value": 0.88},
+      {"timestamp": "2024-01-01T10:02:00", "value": 0.95}
+    ]
+  }
+}

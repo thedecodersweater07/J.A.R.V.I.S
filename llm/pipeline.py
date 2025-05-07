@@ -4,6 +4,9 @@ from pathlib import Path
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import numpy as np
+from .config import ConfigManager
+from .templates import PromptTemplate
+from .processor import ResponseProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +17,9 @@ class LLMPipeline:
         self.active_model = "default"
         self.max_length = 1024
         self.model_path = Path(__file__).parent / "models"
+        self.config = ConfigManager()
+        self.templates = PromptTemplate()
+        self.processor = ResponseProcessor()
         self._initialize_pipeline()
         
     def _initialize_pipeline(self):
@@ -29,32 +35,25 @@ class LLMPipeline:
         except Exception as e:
             logger.error(f"Failed to initialize LLM pipeline: {e}")
             
-    def process(self, text: str, context: Optional[Dict[str, Any]] = None) -> str:
-        if not self.models or self.active_model not in self.models:
-            return "System is initializing..."
-            
-        try:
-            tokenizer = self.tokenizers[self.active_model]
-            model = self.models[self.active_model]
-            
-            inputs = tokenizer(text, return_tensors="pt")
-            if torch.cuda.is_available():
-                inputs = {k: v.to("cuda") for k, v in inputs.items()}
-                
-            outputs = model.generate(
-                **inputs,
-                max_length=self.max_length,
-                num_return_sequences=1,
-                pad_token_id=tokenizer.eos_token_id
-            )
-            
-            response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-            return response
-            
-        except Exception as e:
-            logger.error(f"Error processing text: {e}")
-            return "Sorry, I encountered an error processing your request."
-            
+    async def process(self, user_input: str, context: str = "", template: str = "chat"):
+        # Format prompt
+        prompt = self.templates.format_prompt(
+            template,
+            user_input=user_input,
+            context=context
+        )
+        
+        # Get configuration
+        config = self.config.load_config()
+        
+        # Process response
+        response = await self._get_llm_response(prompt, config)
+        return self.processor.process_response(response)
+    
+    async def _get_llm_response(self, prompt: str, config):
+        # Implement actual LLM call here
+        return "AI Response"
+    
     def add_model(self, name: str, model_path: str) -> bool:
         try:
             self.tokenizers[name] = AutoTokenizer.from_pretrained(model_path)

@@ -1,6 +1,7 @@
 import torch
 from typing import Dict, Any
 from dataclasses import dataclass
+from transformers import PreTrainedModel
 
 @dataclass
 class LLMOptimizationConfig:
@@ -9,6 +10,8 @@ class LLMOptimizationConfig:
     tensor_parallelism: bool = False
     batch_size: int = 1
     max_length: int = 512
+    quantization: bool = False
+    gradient_checkpointing: bool = False
 
 class LLMOptimizer:
     """Optimizes LLM inference and processing"""
@@ -36,4 +39,20 @@ class LLMOptimizer:
         """Enable key-value caching for faster inference"""
         if hasattr(model, "enable_kv_caching"):
             model.enable_kv_caching()
+        return model
+
+    def optimize_model(self, model: PreTrainedModel) -> PreTrainedModel:
+        """Apply optimization techniques to the model based on configuration."""
+        if self.config.quantization:
+            model = self._apply_quantization(model)
+            
+        if self.config.gradient_checkpointing:
+            model.gradient_checkpointing_enable()
+            
+        return model
+        
+    def _apply_quantization(self, model: PreTrainedModel) -> PreTrainedModel:
+        """Apply quantization if supported by the model."""
+        if hasattr(model, "quantize_"):
+            model = model.quantize_()
         return model

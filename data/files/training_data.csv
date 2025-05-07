@@ -1,0 +1,4 @@
+timestamp,user_input,response,feedback_score
+2024-01-01 10:00:00,How are you?,I'm doing well thank you.,5
+2024-01-01 10:01:23,What's the weather?,The weather is sunny today.,4
+2024-01-01 10:05:45,Tell me a joke.,Why did the AI go to school? To improve its neural network!,3
