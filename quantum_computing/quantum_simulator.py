@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import time
-from typing import Dict, Any
+from typing import Dict, Any, Union, List
 import random
 
 class QuantumSimulator:
@@ -10,6 +10,15 @@ class QuantumSimulator:
         self.state = torch.zeros((2**n_qubits), dtype=torch.complex64)
         self.state[0] = 1.0  # Initialize to |0>
         
+    def _complex_to_dict(self, z: complex) -> Dict[str, float]:
+        """Convert complex number to serializable dictionary"""
+        return {"real": float(z.real), "imag": float(z.imag)}
+
+    def _quantum_state_to_serializable(self, state: torch.Tensor) -> List[Dict[str, float]]:
+        """Convert quantum state tensor to JSON-serializable format"""
+        np_array = state.cpu().detach().numpy()
+        return [self._complex_to_dict(complex(x)) for x in np_array]
+
     async def run_quantum_process(self, complexity: int = 5) -> Dict[str, Any]:
         """Simulate quantum processing with realistic delays"""
         # Simulate quantum decoherence and processing time 
@@ -21,11 +30,10 @@ class QuantumSimulator:
             self._apply_random_quantum_gate()
             time.sleep(random.uniform(0.1, 0.3))
             
-        # Convert quantum state tensor to list before returning
         return {
-            "quantum_state": self.state.cpu().detach().numpy().tolist(),  # Convert tensor to list
-            "process_time": process_time,
-            "coherence": float(self._calculate_coherence())  # Ensure scalar output
+            "quantum_state": self._quantum_state_to_serializable(self.state),
+            "process_time": float(process_time),
+            "coherence": float(self._calculate_coherence())
         }
         
     def _apply_random_quantum_gate(self):

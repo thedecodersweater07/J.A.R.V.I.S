@@ -11,6 +11,7 @@ import random
 from datetime import datetime
 from pathlib import Path
 from core.logging.advanced_logger import AdvancedLogger, CustomJSONEncoder
+from data.processing.virtual_env_summarizer import VirtualEnvSummarizer
 
 logger = AdvancedLogger("virtual_environment").get_logger()
 
@@ -119,6 +120,18 @@ class VirtualEnvironment:
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         with gzip.open(filepath, 'wt') as f:
             json.dump(sanitized_results, f, cls=CustomJSONEncoder, indent=2)
+
+    async def shutdown(self):
+        """Cleanup and generate summary before shutting down"""
+        if self.data_path:
+            summarizer = VirtualEnvSummarizer(self.data_path)
+            csv_path = summarizer.generate_summary()
+            if csv_path:
+                logger.info(f"Generated summary report: {csv_path}")
+        
+        # Cleanup code
+        self.history.clear()
+        self.state.clear()
 
 class VirtualEnvironmentManager:
     """Enhanced manager with data handling"""
