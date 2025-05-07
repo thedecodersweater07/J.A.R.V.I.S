@@ -1,0 +1,5 @@
+gesprek_id,beoordeling,feedback_tekst,gebruiker_stemming,timestamp,verbetering_nodig
+1,5,"Zeer behulpzaam antwoord van Jarvis","positief",2024-01-01 00:00:00,nee
+2,4,"Goed antwoord, maar mag wat uitgebreider","neutraal",2024-01-01 00:00:01,ja
+3,5,"Perfect begrip van mijn vraag","positief",2024-01-01 00:00:02,nee
+4,3,"Antwoord was te technisch","negatief",2024-01-01 00:00:03,ja

@@ -1,45 +1,69 @@
+from typing import Optional, Dict, Any
+import torch
+from pathlib import Path
+import yaml
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from ..memory import EnhancedMemoryManager
+from ..optimization import LLMOptimizer
+from db import DatabaseManager
+
 class LLMCore:
-    """
-    Core class for Language Model interactions
-    """
-    
-    def __init__(self):
-        """
-        Initialize the LLM core
-        """
-        self.model = None
-        self.config = None
-    
-    def load_model(self, model_config):
-        """
-        Load a language model with specified configuration
+    def __init__(self, config_path: Optional[Path] = None):
+        self.config = self._load_config(config_path)
+        self.db = DatabaseManager(self.config["database"])
+        self.memory = EnhancedMemoryManager(self.config["llm"]["memory"])
+        self.optimizer = LLMOptimizer(self.config["llm"]["model"]["optimization"])
         
-        Args:
-            model_config (dict): Configuration for the model
-        """
-        self.config = model_config
-        # TODO: Implement model loading logic
-        pass
-    
-    def generate_response(self, prompt):
-        """
-        Generate a response using the loaded model
+        self._initialize_model()
+
+    def _initialize_model(self):
+        model_name = self.config["llm"]["model"]["name"]
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name)
         
-        Args:
-            prompt (str): Input prompt for the model
-            
-        Returns:
-            str: Generated response
-        """
-        if not self.model:
-            raise RuntimeError("Model not loaded")
+        # Apply optimizations
+        self.model = self.optimizer.optimize_model(self.model)
         
-        # TODO: Implement response generation logic
-        return ""
-    
-    def reset(self):
-        """
-        Reset the model state
-        """
-        self.model = None
-        self.config = None
+        if torch.cuda.is_available():
+            self.model = self.model.to("cuda")
+
+    def generate_response(self, prompt: str, context: Optional[Dict] = None) -> str:
+        # Get relevant context from memory
+        context_data = self.memory.get_context(prompt) if context is None else context
+        
+        # Prepare input with context
+        enhanced_prompt = self._prepare_prompt(prompt, context_data)
+        
+        # Generate response
+        inputs = self.tokenizer(enhanced_prompt, return_tensors="pt")
+        outputs = self.model.generate(
+            inputs["input_ids"].to(self.model.device),
+            max_length=self.config["llm"]["model"]["max_length"],
+            temperature=self.config["llm"]["model"]["temperature"],
+            pad_token_id=self.tokenizer.eos_token_id
+        )
+        
+        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        
+        # Store interaction in memory
+        self.memory.store_interaction(prompt, response, context_data)
+        
+        return response
+
+    def _prepare_prompt(self, prompt: str, context: Dict) -> str:
+        if not context:
+            return prompt
+        
+        context_str = "\n".join([
+            f"Previous [{c['category']}]: {c['text']}"
+            for c in context.get("relevant_history", [])
+        ])
+        
+        return f"{context_str}\nCurrent: {prompt}"
+
+    def _load_config(self, config_path: Optional[Path]) -> Dict[str, Any]:
+        if config_path is None:
+            config_path = Path(__file__).parent.parent.parent / "data" / "config.yaml"
+        
+        with open(config_path) as f:
+            return yaml.safe_load(f)

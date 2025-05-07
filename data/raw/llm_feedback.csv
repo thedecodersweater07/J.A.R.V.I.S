@@ -1,0 +1,4 @@
+response_id,rating,feedback_text,timestamp
+1,5,"Very helpful response",2024-01-01 00:00:00
+2,4,"Good but could be more detailed",2024-01-01 00:00:01
+3,3,"Somewhat relevant",2024-01-01 00:00:02

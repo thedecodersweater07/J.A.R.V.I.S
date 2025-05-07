@@ -1,0 +1,5 @@
+vraag,antwoord,categorie,prioriteit,context,timestamp,feedback_score
+"Hoe gaat het met je, Jarvis?","Het gaat uitstekend met mij. Ik sta klaar om u te helpen!",algemeen,hoog,begroeting,2024-01-01 00:00:00,4.8
+"Wat kan je allemaal?","Als Jarvis kan ik u helpen met verschillende taken zoals: programmeren, vragen beantwoorden, analyses maken en informatie zoeken.",capaciteiten,hoog,introductie,2024-01-01 00:00:01,4.9
+"Leg artificiële intelligentie uit","Artificiële intelligentie is een technologie die machines in staat stelt om te leren en intelligent gedrag te vertonen. Dit omvat taken zoals patroonherkenning, taalverwerking en probleemoplossing.",technisch,medium,AI,2024-01-01 00:00:02,4.7
+"Wat is het verschil tussen machine learning en deep learning?","Machine learning is een breed gebied waarbij systemen leren van data. Deep learning is een specifieke vorm hiervan die gebruik maakt van diepe neurale netwerken voor complexere taken.",technisch,hoog,AI,2024-01-01 00:00:03,4.6
