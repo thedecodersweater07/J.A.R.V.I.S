@@ -1,27 +1,59 @@
 from .base_screen import BaseScreen
 from db import DatabaseManager
+import imgui
+from typing import Dict, Any
+import logging
 import tkinter as tk
 from tkinter import ttk
+
+logger = logging.getLogger(__name__)
 
 class DataScreen(BaseScreen):
     def __init__(self, master=None):
         super().__init__(master)
         self.db = DatabaseManager()
+        self.metrics = {}
+        self.initialized = False
         self.setup_ui()
+
+    def init(self) -> bool:
+        try:
+            self.initialized = True
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize data screen: {e}")
+            return False
+
+    def render(self, frame_data: Dict[str, Any]) -> None:
+        imgui.begin("Data Viewer", flags=imgui.WINDOW_NO_COLLAPSE)
         
+        if imgui.button("Refresh Data"):
+            self.load_data()
+            
+        imgui.separator()
+        
+        # Display metrics
+        if self.metrics:
+            for key, value in self.metrics.items():
+                imgui.text(f"{key}: {value}")
+        else:
+            imgui.text_colored("No data available", 0.5, 0.5, 0.5)
+            
+        imgui.end()
+
+    def handle_input(self, input_data: Dict[str, Any]) -> None:
+        if not self.initialized:
+            return
+            
+        if input_data.get("type") == "refresh":
+            self.load_data()
+    
     def setup_ui(self):
-        # Stats section
-        self.stats_frame = ttk.LabelFrame(self, text="Statistics")
-        self.stats_frame.pack(pady=10, padx=5, fill="x")
-        
-        # Data viewer
-        self.data_tree = ttk.Treeview(self)
-        self.data_tree.pack(pady=10, fill="both", expand=True)
-        
-        # Load data button
-        self.load_btn = ttk.Button(self, text="Load Data", command=self.load_data)
-        self.load_btn.pack(pady=5)
+        pass  # Not using tkinter elements anymore
         
     def load_data(self):
-        metrics = self.db.load_metrics()
-        self.update_stats(metrics)
+        try:
+            self.metrics = self.db.load_metrics()
+        except Exception as e:
+            logger.error(f"Failed to load metrics: {e}")
+            self.metrics = {}

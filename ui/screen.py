@@ -8,7 +8,10 @@ from typing import Optional, Dict, Any
 from contextlib import contextmanager
 from pathlib import Path
 
-# Fix relative imports
+# Replace main import with core.constants
+from core.constants import OPENGL_AVAILABLE
+
+# Rest of the imports
 from .components.chat_history import ChatHistory
 from .components.chat_input import ChatInput
 from .components.status_bar import StatusBar
@@ -67,34 +70,35 @@ class Screen:
 
     def init(self) -> bool:
         try:
-            self._init_imgui()
-            # Try OpenGL first
+            # Initialize ImGui first
+            if not self._init_imgui():
+                return False
+                
+            # Create renderer
             self.renderer = RendererFactory.create_renderer(
-                RenderMode.OPENGL,
+                RenderMode.OPENGL if OPENGL_AVAILABLE else RenderMode.TEXT,
                 {"width": self.width, "height": self.height, "title": self.title}
             )
-            self.is_initialized = self.renderer.init()
+            
+            if not self.renderer.init():
+                return False
+                
+            self._init_security()
+            self._init_screens()
+            
+            self.is_initialized = True
+            return True
+            
         except ImportError as e:
             logger.warning(f"OpenGL not available: {e}, falling back to text mode")
-            self.render_mode = RenderMode.TEXT
-            self.renderer = RendererFactory.create_renderer(
-                RenderMode.TEXT,
-                {"width": self.width, "height": self.height}
-            )
-            self.is_initialized = self.renderer.init()
-        
-        self._init_security()
-        self._init_screens()
-        self._init_components()
-        return self.is_initialized
-
+            return self._fallback_init()
+            
     def _init_imgui(self) -> bool:
         """Initialize ImGui with proper error handling"""
         try:
-            if not self.ui_state.imgui_initialized:
-                self.ui_state.context = imgui.create_context()
-                imgui.set_current_context(self.ui_state.context)
-                self.ui_state.imgui_initialized = True
+            self.ui_state.context = imgui.create_context()
+            imgui.set_current_context(self.ui_state.context)
+            self.ui_state.imgui_initialized = True
             return True
         except Exception as e:
             logger.error(f"ImGui initialization failed: {e}")
@@ -164,6 +168,10 @@ class Screen:
             logger.error(f"Render error: {e}")
 
     def handle_input(self, input_data: Dict[str, Any]) -> None:
+        # Add quit handling
+        if input_data.get("type") == "quit":
+            self.should_quit = True
+            
         current_screen = self.screens.get(self.active_screen)
         if current_screen:
             current_screen.handle_input(input_data)
@@ -183,34 +191,64 @@ class Screen:
     def set_model_manager(self, model_manager: ModelManager):
         self.model_manager = model_manager
 
+    def process_frame(self, frame_data: Dict[str, Any]) -> bool:
+        """Process a single frame. Returns False if window should close."""
+        if not self.ui_state.is_initialized:
+            return False
+
+        try:
+            # Process window events
+            self.renderer.process_events()
+            if self.renderer.window_should_close():
+                self.should_quit = True
+                return False
+                
+            # Handle queued inputs
+            self._process_inputs()
+                
+            # Render frame
+            with self.frame():
+                current_screen = self.screens.get(self.active_screen)
+                if current_screen:
+                    current_screen.render(frame_data)
+                    
+            return True
+            
+        except Exception as e:
+            logger.error(f"Frame processing error: {e}")
+            return False
+            
+    def _process_inputs(self):
+        """Process queued input events"""
+        try:
+            for event in self.renderer.get_input_events():
+                if event.type == "quit":
+                    self.should_quit = True
+                elif event.type == "keydown" and event.key == "escape":
+                    self.should_quit = True
+                else:
+                    self.handle_input(event)
+        except Exception as e:
+            logger.error(f"Input processing error: {e}")
+            
     def handle_typed_input(self, text: str):
-        if self.llm:
+        if self.llm and not self.should_quit:
             response = self.llm.generate_response(text)
             self.chat_history.add_message(text, is_user=True)
             self.typing_interface.simulate_typing(response)
-            self.chat_history.add_message(response, is_user=False)
+            self.chat_history.add_assistant_message(response)
 
     def cleanup(self) -> None:
-        """Clean up resources"""
-        try:
-            if hasattr(self, 'renderer') and self.renderer:
-                self.renderer.cleanup()
-            self.is_initialized = False
-        except Exception as e:
-            logger.error(f"Cleanup error: {e}")
-        if hasattr(self, 'session_manager'):
-            self.session_manager.cleanup()
+        if self.renderer:
+            self.renderer.cleanup()
+        self.is_initialized = False
+        self.session_manager.cleanup()
         try:
             if imgui.get_current_context():
                 imgui.destroy_context()
         except Exception as e:
             logger.error(f"Error destroying ImGui context: {e}")
-        
-        # Cleanup screens
-        if hasattr(self, 'screens'):
-            for screen in self.screens.values():
-                screen.cleanup()
 
-    def should_exit(self) -> bool:
-        """Check if application should exit"""
-        return self.should_quit or self.interrupt_received
+    def set_should_quit(self, value: bool):
+        """Set the should_quit flag"""
+        self.should_quit = value

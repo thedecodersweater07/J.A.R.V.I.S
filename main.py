@@ -3,40 +3,31 @@ import sys
 import json
 import signal
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 from pathlib import Path
 from datetime import datetime
+import torch
 
 # Import core components
 from core.logging import setup_logging, get_logger
 from core.brain.cerebrum import Cerebrum
 from core.command.command_parser import CommandParser
 from core.command.executor import CommandExecutor
-from ui.screen import Screen
-from ui.input.voice_input import VoiceInput
-from ui.input.text_input import TextInput
-from security.authentication.identity_verifier import IdentityVerifier
-from ml.model_manager import ModelManager
-from llm.core import LLMCore
-from llm.learning import LearningManager
-from llm.knowledge import KnowledgeManager
-from llm.inference import InferenceEngine
-from nlp.language_processor import LanguageProcessor
-from nlp.conversation.conversation_handler import ConversationHandler
-from config.config_validator import ConfigValidator
-from config.validation_schemas import NLP_SCHEMA, LLM_SCHEMA, UI_SCHEMA, DATABASE_SCHEMA
 from db.manager import DatabaseManager
+from llm.core.llm_core import LLMCore
+from ui.screen import Screen
+from core.constants import OPENGL_AVAILABLE
+from core.config import ConfigValidator
+
+# Add new imports
+from models.jarvis.model import JarvisModel
+from llm.knowledge import KnowledgeManager
+from llm.learning.learning_manager import LearningManager
+from llm.inference.inference_engine import InferenceEngine
+from ml.models import ModelManager
 
 # Set up logger
 logger = get_logger(__name__)
-
-# Check OpenGL availability
-try:
-    import OpenGL
-    OPENGL_AVAILABLE = True
-except ImportError:
-    OPENGL_AVAILABLE = False
-
 
 class JARVIS:
     def __init__(self):
@@ -74,7 +65,7 @@ class JARVIS:
         return {
             "system": {
                 "name": "JARVIS",
-                "version": "2.5.0",
+                "version": "0.0.0",
                 "language": "nl-NL",
                 "log_level": "INFO",
                 "memory_limit": "16G",
@@ -82,7 +73,8 @@ class JARVIS:
             },
             "nlp": {
                 "language": "nl",
-                "model": "gpt2",
+                "model": "jarvis-nlp",
+                "tokenizer": "bert-base-multilingual-cased",
                 "max_length": 100,
                 "models": {
                     "sentiment": "distilbert-base-multilingual-cased",
@@ -92,7 +84,8 @@ class JARVIS:
             },
             "llm": {
                 "model": {
-                    "name": "gpt2",
+                    "name": "jarvis-llm",
+                    "type": "transformer",
                     "max_length": 100
                 }
             },
@@ -178,7 +171,20 @@ class JARVIS:
 
     def _init_ml_components(self):
         try:
-            self.model_manager = ModelManager()
+            # Initialize model
+            model_name = self.config.get("model", "jarvis-base")
+            self.model = JarvisModel(model_name)
+            
+            # Verify CUDA availability
+            if torch.cuda.is_available():
+                self.model = self.model.to('cuda')
+                self.logger.info("Using CUDA for model acceleration")
+                
+            # Connect pipelines
+            tasks = ["classification", "generation", "qa"]
+            text = "Initialize system check"
+            results = self.model.process_pipeline(text, tasks)
+            
             self.logger.info("ML components initialized")
         except Exception as e:
             self.logger.error(f"ML initialization failed: {e}")
@@ -198,21 +204,30 @@ class JARVIS:
             self.logger.error(f"UI initialization failed: {e}")
             raise
 
+    def process_input(self, text: str, tasks: List[str]) -> Dict[str, Any]:
+        """Process user input through model pipeline"""
+        try:
+            return self.model.process_pipeline(text, tasks)
+        except Exception as e:
+            self.logger.error(f"Error processing input: {e}")
+            return {"error": str(e)}
+
     def run(self):
-        """Main application loop with improved error handling"""
+        """Main execution loop"""
         if not self.initialized:
             self.logger.error("Cannot run: JARVIS not properly initialized")
             return
 
         try:
             self.logger.info("Starting main loop...")
-            while not self.screen.should_exit:
+            while not self.screen.should_quit:
                 try:
-                    self.screen.render({
+                    if not self.screen.process_frame({
                         "timestamp": datetime.now(),
                         "status": "running",
                         "metrics": self._get_system_metrics()
-                    })
+                    }):
+                        break  # Exit if window was closed
                 except Exception as e:
                     self.logger.error(f"Error in main loop: {e}")
                     self.error_count += 1
@@ -226,6 +241,7 @@ class JARVIS:
             raise
         finally:
             self._cleanup()
+            self.logger.info("JARVIS shutdown complete")
 
     def _cleanup(self):
         self.logger.info("Starting cleanup...")

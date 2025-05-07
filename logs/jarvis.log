@@ -518,3 +518,718 @@ Traceback (most recent call last):
     self.register_screen("chat", ChatScreen(self.llm_pipeline))
                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 TypeError: Can't instantiate abstract class ChatScreen without an implementation for abstract methods 'handle_input', 'init'
+2025-05-07 20:58:33,292 | [95mCRITICAL[0m | [__main__:46] | Failed to initialize JARVIS: name 'ConfigValidator' is not defined
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 34, in __init__
+    self.config_validator = ConfigValidator()
+                            ^^^^^^^^^^^^^^^
+NameError: name 'ConfigValidator' is not defined
+2025-05-07 21:07:11,385 | [91mERROR[0m | [__main__:116] | Failed to initialize config system: ConfigValidator.validate() takes 2 positional arguments but 3 were given
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 109, in _load_config
+    if not self.config_validator.validate(config.get(section, {}), section):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: ConfigValidator.validate() takes 2 positional arguments but 3 were given
+2025-05-07 21:07:11,385 | [91mERROR[0m | [__main__:157] | System initialization failed: name 'DatabaseManager' is not defined
+2025-05-07 21:07:11,385 | [91mERROR[0m | [__main__:133] | Core components initialization failed: name 'DatabaseManager' is not defined
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 124, in _init_core_components
+    self._init_systems()
+  File "c:\nova_industrie\jarvis\main.py", line 140, in _init_systems
+    self.db_manager = DatabaseManager()
+                      ^^^^^^^^^^^^^^^
+NameError: name 'DatabaseManager' is not defined
+2025-05-07 21:07:11,389 | [95mCRITICAL[0m | [__main__:47] | Failed to initialize JARVIS: name 'DatabaseManager' is not defined
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 39, in __init__
+    self._init_core_components()
+  File "c:\nova_industrie\jarvis\main.py", line 124, in _init_core_components
+    self._init_systems()
+  File "c:\nova_industrie\jarvis\main.py", line 140, in _init_systems
+    self.db_manager = DatabaseManager()
+                      ^^^^^^^^^^^^^^^
+NameError: name 'DatabaseManager' is not defined
+2025-05-07 21:09:50,716 | [91mERROR[0m | [__main__:124] | Failed to initialize config system: ConfigValidator.validate() takes 2 positional arguments but 3 were given
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 117, in _load_config
+    if not self.config_validator.validate(config.get(section, {}), section):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: ConfigValidator.validate() takes 2 positional arguments but 3 were given
+2025-05-07 21:09:50,747 | [92mINFO[0m | [__main__:163] | System components initialized
+2025-05-07 21:09:50,747 | [92mINFO[0m | [llm.optimization.llm_optimizer:35] | Initializing LLMOptimizer with device: cpu
+2025-05-07 21:09:50,749 | [92mINFO[0m | [llm.core.llm_core:64] | Loading model: gpt2
+2025-05-07 21:09:52,113 | [92mINFO[0m | [llm.optimization.llm_optimizer:53] | Model optimization completed successfully
+2025-05-07 21:09:52,114 | [92mINFO[0m | [llm.core.llm_core:31] | LLMCore initialized successfully
+2025-05-07 21:09:52,114 | [92mINFO[0m | [__main__:138] | Core components initialized
+2025-05-07 21:09:52,114 | [92mINFO[0m | [__main__:171] | ML components initialized
+2025-05-07 21:09:53,239 | [91mERROR[0m | [ui.rendering.opengl_renderer:46] | OpenGL initialization failed: No valid ImGui context. Use imgui.create_context() first and/or imgui.set_current_context().
+2025-05-07 21:09:53,239 | [91mERROR[0m | [security.auth.auth_service:36] | Failed to setup auth database: 'Database' object is not callable
+2025-05-07 21:09:53,239 | [92mINFO[0m | [security.auth.auth_service:20] | AuthService initialized
+2025-05-07 21:09:53,240 | [91mERROR[0m | [__main__:187] | UI initialization failed: Can't instantiate abstract class ChatScreen without an implementation for abstract methods 'handle_input', 'init'
+2025-05-07 21:09:53,240 | [95mCRITICAL[0m | [__main__:55] | Failed to initialize JARVIS: Can't instantiate abstract class ChatScreen without an implementation for abstract methods 'handle_input', 'init'
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 49, in __init__
+    self._init_ui()
+  File "c:\nova_industrie\jarvis\main.py", line 180, in _init_ui
+    success = self.screen.init()
+              ^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\ui\screen.py", line 89, in init
+    self._init_screens()
+  File "c:\nova_industrie\jarvis\ui\screen.py", line 117, in _init_screens
+    self.register_screen("chat", ChatScreen(self.llm_pipeline))
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Can't instantiate abstract class ChatScreen without an implementation for abstract methods 'handle_input', 'init'
+2025-05-07 21:11:05,640 | [93mWARNING[0m | [__main__:118] | Invalid llm config, using defaults
+2025-05-07 21:11:05,645 | [92mINFO[0m | [__main__:163] | System components initialized
+2025-05-07 21:11:05,645 | [92mINFO[0m | [llm.optimization.llm_optimizer:35] | Initializing LLMOptimizer with device: cpu
+2025-05-07 21:11:05,647 | [92mINFO[0m | [llm.core.llm_core:64] | Loading model: gpt2
+2025-05-07 21:11:06,531 | [92mINFO[0m | [llm.optimization.llm_optimizer:53] | Model optimization completed successfully
+2025-05-07 21:11:06,531 | [92mINFO[0m | [llm.core.llm_core:31] | LLMCore initialized successfully
+2025-05-07 21:11:06,531 | [92mINFO[0m | [__main__:138] | Core components initialized
+2025-05-07 21:11:06,531 | [92mINFO[0m | [__main__:171] | ML components initialized
+2025-05-07 21:11:07,709 | [91mERROR[0m | [security.auth.auth_service:36] | Failed to setup auth database: 'Database' object is not callable
+2025-05-07 21:11:07,709 | [92mINFO[0m | [security.auth.auth_service:20] | AuthService initialized
+2025-05-07 21:11:07,710 | [91mERROR[0m | [__main__:187] | UI initialization failed: Can't instantiate abstract class DataScreen without an implementation for abstract methods 'handle_input', 'init', 'render'
+2025-05-07 21:11:07,710 | [95mCRITICAL[0m | [__main__:55] | Failed to initialize JARVIS: Can't instantiate abstract class DataScreen without an implementation for abstract methods 'handle_input', 'init', 'render'
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 49, in __init__
+    self._init_ui()
+  File "c:\nova_industrie\jarvis\main.py", line 180, in _init_ui
+    success = self.screen.init()
+              ^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\ui\screen.py", line 87, in init
+    self._init_screens()
+  File "c:\nova_industrie\jarvis\ui\screen.py", line 122, in _init_screens
+    self.register_screen("data", DataScreen())
+                                 ^^^^^^^^^^^^
+TypeError: Can't instantiate abstract class DataScreen without an implementation for abstract methods 'handle_input', 'init', 'render'
+2025-05-07 21:12:18,248 | [93mWARNING[0m | [__main__:118] | Invalid llm config, using defaults
+2025-05-07 21:12:18,253 | [92mINFO[0m | [__main__:163] | System components initialized
+2025-05-07 21:12:18,253 | [92mINFO[0m | [llm.optimization.llm_optimizer:35] | Initializing LLMOptimizer with device: cpu
+2025-05-07 21:12:18,254 | [92mINFO[0m | [llm.core.llm_core:64] | Loading model: gpt2
+2025-05-07 21:12:18,965 | [92mINFO[0m | [llm.optimization.llm_optimizer:53] | Model optimization completed successfully
+2025-05-07 21:12:18,966 | [92mINFO[0m | [llm.core.llm_core:31] | LLMCore initialized successfully
+2025-05-07 21:12:18,966 | [92mINFO[0m | [__main__:138] | Core components initialized
+2025-05-07 21:12:18,966 | [92mINFO[0m | [__main__:171] | ML components initialized
+2025-05-07 21:12:20,021 | [91mERROR[0m | [security.auth.auth_service:36] | Failed to setup auth database: 'Database' object is not callable
+2025-05-07 21:12:20,021 | [92mINFO[0m | [security.auth.auth_service:20] | AuthService initialized
+2025-05-07 21:12:20,023 | [91mERROR[0m | [__main__:187] | UI initialization failed: Can't instantiate abstract class DataScreen without an implementation for abstract methods 'handle_input', 'init', 'render'
+2025-05-07 21:12:20,023 | [95mCRITICAL[0m | [__main__:55] | Failed to initialize JARVIS: Can't instantiate abstract class DataScreen without an implementation for abstract methods 'handle_input', 'init', 'render'
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 49, in __init__
+    self._init_ui()
+  File "c:\nova_industrie\jarvis\main.py", line 180, in _init_ui
+    success = self.screen.init()
+              ^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\ui\screen.py", line 87, in init
+    self._init_screens()
+  File "c:\nova_industrie\jarvis\ui\screen.py", line 122, in _init_screens
+    self.register_screen("data", DataScreen())
+                                 ^^^^^^^^^^^^
+TypeError: Can't instantiate abstract class DataScreen without an implementation for abstract methods 'handle_input', 'init', 'render'
+2025-05-07 21:13:33,554 | [93mWARNING[0m | [__main__:118] | Invalid llm config, using defaults
+2025-05-07 21:13:33,559 | [92mINFO[0m | [__main__:163] | System components initialized
+2025-05-07 21:13:33,559 | [92mINFO[0m | [llm.optimization.llm_optimizer:35] | Initializing LLMOptimizer with device: cpu
+2025-05-07 21:13:33,560 | [92mINFO[0m | [llm.core.llm_core:64] | Loading model: gpt2
+2025-05-07 21:13:34,432 | [92mINFO[0m | [llm.optimization.llm_optimizer:53] | Model optimization completed successfully
+2025-05-07 21:13:34,433 | [92mINFO[0m | [llm.core.llm_core:31] | LLMCore initialized successfully
+2025-05-07 21:13:34,433 | [92mINFO[0m | [__main__:138] | Core components initialized
+2025-05-07 21:13:34,433 | [92mINFO[0m | [__main__:171] | ML components initialized
+2025-05-07 21:13:35,517 | [91mERROR[0m | [security.auth.auth_service:36] | Failed to setup auth database: 'Database' object is not callable
+2025-05-07 21:13:35,517 | [92mINFO[0m | [security.auth.auth_service:20] | AuthService initialized
+2025-05-07 21:13:35,517 | [92mINFO[0m | [__main__:185] | UI initialized successfully
+2025-05-07 21:13:35,517 | [92mINFO[0m | [__main__:52] | JARVIS initialization complete
+2025-05-07 21:13:35,517 | [92mINFO[0m | [__main__:197] | Starting main loop...
+2025-05-07 21:13:35,518 | [95mCRITICAL[0m | [__main__:214] | Fatal error in main loop: 'Screen' object has no attribute 'should_exit'
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 198, in run
+    while not self.screen.should_exit:
+              ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Screen' object has no attribute 'should_exit'. Did you mean: 'should_quit'?
+2025-05-07 21:13:35,519 | [92mINFO[0m | [__main__:220] | Starting cleanup...
+2025-05-07 21:13:35,526 | [91mERROR[0m | [ui.screen:206] | Error destroying ImGui context: Context invalid (None or destroyed)
+2025-05-07 21:14:40,144 | [93mWARNING[0m | [__main__:118] | Invalid llm config, using defaults
+2025-05-07 21:14:40,149 | [92mINFO[0m | [__main__:163] | System components initialized
+2025-05-07 21:14:40,149 | [92mINFO[0m | [llm.optimization.llm_optimizer:35] | Initializing LLMOptimizer with device: cpu
+2025-05-07 21:14:40,149 | [92mINFO[0m | [llm.core.llm_core:64] | Loading model: gpt2
+2025-05-07 21:14:40,882 | [92mINFO[0m | [llm.optimization.llm_optimizer:53] | Model optimization completed successfully
+2025-05-07 21:14:40,882 | [92mINFO[0m | [llm.core.llm_core:31] | LLMCore initialized successfully
+2025-05-07 21:14:40,883 | [92mINFO[0m | [__main__:138] | Core components initialized
+2025-05-07 21:14:40,883 | [92mINFO[0m | [__main__:171] | ML components initialized
+2025-05-07 21:14:42,020 | [91mERROR[0m | [security.auth.auth_service:36] | Failed to setup auth database: 'Database' object is not callable
+2025-05-07 21:14:42,020 | [92mINFO[0m | [security.auth.auth_service:20] | AuthService initialized
+2025-05-07 21:14:42,020 | [92mINFO[0m | [__main__:185] | UI initialized successfully
+2025-05-07 21:14:42,020 | [92mINFO[0m | [__main__:52] | JARVIS initialization complete
+2025-05-07 21:14:42,021 | [92mINFO[0m | [__main__:197] | Starting main loop...
+2025-05-07 21:14:42,021 | [95mCRITICAL[0m | [__main__:214] | Fatal error in main loop: 'Screen' object has no attribute 'should_exit'
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 198, in run
+    while not self.screen.should_exit:
+              ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Screen' object has no attribute 'should_exit'. Did you mean: 'should_quit'?
+2025-05-07 21:14:42,023 | [92mINFO[0m | [__main__:220] | Starting cleanup...
+2025-05-07 21:14:42,042 | [91mERROR[0m | [ui.screen:206] | Error destroying ImGui context: Context invalid (None or destroyed)
+2025-05-07 21:16:24,303 | [93mWARNING[0m | [__main__:120] | Invalid llm config, using defaults
+2025-05-07 21:16:24,309 | [92mINFO[0m | [__main__:165] | System components initialized
+2025-05-07 21:16:24,309 | [92mINFO[0m | [llm.optimization.llm_optimizer:35] | Initializing LLMOptimizer with device: cpu
+2025-05-07 21:16:24,309 | [92mINFO[0m | [llm.core.llm_core:64] | Loading model: jarvis-llm
+2025-05-07 21:16:24,520 | [91mERROR[0m | [llm.core.llm_core:74] | Model initialization failed: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 409, in hf_raise_for_status
+    response.raise_for_status()
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\requests\models.py", line 1024, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 424, in cached_files
+    hf_hub_download(
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 961, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1068, in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1596, in _raise_on_head_call_error
+    raise head_call_error
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1484, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1401, in get_hf_file_metadata
+    r = _request_wrapper(
+        ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 285, in _request_wrapper
+    response = _request_wrapper(
+               ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    hf_raise_for_status(response)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 459, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-681bb19b-6e8f21a54f52b18345f4ed64;02ae7881-695d-4b78-96a2-5921580a1f24)
+
+Repository Not Found for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 66, in _initialize_model
+    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 946, in from_pretrained
+    tokenizer_config = get_tokenizer_config(pretrained_model_name_or_path, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 778, in get_tokenizer_config
+    resolved_config_file = cached_file(
+                           ^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 266, in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 456, in cached_files
+    raise OSError(
+OSError: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+2025-05-07 21:16:24,575 | [91mERROR[0m | [llm.core.llm_core:34] | Failed to initialize LLMCore: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 409, in hf_raise_for_status
+    response.raise_for_status()
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\requests\models.py", line 1024, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 424, in cached_files
+    hf_hub_download(
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 961, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1068, in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1596, in _raise_on_head_call_error
+    raise head_call_error
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1484, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1401, in get_hf_file_metadata
+    r = _request_wrapper(
+        ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 285, in _request_wrapper
+    response = _request_wrapper(
+               ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    hf_raise_for_status(response)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 459, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-681bb19b-6e8f21a54f52b18345f4ed64;02ae7881-695d-4b78-96a2-5921580a1f24)
+
+Repository Not Found for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 30, in __init__
+    self._initialize_model()
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 66, in _initialize_model
+    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 946, in from_pretrained
+    tokenizer_config = get_tokenizer_config(pretrained_model_name_or_path, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 778, in get_tokenizer_config
+    resolved_config_file = cached_file(
+                           ^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 266, in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 456, in cached_files
+    raise OSError(
+OSError: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+2025-05-07 21:16:24,578 | [91mERROR[0m | [__main__:143] | Core components initialization failed: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 409, in hf_raise_for_status
+    response.raise_for_status()
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\requests\models.py", line 1024, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 424, in cached_files
+    hf_hub_download(
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 961, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1068, in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1596, in _raise_on_head_call_error
+    raise head_call_error
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1484, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1401, in get_hf_file_metadata
+    r = _request_wrapper(
+        ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 285, in _request_wrapper
+    response = _request_wrapper(
+               ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    hf_raise_for_status(response)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 459, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-681bb19b-6e8f21a54f52b18345f4ed64;02ae7881-695d-4b78-96a2-5921580a1f24)
+
+Repository Not Found for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 138, in _init_core_components
+    self.llm = LLMCore(config=llm_config)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 30, in __init__
+    self._initialize_model()
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 66, in _initialize_model
+    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 946, in from_pretrained
+    tokenizer_config = get_tokenizer_config(pretrained_model_name_or_path, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 778, in get_tokenizer_config
+    resolved_config_file = cached_file(
+                           ^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 266, in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 456, in cached_files
+    raise OSError(
+OSError: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+2025-05-07 21:16:24,580 | [95mCRITICAL[0m | [__main__:55] | Failed to initialize JARVIS: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 409, in hf_raise_for_status
+    response.raise_for_status()
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\requests\models.py", line 1024, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 424, in cached_files
+    hf_hub_download(
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 961, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1068, in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1596, in _raise_on_head_call_error
+    raise head_call_error
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1484, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1401, in get_hf_file_metadata
+    r = _request_wrapper(
+        ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 285, in _request_wrapper
+    response = _request_wrapper(
+               ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    hf_raise_for_status(response)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 459, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-681bb19b-6e8f21a54f52b18345f4ed64;02ae7881-695d-4b78-96a2-5921580a1f24)
+
+Repository Not Found for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 47, in __init__
+    self._init_core_components()
+  File "c:\nova_industrie\jarvis\main.py", line 138, in _init_core_components
+    self.llm = LLMCore(config=llm_config)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 30, in __init__
+    self._initialize_model()
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 66, in _initialize_model
+    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 946, in from_pretrained
+    tokenizer_config = get_tokenizer_config(pretrained_model_name_or_path, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 778, in get_tokenizer_config
+    resolved_config_file = cached_file(
+                           ^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 266, in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 456, in cached_files
+    raise OSError(
+OSError: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+2025-05-07 21:19:45,400 | [93mWARNING[0m | [__main__:120] | Invalid llm config, using defaults
+2025-05-07 21:19:45,405 | [92mINFO[0m | [__main__:165] | System components initialized
+2025-05-07 21:19:45,405 | [92mINFO[0m | [llm.optimization.llm_optimizer:35] | Initializing LLMOptimizer with device: cpu
+2025-05-07 21:19:45,405 | [92mINFO[0m | [llm.core.llm_core:64] | Loading model: jarvis-llm
+2025-05-07 21:19:45,627 | [91mERROR[0m | [llm.core.llm_core:74] | Model initialization failed: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 409, in hf_raise_for_status
+    response.raise_for_status()
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\requests\models.py", line 1024, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 424, in cached_files
+    hf_hub_download(
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 961, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1068, in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1596, in _raise_on_head_call_error
+    raise head_call_error
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1484, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1401, in get_hf_file_metadata
+    r = _request_wrapper(
+        ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 285, in _request_wrapper
+    response = _request_wrapper(
+               ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    hf_raise_for_status(response)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 459, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-681bb264-0e671fe528aced6c61747a3c;49e9230e-767f-49dd-95eb-0853f4a7e7ac)
+
+Repository Not Found for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 66, in _initialize_model
+    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 946, in from_pretrained
+    tokenizer_config = get_tokenizer_config(pretrained_model_name_or_path, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 778, in get_tokenizer_config
+    resolved_config_file = cached_file(
+                           ^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 266, in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 456, in cached_files
+    raise OSError(
+OSError: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+2025-05-07 21:19:45,632 | [91mERROR[0m | [llm.core.llm_core:34] | Failed to initialize LLMCore: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 409, in hf_raise_for_status
+    response.raise_for_status()
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\requests\models.py", line 1024, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 424, in cached_files
+    hf_hub_download(
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 961, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1068, in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1596, in _raise_on_head_call_error
+    raise head_call_error
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1484, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1401, in get_hf_file_metadata
+    r = _request_wrapper(
+        ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 285, in _request_wrapper
+    response = _request_wrapper(
+               ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    hf_raise_for_status(response)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 459, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-681bb264-0e671fe528aced6c61747a3c;49e9230e-767f-49dd-95eb-0853f4a7e7ac)
+
+Repository Not Found for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 30, in __init__
+    self._initialize_model()
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 66, in _initialize_model
+    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 946, in from_pretrained
+    tokenizer_config = get_tokenizer_config(pretrained_model_name_or_path, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 778, in get_tokenizer_config
+    resolved_config_file = cached_file(
+                           ^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 266, in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 456, in cached_files
+    raise OSError(
+OSError: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+2025-05-07 21:19:45,635 | [91mERROR[0m | [__main__:143] | Core components initialization failed: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 409, in hf_raise_for_status
+    response.raise_for_status()
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\requests\models.py", line 1024, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 424, in cached_files
+    hf_hub_download(
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 961, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1068, in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1596, in _raise_on_head_call_error
+    raise head_call_error
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1484, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1401, in get_hf_file_metadata
+    r = _request_wrapper(
+        ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 285, in _request_wrapper
+    response = _request_wrapper(
+               ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    hf_raise_for_status(response)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 459, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-681bb264-0e671fe528aced6c61747a3c;49e9230e-767f-49dd-95eb-0853f4a7e7ac)
+
+Repository Not Found for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 138, in _init_core_components
+    self.llm = LLMCore(config=llm_config)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 30, in __init__
+    self._initialize_model()
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 66, in _initialize_model
+    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 946, in from_pretrained
+    tokenizer_config = get_tokenizer_config(pretrained_model_name_or_path, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 778, in get_tokenizer_config
+    resolved_config_file = cached_file(
+                           ^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 266, in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 456, in cached_files
+    raise OSError(
+OSError: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+2025-05-07 21:19:45,638 | [95mCRITICAL[0m | [__main__:55] | Failed to initialize JARVIS: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 409, in hf_raise_for_status
+    response.raise_for_status()
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\requests\models.py", line 1024, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 424, in cached_files
+    hf_hub_download(
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 961, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1068, in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1596, in _raise_on_head_call_error
+    raise head_call_error
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1484, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 1401, in get_hf_file_metadata
+    r = _request_wrapper(
+        ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 285, in _request_wrapper
+    response = _request_wrapper(
+               ^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    hf_raise_for_status(response)
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\huggingface_hub\utils\_http.py", line 459, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-681bb264-0e671fe528aced6c61747a3c;49e9230e-767f-49dd-95eb-0853f4a7e7ac)
+
+Repository Not Found for url: https://huggingface.co/jarvis-llm/resolve/main/tokenizer_config.json.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 47, in __init__
+    self._init_core_components()
+  File "c:\nova_industrie\jarvis\main.py", line 138, in _init_core_components
+    self.llm = LLMCore(config=llm_config)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 30, in __init__
+    self._initialize_model()
+  File "c:\nova_industrie\jarvis\llm\core\llm_core.py", line 66, in _initialize_model
+    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 946, in from_pretrained
+    tokenizer_config = get_tokenizer_config(pretrained_model_name_or_path, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\models\auto\tokenization_auto.py", line 778, in get_tokenizer_config
+    resolved_config_file = cached_file(
+                           ^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 266, in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bruce\AppData\Roaming\Python\Python312\site-packages\transformers\utils\hub.py", line 456, in cached_files
+    raise OSError(
+OSError: jarvis-llm is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
