@@ -5,9 +5,11 @@ import aiohttp
 from datetime import datetime
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from db.database import Database
+from db.sql.database_manager import DatabaseManager  # Use DatabaseManager only
 from .pipelines.structured_learning import StructuredLearningPipeline
 from .pipelines.adaptive_learning import AdaptiveLearningPipeline
+from llm.knowledge import KnowledgeManager
+from llm.virtual_environment import VirtualEnvironmentManager
 
 try:
     import pymongo
@@ -20,15 +22,26 @@ logger = logging.getLogger(__name__)
 class LearningManager:
     """Manages continuous learning from various sources with improved error handling"""
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], knowledge_manager: Optional[KnowledgeManager] = None):
         self.config = config
         self.batch_size = config.get('batch_size', 32)
         self.retry_attempts = config.get('retry_attempts', 3)
         self.model = None
         self.tokenizer = None
-        self.db = Database()
-        self.structured_pipeline = StructuredLearningPipeline()
-        self.adaptive_pipeline = AdaptiveLearningPipeline()
+        self.db = DatabaseManager()
+        self.knowledge_manager = knowledge_manager or KnowledgeManager(self.db)
+        self.virtual_env_manager = VirtualEnvironmentManager(config.get('virtual_environment', {}))
+        self.experiment_tasks = []
+        
+        # Initialize pipelines with config and knowledge manager
+        self.structured_pipeline = StructuredLearningPipeline(
+            config=config.get('structured_learning', {}),
+            knowledge_manager=self.knowledge_manager
+        )
+        self.adaptive_pipeline = AdaptiveLearningPipeline(
+            config=config.get('adaptive_learning', {}),
+            knowledge_manager=self.knowledge_manager
+        )
 
     async def initialize(self):
         """Initialize the learning system"""
@@ -114,6 +127,7 @@ class LearningManager:
                 for source_name, settings in sources.items():
                     if settings.get('enabled', False):
                         await self._scrape_source(source_name)
+                        await self._run_virtual_experiments(source_name)
                         await asyncio.sleep(settings.get('frequency', 3600))
                         
             except Exception as e:
@@ -139,6 +153,38 @@ class LearningManager:
                     
         except Exception as e:
             logger.error(f"Error scraping source {source}: {e}")
+            
+    async def _run_virtual_experiments(self, topic: str) -> None:
+        """Run experiments in virtual environment based on learned topics"""
+        try:
+            sim_id = await self.virtual_env_manager.create_simulation(
+                "knowledge_validation",
+                {"topic": topic}
+            )
+            
+            experiment_config = {
+                "topic": topic,
+                "validation_steps": 10,
+                "learning_rate": 0.001
+            }
+            
+            results = await self.virtual_env_manager.run_experiment(
+                sim_id, 
+                experiment_config
+            )
+            
+            await self._integrate_experiment_results(results)
+            
+        except Exception as e:
+            logger.error(f"Virtual experiment error: {e}")
+
+    async def _integrate_experiment_results(self, results: Dict[str, Any]) -> None:
+        """Integrate experimental results into knowledge base"""
+        if results.get("confidence_score", 0) > 0.8:
+            await self.knowledge_manager.add_validated_knowledge(
+                results["topic"],
+                results["learned_data"]
+            )
             
     async def _perform_self_improvement(self):
         """Enhanced continuous self-improvement loop with batch processing"""

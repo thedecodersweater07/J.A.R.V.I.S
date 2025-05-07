@@ -1,6 +1,7 @@
 import logging
 from typing import Dict, List, Optional
-from db.database import Database
+from db.sql.models.database import Database
+from db.sql.database_manager import DatabaseManager
 import numpy as np
 from datetime import datetime
 
@@ -9,8 +10,8 @@ logger = logging.getLogger(__name__)
 class KnowledgeManager:
     """Manages knowledge storage and retrieval"""
     
-    def __init__(self, db: Database):
-        self.db = db
+    def __init__(self, db: Optional[Database] = None):
+        self.db = db or DatabaseManager().db
         self.knowledge_cache = {}
         
     async def initialize(self):

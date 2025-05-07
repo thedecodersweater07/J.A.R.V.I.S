@@ -1,10 +1,14 @@
-from typing import Optional, Union, Any
+from typing import Optional, Union, Any, Dict
 import sqlite3
+from pathlib import Path
 from .models.database import Database
 
 class DatabaseManager:
-    def __init__(self):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        self.config = config or {}
         self.db = Database.get_instance()
+        if self.config.get('path'):
+            self.db.db_root = Path(self.config['path'])
         
     def get_connection(self) -> Union[Any, sqlite3.Connection]:
         return self.db.get_client()

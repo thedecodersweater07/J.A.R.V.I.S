@@ -1,0 +1,27 @@
+module_connections:
+  llm:
+    knowledge:
+      type: bidirectional
+      batch_size: 32
+      cache_enabled: true
+    memory:
+      type: bidirectional
+      max_context: 1000
+      priority: high
+      
+  ml:
+    data_processor:
+      type: pipeline
+      buffer_size: 1000
+      parallel_processing: true
+    model_manager:
+      type: service
+      auto_reload: true
+      
+  brain:
+    cognitive_functions:
+      type: direct
+      sync_mode: true
+    memory:
+      type: cached
+      cache_size: 10000

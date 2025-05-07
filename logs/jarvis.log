@@ -206,3 +206,315 @@ Traceback (most recent call last):
     if self.config.attention_slicing:
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 AttributeError: 'dict' object has no attribute 'attention_slicing'
+2025-05-07 16:27:08,121 | [95mCRITICAL[0m | [__main__:59] | Failed to initialize JARVIS: 'JARVIS' object has no attribute '_init_config'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 50, in __init__
+    self._init_config()
+    ^^^^^^^^^^^^^^^^^
+AttributeError: 'JARVIS' object has no attribute '_init_config'. Did you mean: '_load_config'?
+2025-05-07 16:28:16,618 | [91mERROR[0m | [__main__:87] | Failed to initialize config system
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 72, in _load_config
+    self.logger.warning("Config file not found, using defaults")
+    ^^^^^^^^^^^
+AttributeError: 'JARVIS' object has no attribute 'logger'
+2025-05-07 16:28:16,619 | [95mCRITICAL[0m | [__main__:61] | Failed to initialize JARVIS: 'JARVIS' object has no attribute 'logger'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 52, in __init__
+    self.config = self._load_config()  # Use existing _load_config instead of _init_config
+                  ^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/main.py", line 72, in _load_config
+    self.logger.warning("Config file not found, using defaults")
+    ^^^^^^^^^^^
+AttributeError: 'JARVIS' object has no attribute 'logger'
+2025-05-07 16:29:59,233 | [91mERROR[0m | [config.config_validator:32] | Config validation failed: 'language' is a required property
+
+Failed validating 'required' in schema:
+    {'type': 'object',
+     'properties': {'language': {'type': 'string', 'enum': ['en', 'nl']},
+                    'models': {'type': 'object',
+                               'properties': {'sentiment': {'type': 'string'},
+                                              'intent': {'type': 'string'},
+                                              'embedding': {'type': 'string'}}},
+                    'tokenizer': {'type': 'object',
+                                  'properties': {'max_length': {'type': 'integer'},
+                                                 'padding': {'type': 'boolean'}}}},
+     'required': ['language']}
+
+On instance:
+    {'model': 'gpt2', 'max_length': 100}
+2025-05-07 16:29:59,234 | [93mWARNING[0m | [__main__:116] | Invalid nlp config, using defaults
+2025-05-07 16:29:59,237 | [91mERROR[0m | [config.config_validator:32] | Config validation failed: {'name': 'gpt2', 'max_length': 100} is not of type 'string'
+
+Failed validating 'type' in schema['properties']['model']:
+    {'type': 'string'}
+
+On instance['model']:
+    {'name': 'gpt2', 'max_length': 100}
+2025-05-07 16:29:59,237 | [93mWARNING[0m | [__main__:116] | Invalid llm config, using defaults
+2025-05-07 16:29:59,237 | [91mERROR[0m | [config.config_validator:26] | Schema ui not found
+2025-05-07 16:29:59,237 | [93mWARNING[0m | [__main__:116] | Invalid ui config, using defaults
+2025-05-07 16:29:59,238 | [92mINFO[0m | [Cerebrum:22] | Cerebrum initialized successfully
+2025-05-07 16:29:59,238 | [91mERROR[0m | [llm.core.llm_core:34] | Failed to initialize LLMCore: DatabaseManager.__init__() got an unexpected keyword argument 'config'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/llm/core/llm_core.py", line 26, in __init__
+    self.db = DatabaseManager(config=self.config.get("database", {}))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: DatabaseManager.__init__() got an unexpected keyword argument 'config'
+2025-05-07 16:29:59,238 | [91mERROR[0m | [__main__:135] | Core components initialization failed: DatabaseManager.__init__() got an unexpected keyword argument 'config'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 130, in _init_core_components
+    self.llm = LLMCore(config=llm_config)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/llm/core/llm_core.py", line 26, in __init__
+    self.db = DatabaseManager(config=self.config.get("database", {}))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: DatabaseManager.__init__() got an unexpected keyword argument 'config'
+2025-05-07 16:29:59,239 | [95mCRITICAL[0m | [__main__:64] | Failed to initialize JARVIS: DatabaseManager.__init__() got an unexpected keyword argument 'config'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 56, in __init__
+    self._init_core_components()
+  File "/workspaces/J.A.R.V.I.S/main.py", line 130, in _init_core_components
+    self.llm = LLMCore(config=llm_config)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/llm/core/llm_core.py", line 26, in __init__
+    self.db = DatabaseManager(config=self.config.get("database", {}))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: DatabaseManager.__init__() got an unexpected keyword argument 'config'
+2025-05-07 16:31:24,267 | [91mERROR[0m | [config.config_validator:32] | Config validation failed: {'name': 'gpt2', 'max_length': 100} is not of type 'string'
+
+Failed validating 'type' in schema['properties']['model']:
+    {'type': 'string'}
+
+On instance['model']:
+    {'name': 'gpt2', 'max_length': 100}
+2025-05-07 16:31:24,268 | [93mWARNING[0m | [__main__:128] | Invalid llm config, using defaults
+2025-05-07 16:31:24,268 | [91mERROR[0m | [config.config_validator:26] | Schema ui not found
+2025-05-07 16:31:24,268 | [93mWARNING[0m | [__main__:128] | Invalid ui config, using defaults
+2025-05-07 16:31:24,268 | [92mINFO[0m | [Cerebrum:22] | Cerebrum initialized successfully
+2025-05-07 16:31:24,280 | [92mINFO[0m | [llm.optimization.llm_optimizer:35] | Initializing LLMOptimizer with device: cpu
+2025-05-07 16:31:24,280 | [92mINFO[0m | [llm.core.llm_core:64] | Loading model: gpt2
+2025-05-07 16:31:25,283 | [92mINFO[0m | [llm.optimization.llm_optimizer:53] | Model optimization completed successfully
+2025-05-07 16:31:25,283 | [92mINFO[0m | [llm.core.llm_core:31] | LLMCore initialized successfully
+2025-05-07 16:31:25,285 | [91mERROR[0m | [__main__:147] | Core components initialization failed: 'Cerebrum' object has no attribute 'initialize'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 143, in _init_core_components
+    self.brain.initialize()
+    ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Cerebrum' object has no attribute 'initialize'. Did you mean: 'initialized'?
+2025-05-07 16:31:25,290 | [95mCRITICAL[0m | [__main__:65] | Failed to initialize JARVIS: 'Cerebrum' object has no attribute 'initialize'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 57, in __init__
+    self._init_core_components()
+  File "/workspaces/J.A.R.V.I.S/main.py", line 143, in _init_core_components
+    self.brain.initialize()
+    ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Cerebrum' object has no attribute 'initialize'. Did you mean: 'initialized'?
+2025-05-07 16:33:41,210 | [91mERROR[0m | [config.config_validator:32] | Config validation failed: {'name': 'gpt2', 'max_length': 100} is not of type 'string'
+
+Failed validating 'type' in schema['properties']['model']:
+    {'type': 'string'}
+
+On instance['model']:
+    {'name': 'gpt2', 'max_length': 100}
+2025-05-07 16:33:41,210 | [93mWARNING[0m | [__main__:128] | Invalid llm config, using defaults
+2025-05-07 16:33:41,211 | [91mERROR[0m | [config.config_validator:26] | Schema ui not found
+2025-05-07 16:33:41,211 | [93mWARNING[0m | [__main__:128] | Invalid ui config, using defaults
+2025-05-07 16:33:41,211 | [91mERROR[0m | [__main__:162] | System initialization failed: KnowledgeManager.__init__() missing 1 required positional argument: 'db'
+2025-05-07 16:33:41,211 | [91mERROR[0m | [__main__:152] | Core components initialization failed: KnowledgeManager.__init__() missing 1 required positional argument: 'db'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 142, in _init_core_components
+    self._init_systems()  # Initialize core systems
+    ^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/main.py", line 158, in _init_systems
+    self.knowledge_manager = KnowledgeManager()
+                             ^^^^^^^^^^^^^^^^^^
+TypeError: KnowledgeManager.__init__() missing 1 required positional argument: 'db'
+2025-05-07 16:33:41,212 | [95mCRITICAL[0m | [__main__:65] | Failed to initialize JARVIS: KnowledgeManager.__init__() missing 1 required positional argument: 'db'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 57, in __init__
+    self._init_core_components()
+  File "/workspaces/J.A.R.V.I.S/main.py", line 142, in _init_core_components
+    self._init_systems()  # Initialize core systems
+    ^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/main.py", line 158, in _init_systems
+    self.knowledge_manager = KnowledgeManager()
+                             ^^^^^^^^^^^^^^^^^^
+TypeError: KnowledgeManager.__init__() missing 1 required positional argument: 'db'
+2025-05-07 16:35:22,912 | [91mERROR[0m | [config.config_validator:32] | Config validation failed: {'name': 'gpt2', 'max_length': 100} is not of type 'string'
+
+Failed validating 'type' in schema['properties']['model']:
+    {'type': 'string'}
+
+On instance['model']:
+    {'name': 'gpt2', 'max_length': 100}
+2025-05-07 16:35:22,912 | [93mWARNING[0m | [__main__:129] | Invalid llm config, using defaults
+2025-05-07 16:35:22,912 | [91mERROR[0m | [config.config_validator:26] | Schema ui not found
+2025-05-07 16:35:22,912 | [93mWARNING[0m | [__main__:129] | Invalid ui config, using defaults
+2025-05-07 16:35:22,917 | [91mERROR[0m | [__main__:168] | System initialization failed: StructuredLearningPipeline.__init__() missing 2 required positional arguments: 'config' and 'knowledge_manager'
+2025-05-07 16:35:22,917 | [91mERROR[0m | [__main__:152] | Core components initialization failed: StructuredLearningPipeline.__init__() missing 2 required positional arguments: 'config' and 'knowledge_manager'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 143, in _init_core_components
+    self._init_systems()
+  File "/workspaces/J.A.R.V.I.S/main.py", line 163, in _init_systems
+    self.learning_manager = LearningManager(self.config.get('learning', {}))
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/llm/learning/learning_manager.py", line 30, in __init__
+    self.structured_pipeline = StructuredLearningPipeline()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: StructuredLearningPipeline.__init__() missing 2 required positional arguments: 'config' and 'knowledge_manager'
+2025-05-07 16:35:22,918 | [95mCRITICAL[0m | [__main__:66] | Failed to initialize JARVIS: StructuredLearningPipeline.__init__() missing 2 required positional arguments: 'config' and 'knowledge_manager'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 58, in __init__
+    self._init_core_components()
+  File "/workspaces/J.A.R.V.I.S/main.py", line 143, in _init_core_components
+    self._init_systems()
+  File "/workspaces/J.A.R.V.I.S/main.py", line 163, in _init_systems
+    self.learning_manager = LearningManager(self.config.get('learning', {}))
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/llm/learning/learning_manager.py", line 30, in __init__
+    self.structured_pipeline = StructuredLearningPipeline()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: StructuredLearningPipeline.__init__() missing 2 required positional arguments: 'config' and 'knowledge_manager'
+2025-05-07 16:46:55,774 | [91mERROR[0m | [config.config_validator:32] | Config validation failed: {'name': 'gpt2', 'max_length': 100} is not of type 'string'
+
+Failed validating 'type' in schema['properties']['model']:
+    {'type': 'string'}
+
+On instance['model']:
+    {'name': 'gpt2', 'max_length': 100}
+2025-05-07 16:46:55,775 | [93mWARNING[0m | [__main__:129] | Invalid llm config, using defaults
+2025-05-07 16:46:55,775 | [91mERROR[0m | [config.config_validator:26] | Schema ui not found
+2025-05-07 16:46:55,775 | [93mWARNING[0m | [__main__:129] | Invalid ui config, using defaults
+2025-05-07 16:46:55,778 | [91mERROR[0m | [__main__:176] | System initialization failed: 'dict' object has no attribute 'to'
+2025-05-07 16:46:55,778 | [91mERROR[0m | [__main__:152] | Core components initialization failed: 'dict' object has no attribute 'to'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 143, in _init_core_components
+    self._init_systems()
+  File "/workspaces/J.A.R.V.I.S/main.py", line 166, in _init_systems
+    self.learning_manager = LearningManager(
+                            ^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/llm/learning/learning_manager.py", line 34, in __init__
+    self.structured_pipeline = StructuredLearningPipeline(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/llm/learning/pipelines/structured_learning.py", line 19, in __init__
+    self.trainer = ModelTrainer(config.get('training_config', {}))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/ml/training/trainers/model_trainer.py", line 16, in __init__
+    self._set_model(model)
+  File "/workspaces/J.A.R.V.I.S/ml/training/trainers/model_trainer.py", line 22, in _set_model
+    self.model.to(self.device)
+    ^^^^^^^^^^^^^
+AttributeError: 'dict' object has no attribute 'to'
+2025-05-07 16:46:55,780 | [95mCRITICAL[0m | [__main__:66] | Failed to initialize JARVIS: 'dict' object has no attribute 'to'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 58, in __init__
+    self._init_core_components()
+  File "/workspaces/J.A.R.V.I.S/main.py", line 143, in _init_core_components
+    self._init_systems()
+  File "/workspaces/J.A.R.V.I.S/main.py", line 166, in _init_systems
+    self.learning_manager = LearningManager(
+                            ^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/llm/learning/learning_manager.py", line 34, in __init__
+    self.structured_pipeline = StructuredLearningPipeline(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/llm/learning/pipelines/structured_learning.py", line 19, in __init__
+    self.trainer = ModelTrainer(config.get('training_config', {}))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/ml/training/trainers/model_trainer.py", line 16, in __init__
+    self._set_model(model)
+  File "/workspaces/J.A.R.V.I.S/ml/training/trainers/model_trainer.py", line 22, in _set_model
+    self.model.to(self.device)
+    ^^^^^^^^^^^^^
+AttributeError: 'dict' object has no attribute 'to'
+2025-05-07 16:49:10,742 | [91mERROR[0m | [config.config_validator:32] | Config validation failed: {'name': 'gpt2', 'max_length': 100} is not of type 'string'
+
+Failed validating 'type' in schema['properties']['model']:
+    {'type': 'string'}
+
+On instance['model']:
+    {'name': 'gpt2', 'max_length': 100}
+2025-05-07 16:49:10,742 | [93mWARNING[0m | [__main__:129] | Invalid llm config, using defaults
+2025-05-07 16:49:10,742 | [91mERROR[0m | [config.config_validator:26] | Schema ui not found
+2025-05-07 16:49:10,742 | [93mWARNING[0m | [__main__:129] | Invalid ui config, using defaults
+2025-05-07 16:49:10,745 | [91mERROR[0m | [__main__:176] | System initialization failed: 'dict' object has no attribute 'to'
+2025-05-07 16:49:10,745 | [91mERROR[0m | [__main__:152] | Core components initialization failed: 'dict' object has no attribute 'to'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 143, in _init_core_components
+    self._init_systems()
+  File "/workspaces/J.A.R.V.I.S/main.py", line 166, in _init_systems
+    self.learning_manager = LearningManager(
+                            ^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/llm/learning/learning_manager.py", line 34, in __init__
+    self.structured_pipeline = StructuredLearningPipeline(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/llm/learning/pipelines/structured_learning.py", line 19, in __init__
+    self.trainer = ModelTrainer(config.get('training_config', {}))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/ml/training/trainers/model_trainer.py", line 16, in __init__
+    self._set_model(model)
+  File "/workspaces/J.A.R.V.I.S/ml/training/trainers/model_trainer.py", line 22, in _set_model
+    self.model.to(self.device)
+    ^^^^^^^^^^^^^
+AttributeError: 'dict' object has no attribute 'to'
+2025-05-07 16:49:10,747 | [95mCRITICAL[0m | [__main__:66] | Failed to initialize JARVIS: 'dict' object has no attribute 'to'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 58, in __init__
+    self._init_core_components()
+  File "/workspaces/J.A.R.V.I.S/main.py", line 143, in _init_core_components
+    self._init_systems()
+  File "/workspaces/J.A.R.V.I.S/main.py", line 166, in _init_systems
+    self.learning_manager = LearningManager(
+                            ^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/llm/learning/learning_manager.py", line 34, in __init__
+    self.structured_pipeline = StructuredLearningPipeline(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/llm/learning/pipelines/structured_learning.py", line 19, in __init__
+    self.trainer = ModelTrainer(config.get('training_config', {}))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/ml/training/trainers/model_trainer.py", line 16, in __init__
+    self._set_model(model)
+  File "/workspaces/J.A.R.V.I.S/ml/training/trainers/model_trainer.py", line 22, in _set_model
+    self.model.to(self.device)
+    ^^^^^^^^^^^^^
+AttributeError: 'dict' object has no attribute 'to'
+2025-05-07 17:14:48,911 | [91mERROR[0m | [config.config_validator:32] | Config validation failed: {'name': 'gpt2', 'max_length': 100} is not of type 'string'
+
+Failed validating 'type' in schema['properties']['model']:
+    {'type': 'string'}
+
+On instance['model']:
+    {'name': 'gpt2', 'max_length': 100}
+2025-05-07 17:14:48,912 | [93mWARNING[0m | [__main__:129] | Invalid llm config, using defaults
+2025-05-07 17:14:48,912 | [91mERROR[0m | [config.config_validator:26] | Schema ui not found
+2025-05-07 17:14:48,912 | [93mWARNING[0m | [__main__:129] | Invalid ui config, using defaults
+2025-05-07 17:14:48,915 | [92mINFO[0m | [__main__:174] | System components initialized
+2025-05-07 17:14:48,916 | [92mINFO[0m | [llm.optimization.llm_optimizer:35] | Initializing LLMOptimizer with device: cpu
+2025-05-07 17:14:48,916 | [92mINFO[0m | [llm.core.llm_core:64] | Loading model: gpt2
+2025-05-07 17:14:50,040 | [92mINFO[0m | [llm.optimization.llm_optimizer:53] | Model optimization completed successfully
+2025-05-07 17:14:50,041 | [92mINFO[0m | [llm.core.llm_core:31] | LLMCore initialized successfully
+2025-05-07 17:14:50,041 | [92mINFO[0m | [__main__:149] | Core components initialized
+2025-05-07 17:14:50,041 | [92mINFO[0m | [__main__:182] | ML components initialized
+2025-05-07 17:14:50,669 | [92mINFO[0m | [OpenGL.platform.ctypesloader:70] | Failed to load library ( 'libGLX.so.0' ): libGLX.so.0: cannot open shared object file: No such file or directory
+2025-05-07 17:14:50,671 | [92mINFO[0m | [OpenGL.platform.ctypesloader:70] | Failed to load library ( 'libOpenGL.so.0' ): libOpenGL.so.0: cannot open shared object file: No such file or directory
+2025-05-07 17:14:50,673 | [92mINFO[0m | [OpenGL.platform.ctypesloader:70] | Failed to load library ( 'libGL.so.0' ): libGL.so.0: cannot open shared object file: No such file or directory
+2025-05-07 17:14:50,674 | [92mINFO[0m | [OpenGL.acceleratesupport:24] | No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+2025-05-07 17:14:50,697 | [92mINFO[0m | [OpenGL.platform.ctypesloader:70] | Failed to load library ( 'libOpenGL.so.0' ): libOpenGL.so.0: cannot open shared object file: No such file or directory
+2025-05-07 17:14:50,698 | [92mINFO[0m | [OpenGL.platform.ctypesloader:70] | Failed to load library ( 'libGL.so.0' ): libGL.so.0: cannot open shared object file: No such file or directory
+2025-05-07 17:14:50,698 | [93mWARNING[0m | [ui.rendering.renderer_factory:19] | OpenGL not available
+2025-05-07 17:14:50,699 | [91mERROR[0m | [security.auth.auth_service:36] | Failed to setup auth database: 'Database' object is not callable
+2025-05-07 17:14:50,699 | [92mINFO[0m | [security.auth.auth_service:20] | AuthService initialized
+2025-05-07 17:14:50,699 | [91mERROR[0m | [__main__:198] | UI initialization failed: Can't instantiate abstract class ChatScreen without an implementation for abstract methods 'handle_input', 'init'
+2025-05-07 17:14:50,699 | [95mCRITICAL[0m | [__main__:66] | Failed to initialize JARVIS: Can't instantiate abstract class ChatScreen without an implementation for abstract methods 'handle_input', 'init'
+Traceback (most recent call last):
+  File "/workspaces/J.A.R.V.I.S/main.py", line 60, in __init__
+    self._init_ui()
+  File "/workspaces/J.A.R.V.I.S/main.py", line 191, in _init_ui
+    success = self.screen.init()
+              ^^^^^^^^^^^^^^^^^^
+  File "/workspaces/J.A.R.V.I.S/ui/screen.py", line 87, in init
+    self._init_screens()
+  File "/workspaces/J.A.R.V.I.S/ui/screen.py", line 116, in _init_screens
+    self.register_screen("chat", ChatScreen(self.llm_pipeline))
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Can't instantiate abstract class ChatScreen without an implementation for abstract methods 'handle_input', 'init'

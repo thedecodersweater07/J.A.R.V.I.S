@@ -1,0 +1,22 @@
+sandbox:
+  environment:
+    max_steps: 1000
+    complexity_range: [0.1, 1.0]
+    scenarios:
+      - type: problem_solving
+        weight: 0.4
+      - type: knowledge_test
+        weight: 0.3
+      - type: interaction
+        weight: 0.3
+        
+  training:
+    epochs: 50
+    batch_size: 32
+    learning_rate: 0.001
+    save_interval: 10
+    
+  data_integration:
+    sandbox_weight: 0.3
+    real_data_weight: 0.7
+    validation_split: 0.2

@@ -8,22 +8,27 @@ from typing import Optional, Dict, Any
 from contextlib import contextmanager
 from pathlib import Path
 
-from components.chat_history import ChatHistory
-from components.chat_input import ChatInput
-from components.status_bar import StatusBar
-from themes.theme_manager import ThemeManager
-from components.typing_interface import TypingInterface
-from llm.pipeline import LLMPipeline
-from llm.core.llm_core import LLMCore
+# Fix relative imports
+from .components.chat_history import ChatHistory
+from .components.chat_input import ChatInput
+from .components.status_bar import StatusBar
+from .components.typing_interface import TypingInterface
+from .themes.theme_manager import ThemeManager
+from .rendering import RendererFactory, RenderMode
 
-# Import local modules
+# Import screens
 from .screens.base_screen import BaseScreen
 from .screens.login_screen import LoginScreen
 from .screens.chat_screen import ChatScreen
 from .screens.settings_screen import SettingsScreen
 from .screens.data_screen import DataScreen
 from .screens.main_screen import MainScreen
-from ui.rendering import RendererFactory, RenderMode
+
+# Import LLM components
+from llm.core import LLMCore
+from llm.pipeline import LLMPipeline
+
+# Import other dependencies
 from security.auth.auth_service import AuthService
 from security.config.security_config import SecurityConfig
 from core.session import SessionManager

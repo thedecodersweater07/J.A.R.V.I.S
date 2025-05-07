@@ -155,9 +155,29 @@ class ConsciousnessSimulator:
                         importance=0.4
                     )
             
+            # Voeg virtuele omgevingservaringen toe aan reflectie
+            if hasattr(self, 'virtual_experiences'):
+                recent_experiences = self.virtual_experiences[-5:]
+                for exp in recent_experiences:
+                    self.add_reflection(
+                        f"Virtually experienced: {exp['scenario']} with outcome {exp['outcome']}",
+                        importance=exp['significance']
+                    )
+                
             # Simuleer drift in bewustzijnsniveau
             drift = (np.random.random() - 0.5) * 0.05
             self._adjust_awareness(drift)
+
+    def integrate_virtual_experience(self, experience_data: Dict[str, Any]) -> None:
+        """Integreer ervaring uit virtuele omgeving in bewustzijn"""
+        if not hasattr(self, 'virtual_experiences'):
+            self.virtual_experiences = []
+            
+        self.virtual_experiences.append(experience_data)
+        self.add_reflection(
+            f"New virtual experience gained: {experience_data['scenario']}", 
+            importance=0.6
+        )
 
     def shutdown(self) -> None:
         """Stop alle bewustzijnsprocessen veilig"""

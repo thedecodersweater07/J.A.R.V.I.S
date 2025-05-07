@@ -5,6 +5,7 @@ import torch.nn as nn
 from llm.knowledge import KnowledgeManager
 from ml.training.trainers import ModelTrainer
 from ml.feature_engineering import FeatureExtractor
+from db.sql.database_manager import DatabaseManager  # Add DatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -12,23 +13,28 @@ class StructuredLearningPipeline:
     """Handles structured learning processes"""
     
     def __init__(self, config: Dict[str, Any], knowledge_manager: KnowledgeManager):
-        self.config = config
+        self.config = config or {}
         self.knowledge_manager = knowledge_manager
         self.feature_extractor = FeatureExtractor()
-        self.trainer = ModelTrainer(config.get('training_config', {}))
+        
+        # Initialize trainer with proper config
+        training_config = {
+            "input_size": config.get("input_size", 768),
+            "hidden_size": config.get("hidden_size", 512),
+            "output_size": config.get("output_size", 256),
+            **config.get("training_config", {})
+        }
+        self.trainer = ModelTrainer(config=training_config)
         
     async def process_batch(self, data: List[Dict[str, Any]]):
         """Process a batch of data through the learning pipeline"""
         try:
             # Extract features
-            features = await self.feature_extractor.process_batch(data)
+            features = self.feature_extractor.process_batch(data)
             
-            # Prepare training data
-            train_data = self._prepare_training_data(features)
-            
-            # Train model
+            # Train model on batch
             training_results = await self.trainer.train_batch(
-                train_data, 
+                features,
                 self.config.get('batch_training_config', {})
             )
             

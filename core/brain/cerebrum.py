@@ -12,17 +12,22 @@ class Cerebrum:
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.initialized = False
-        self._init_systems()
+        self.systems = {}
         
-    def _init_systems(self):
+    def initialize(self):
         """Initialize all brain subsystems"""
         try:
-            # Initialize core systems
+            self._init_systems()
             self.initialized = True
             self.logger.info("Cerebrum initialized successfully")
         except Exception as e:
             self.logger.error(f"Failed to initialize Cerebrum: {e}")
             raise
+
+    def _init_systems(self):
+        """Initialize core systems"""
+        # TODO: Initialize core subsystems
+        pass
 
     def process(self, input_data: Any) -> Dict[str, Any]:
         """Process input and coordinate response"""
