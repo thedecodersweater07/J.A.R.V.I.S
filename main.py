@@ -3,7 +3,11 @@ import sys
 import json
 import signal
 import logging
-from typing import Dict, Any, List
+import threading
+
+# Suppress TensorFlow oneDNN warnings
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 from datetime import datetime
 import torch
@@ -26,6 +30,20 @@ from llm.knowledge import KnowledgeManager
 from llm.learning.learning_manager import LearningManager
 from llm.inference.inference_engine import InferenceEngine
 from ml.models import ModelManager
+# Import optional components with error handling
+APIClient = None
+server_launcher = None
+
+try:
+    from ui.api_client import APIClient
+except ImportError:
+    print("APIClient not found, API features will be disabled")
+
+try:
+    from server.launcher import start_server
+    server_launcher = start_server
+except ImportError:
+    print("Server launcher not found, server features will be disabled")
 
 # Set up logger
 logger = get_logger(__name__)
@@ -37,6 +55,8 @@ class JARVIS:
         self.initialized = False
         self.config = {}
         self.logger = get_logger(__name__)  # Initialize instance logger
+        self.server_thread = None
+        self.api_client = None
         
         try:
             # Run installation/configuration if needed
@@ -55,7 +75,16 @@ class JARVIS:
             
             # Initialize remaining components
             self._init_core_components()
-            self._init_ml_components() 
+            self._init_ml_components()
+            
+            # Start server backend if enabled
+            if self.config.get("use_server", True):
+                self._start_server_backend()
+            
+            # Initialize API client
+            self._init_api_client()
+            
+            # Initialize UI last
             self._init_ui()
             
             self.initialized = True
@@ -221,20 +250,105 @@ class JARVIS:
         except Exception as e:
             self.logger.error(f"ML initialization failed: {e}")
             raise
+            
+    def _start_server_backend(self):
+        """Start the server backend in a separate thread"""
+        # Check if server launcher is available
+        if server_launcher is None:
+            self.logger.warning("Server launcher not available, skipping server startup")
+            return False
+            
+        try:
+            def run_server():
+                """Run the server in a separate process"""
+                try:
+                    # Get server config
+                    server_config = self.config.get('server', {})
+                    host = server_config.get('host', '127.0.0.1')
+                    port = server_config.get('port', 8000)
+                    debug = '--debug' in sys.argv
+                    
+                    # Start server using the launcher
+                    server_launcher(host=host, port=port, debug=debug)
+                except Exception as e:
+                    self.logger.error(f"Server error: {e}")
+            
+            # Start server in a separate thread
+            self.server_thread = threading.Thread(target=run_server, daemon=True)
+            self.server_thread.start()
+            
+            self.logger.info("Server backend started")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to start server backend: {e}")
+            return False
+    
+    def _init_api_client(self):
+        """Initialize API client for UI-Server communication"""
+        # Check if APIClient is available
+        if APIClient is None:
+            self.logger.warning("APIClient not available, skipping API client initialization")
+            return False
+            
+        try:
+            # Get server config
+            server_config = self.config.get('server', {})
+            host = server_config.get('host', '127.0.0.1')
+            port = server_config.get('port', 8000)
+            
+            # Create API client
+            base_url = f"http://{host}:{port}"
+            self.api_client = APIClient(base_url=base_url)
+            
+            self.logger.info(f"API client initialized with URL: {base_url}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"API client initialization failed: {e}")
+            return False
 
     def _init_ui(self):
         """Initialize UI components"""
         try:
-            self.screen = Screen(800, 600, "JARVIS Interface")
-            success = self.screen.init()
-            if not success:
-                raise RuntimeError("Failed to initialize screen")
-            self.screen.set_llm(self.llm)
-            self.screen.set_model_manager(self.model_manager)
+            # Get UI config
+            ui_config = self.config.get('ui', {})
+            width = ui_config.get('width', 800)
+            height = ui_config.get('height', 600)
+            title = ui_config.get('title', 'JARVIS Interface')
+            
+            # Initialize screen manager
+            self.screen = Screen(width=width, height=height, title=title)
+            
+            # Connect components
+            if hasattr(self.screen, 'set_llm'):
+                self.screen.set_llm(self.llm)
+            else:
+                self.screen.llm = self.llm
+                
+            if hasattr(self.screen, 'set_model_manager'):
+                self.screen.set_model_manager(self.model_manager)
+            else:
+                self.screen.model_manager = self.model_manager
+                
+            # Connect API client
+            if self.api_client:
+                if hasattr(self.screen, 'set_api_client'):
+                    self.screen.set_api_client(self.api_client)
+                else:
+                    self.screen.api_client = self.api_client
+            
+            # Initialize UI
+            if not self.screen.init():
+                self.logger.error("Failed to initialize UI")
+                return False
+                
             self.logger.info("UI initialized successfully")
+            return True
+            
         except Exception as e:
             self.logger.error(f"UI initialization failed: {e}")
-            raise
+            return False
 
     def process_input(self, text: str, tasks: List[str]) -> Dict[str, Any]:
         """Process user input through model pipeline"""

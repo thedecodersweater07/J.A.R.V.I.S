@@ -4,6 +4,8 @@ import logging
 import time
 from typing import List, Dict, Any, Optional, Tuple
 
+from .renderer_base import RendererBase
+
 logger = logging.getLogger(__name__)
 
 class InputEvent:
@@ -13,7 +15,7 @@ class InputEvent:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-class TextRenderer:
+class TextRenderer(RendererBase):
     """Text-based renderer for fallback mode"""
     
     def __init__(self, width: int = 80, height: int = 24, title: str = "JARVIS"):
@@ -89,7 +91,7 @@ class TextRenderer:
         self.input_events.clear()
         return events
             
-    def render(self, draw_data: Any) -> None:
+    def render(self, frame_data: Dict[str, Any] = None) -> None:
         """Render text frame"""
         try:
             # Limit frame rate
@@ -107,6 +109,11 @@ class TextRenderer:
                 for line in self.frame_buffer:
                     print(line)
                 self.frame_buffer.clear()
+                
+            # If frame_data contains any text messages, print them
+            if frame_data and 'text_messages' in frame_data:
+                for message in frame_data['text_messages']:
+                    print(message)
                 
         except Exception as e:
             logger.error(f"Text render error: {e}")
@@ -133,3 +140,13 @@ class TextRenderer:
             
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
+            
+    def begin_frame(self):
+        """Setup for frame rendering"""
+        # Nothing to do for text mode
+        pass
+        
+    def end_frame(self):
+        """Cleanup after frame rendering"""
+        # Render any pending text in the buffer
+        self.render()

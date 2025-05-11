@@ -1,6 +1,7 @@
 import logging
 import time
-from typing import Optional, Dict, Any
+import glfw
+from typing import Optional, Dict, Any, List, Tuple
 from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
@@ -8,131 +9,378 @@ logger = logging.getLogger(__name__)
 class ImGuiManager:
     """
     Manages ImGui context and frame state to prevent frame errors
+    Directly integrates with GLFW to ensure proper frame synchronization
     """
     
     def __init__(self):
+        self.impl = None
         self.context = None
+        self.window = None
         self.is_initialized = False
-        self.current_frame_started = False
+        self.frame_active = False
         self.last_frame_time = 0
         self.frame_count = 0
+        self.window_stack = []
+        self.tab_bar_stack = []
         
-    def init(self) -> bool:
-        """Initialize ImGui context"""
+    def init(self, window_handle=None) -> bool:
+        """Initialize ImGui context with direct GLFW integration"""
         try:
             import imgui
+            from imgui.integrations.glfw import GlfwRenderer
             
-            # Create context if not already created
-            if not imgui.get_current_context():
-                self.context = imgui.create_context()
-                imgui.set_current_context(self.context)
+            # Store the window handle
+            self.window = window_handle
+            
+            # Clean up any existing context
+            if self.context:
+                try:
+                    if self.impl:
+                        self.impl.shutdown()
+                    imgui.destroy_context(self.context)
+                except Exception as e:
+                    logger.debug(f"Error cleaning up previous context: {e}")
+            
+            # Create a fresh ImGui context
+            self.context = imgui.create_context()
+            imgui.set_current_context(self.context)
+            
+            # Initialize the GLFW implementation if we have a window
+            if self.window:
+                self.impl = GlfwRenderer(self.window)
+            
+            # Configure style
+            style = imgui.get_style()
+            style.window_rounding = 5.0
+            style.frame_rounding = 3.0
+            style.scrollbar_rounding = 5.0
+            style.frame_border_size = 1.0
+            style.item_spacing = imgui.Vec2(8, 6)
+            style.scrollbar_size = 14
+            
+            # Dark theme with better readability
+            imgui.style_colors_dark()
+            colors = style.colors
+            colors[imgui.COLOR_TEXT] = (1.00, 1.00, 1.00, 1.00)
+            colors[imgui.COLOR_TEXT_DISABLED] = (0.60, 0.60, 0.60, 1.00)
+            colors[imgui.COLOR_WINDOW_BACKGROUND] = (0.10, 0.10, 0.12, 1.00)
+            colors[imgui.COLOR_FRAME_BACKGROUND] = (0.20, 0.20, 0.22, 0.90)
+            colors[imgui.COLOR_FRAME_BACKGROUND_HOVERED] = (0.30, 0.30, 0.32, 1.00)
+            colors[imgui.COLOR_FRAME_BACKGROUND_ACTIVE] = (0.15, 0.60, 0.90, 1.00)
+            
+            # IO configuration
+            io = imgui.get_io()
+            io.config_flags |= imgui.CONFIG_NAV_ENABLE_KEYBOARD
+            
+            self.is_initialized = True
+            self.frame_active = False
+            logger.info("ImGui initialized successfully with direct GLFW integration")
+            return True
                 
-                # Set default style
-                style = imgui.get_style()
-                style.window_rounding = 5.0
-                style.frame_rounding = 3.0
-                style.scrollbar_rounding = 5.0
-                
-                # Dark theme
-                imgui.style_colors_dark()
-                
-                self.is_initialized = True
-                logger.info("ImGui initialized successfully")
-                return True
-            else:
-                self.context = imgui.get_current_context()
-                self.is_initialized = True
-                logger.info("ImGui context already exists, reusing")
-                return True
-                
-        except ImportError:
-            logger.error("ImGui not available")
+        except ImportError as e:
+            logger.error(f"ImGui or GLFW not available: {e}")
             return False
         except Exception as e:
             logger.error(f"ImGui initialization error: {e}")
             return False
+    
+    def set_window(self, window_handle) -> bool:
+        """Set or update the GLFW window handle"""
+        try:
+            import imgui
+            from imgui.integrations.glfw import GlfwRenderer
             
-    @contextmanager
-    def frame(self):
-        """Safe context manager for ImGui frames"""
-        if not self.is_initialized:
-            yield
+            self.window = window_handle
+            
+            # Reinitialize the GLFW implementation
+            if self.impl:
+                self.impl.shutdown()
+                
+            self.impl = GlfwRenderer(window_handle)
+            return True
+        except Exception as e:
+            logger.error(f"Error setting window handle: {e}")
+            return False
+    
+    def process_inputs(self):
+        """Process GLFW inputs for ImGui"""
+        if not self.is_initialized or not self.impl:
             return
             
-        frame_started = False
+        try:
+            self.impl.process_inputs()
+        except Exception as e:
+            logger.error(f"Error processing inputs: {e}")
+    
+    def begin_frame(self) -> bool:
+        """Begin a new ImGui frame with direct GLFW integration"""
+        if not self.is_initialized or not self.impl:
+            return False
+            
         try:
             import imgui
             
-            # Rate limiting to avoid frame issues
+            # Check for valid context
+            if not imgui.get_current_context():
+                logger.error("No valid ImGui context in begin_frame")
+                return False
+                
+            # If a frame is already active, do nothing
+            if self.frame_active:
+                return True
+                
+            # Rate limiting (max 100 fps)
             current_time = time.time()
-            if current_time - self.last_frame_time < 0.01:  # Max 100 fps
-                yield
-                return
+            if current_time - self.last_frame_time < 0.01:
+                time.sleep(0.01 - (current_time - self.last_frame_time))
+            
+            # Process inputs and start a new frame
+            self.impl.process_inputs()
+            imgui.new_frame()
+            
+            # Update state
+            self.frame_active = True
+            self.frame_count += 1
+            self.last_frame_time = current_time
+            self.window_stack = []
+            self.tab_bar_stack = []
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error in begin_frame: {e}")
+            return False
+    
+    def end_frame(self) -> bool:
+        """End the current ImGui frame with direct GLFW integration"""
+        if not self.is_initialized or not self.impl:
+            return False
+            
+        try:
+            import imgui
+            
+            # Close any open windows or tab bars
+            self._close_open_elements()
+            
+            # Only end the frame if one is active
+            if self.frame_active:
+                imgui.render()
+                self.impl.render(imgui.get_draw_data())
+                self.frame_active = False
+                return True
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error in end_frame: {e}")
+            self.frame_active = False
+            return False
+    
+    def _close_open_elements(self):
+        """Close any open ImGui elements (windows, tab bars, etc.)"""
+        import imgui
+        
+        # Close tab bars first (inner elements)
+        while self.tab_bar_stack:
+            try:
+                imgui.end_tab_bar()
+            except Exception as e:
+                logger.error(f"Error closing tab bar: {e}")
+            self.tab_bar_stack.pop()
+            
+        # Then close windows (outer elements)
+        while self.window_stack:
+            try:
+                imgui.end()
+            except Exception as e:
+                logger.error(f"Error closing window: {e}")
+            self.window_stack.pop()
+    
+    def begin_window(self, name: str, **kwargs) -> bool:
+        """Begin a new ImGui window with tracking"""
+        try:
+            import imgui
+            result = imgui.begin(name, **kwargs)
+            self.window_stack.append(name)
+            return result
+        except Exception as e:
+            logger.error(f"Error beginning window '{name}': {e}")
+            return False
+    
+    def end_window(self) -> None:
+        """End the current ImGui window with tracking"""
+        try:
+            import imgui
+            imgui.end()
+            if self.window_stack:
+                self.window_stack.pop()
+        except Exception as e:
+            logger.error(f"Error ending window: {e}")
+    
+    def begin_tab_bar(self, name: str, **kwargs) -> bool:
+        """Begin a new ImGui tab bar with tracking"""
+        try:
+            import imgui
+            result = imgui.begin_tab_bar(name, **kwargs)
+            if result:
+                self.tab_bar_stack.append(name)
+            return result
+        except Exception as e:
+            logger.error(f"Error beginning tab bar '{name}': {e}")
+            return False
+    
+    def end_tab_bar(self) -> None:
+        """End the current ImGui tab bar with tracking"""
+        try:
+            import imgui
+            imgui.end_tab_bar()
+            if self.tab_bar_stack:
+                self.tab_bar_stack.pop()
+        except Exception as e:
+            logger.error(f"Error ending tab bar: {e}")
+    
+    def render_frame(self, render_function, frame_data: Dict[str, Any] = None) -> bool:
+        """Render a complete frame with proper GLFW integration"""
+        if not self.is_initialized or not self.impl:
+            return False
+            
+        if frame_data is None:
+            frame_data = {}
+            
+        # Add self to frame data so components can access ImGui utilities
+        frame_data["imgui_manager"] = self
+        
+        try:
+            # Begin frame
+            if not self.begin_frame():
+                return False
                 
-            # Start frame if not already in a frame
-            ctx = imgui.get_current_context()
-            if ctx and not self.current_frame_started:
-                imgui.new_frame()
-                frame_started = True
-                self.current_frame_started = True
-                self.frame_count += 1
-                
+            # Call the render function
+            render_function(frame_data)
+            
+            # End frame and render
+            self.end_frame()
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error in render_frame: {e}")
+            # Ensure frame is properly closed on error
+            if self.frame_active:
+                try:
+                    self._close_open_elements()
+                    imgui.end_frame()
+                    self.frame_active = False
+                except Exception:
+                    pass
+            return False
+    
+    @contextmanager
+    def frame(self):
+        """Safe context manager for ImGui frames with direct GLFW integration"""
+        frame_started = False
+        try:
+            # Start a new frame
+            frame_started = self.begin_frame()
+            
+            # Yield control to the caller
             yield
             
-            # End frame if we started one
+        finally:
+            # Always end the frame if we started one
             if frame_started:
-                try:
-                    # Make sure to call end_frame before render
-                    imgui.end_frame()
-                    imgui.render()
-                    self.current_frame_started = False
-                    self.last_frame_time = current_time
-                except Exception as e:
-                    logger.error(f"Error ending ImGui frame: {e}")
-                    # Attempt recovery
-                    try:
-                        if self.current_frame_started:
-                            imgui.end_frame()
-                            self.current_frame_started = False
-                    except Exception as e2:
-                        logger.error(f"Failed to recover from frame error: {e2}")
-                        self.current_frame_started = False
-                        
+                self._close_open_elements()
+                self.end_frame()
+                
+    @contextmanager
+    def window(self, name: str, **kwargs):
+        """Safe context manager for ImGui windows"""
+        try:
+            self.begin_window(name, **kwargs)
+            yield
+        finally:
+            self.end_window()
+    
+    @contextmanager
+    def tab_bar(self, name: str, **kwargs):
+        """Safe context manager for ImGui tab bars"""
+        try:
+            if self.begin_tab_bar(name, **kwargs):
+                yield
+                self.end_tab_bar()
+            else:
+                yield
+        except Exception as e:
+            logger.error(f"Error in tab_bar context manager: {e}")
+            yield
+                
+    def set_next_window_centered(self):
+        """Center the next window on screen - replacement for missing ImGui function"""
+        try:
+            import imgui
+            import glfw
+            
+            # Get window size
+            if self.window:
+                window_width, window_height = glfw.get_window_size(self.window)
+                # Center the window
+                imgui.set_next_window_position(
+                    window_width // 2, 
+                    window_height // 2,
+                    imgui.COND_ALWAYS,
+                    pivot_x=0.5, 
+                    pivot_y=0.5
+                )
+                return True
+            return False
         except Exception as e:
             logger.error(f"ImGui frame error: {e}")
-            if not frame_started:
-                yield
+            return False
             
-            # Try to recover from bad frame state
-            try:
-                if self.current_frame_started:
-                    imgui.end_frame()
-                    self.current_frame_started = False
-            except Exception:
-                self.current_frame_started = False
-                
     def cleanup(self):
         """Clean up ImGui resources"""
         try:
             import imgui
             
             # End any active frame
-            if self.current_frame_started:
+            if self.frame_active:
                 try:
+                    self._close_open_elements()
                     imgui.end_frame()
+                    self.frame_active = False
                 except Exception as e:
                     logger.error(f"Error ending frame during cleanup: {e}")
-                self.current_frame_started = False
+            
+            # Shutdown the GLFW implementation met veilige OpenGL cleanup
+            if self.impl:
+                try:
+                    # Controleer of de OpenGL functies beschikbaar zijn voordat we ze aanroepen
+                    from OpenGL import GL
+                    if hasattr(GL, 'glDeleteVertexArrays') and bool(GL.glDeleteVertexArrays):
+                        self.impl.shutdown()
+                    else:
+                        # Alternatieve cleanup zonder glDeleteVertexArrays
+                        logger.warning("OpenGL glDeleteVertexArrays not available, using alternative cleanup")
+                        if hasattr(self.impl, '_imgui_io'):
+                            self.impl._imgui_io = None
+                        if hasattr(self.impl, '_font_texture'):
+                            self.impl._font_texture = None
+                except ImportError:
+                    logger.warning("OpenGL module not available, skipping GLFW implementation shutdown")
+                except Exception as e:
+                    logger.error(f"Error shutting down GLFW implementation: {e}")
+                self.impl = None
                 
-            # Destroy context if it's ours
+            # Destroy the ImGui context
             if self.context and imgui.get_current_context() == self.context:
                 try:
                     imgui.destroy_context(self.context)
                 except Exception as e:
                     logger.error(f"Error destroying ImGui context: {e}")
                 
+            # Reset state
             self.context = None
+            self.window = None
             self.is_initialized = False
+            self.frame_active = False
+            
             logger.info("ImGui cleaned up successfully")
             
         except Exception as e:

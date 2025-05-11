@@ -26,6 +26,7 @@ from .screens.chat_screen import ChatScreen
 from .screens.settings_screen import SettingsScreen
 from .screens.data_screen import DataScreen
 from .screens.main_screen import MainScreen
+from .screens.ai_interface_screen import AIInterfaceScreen
 
 # Import LLM components
 from llm.core import LLMCore
@@ -102,18 +103,24 @@ class Screen:
     def _init_opengl(self) -> bool:
         """Initialize OpenGL rendering with ImGui"""
         try:
-            # Initialize ImGui first using our manager
-            if not self.ui_state.imgui_manager.init():
-                logger.error("ImGui initialization failed")
-                return False
-            
-            # Create OpenGL renderer
+            # Create OpenGL renderer first to get the GLFW window
             self.renderer = RendererFactory.create_renderer(
                 RenderMode.OPENGL,
                 {"width": self.width, "height": self.height, "title": self.title}
             )
             
             if not self.renderer.init():
+                logger.error("OpenGL renderer initialization failed")
+                return False
+            
+            # Get the GLFW window handle from the renderer
+            window_handle = None
+            if hasattr(self.renderer, 'window'):
+                window_handle = self.renderer.window
+            
+            # Initialize ImGui with the GLFW window
+            if not self.ui_state.imgui_manager.init(window_handle):
+                logger.error("ImGui initialization failed")
                 return False
                 
             self._init_security()
@@ -181,9 +188,24 @@ class Screen:
             self.register_screen("settings", SettingsScreen())
             self.register_screen("data", DataScreen())
             
+            # Add AI interface screen if API client is available
+            if hasattr(self, 'api_client') and self.api_client:
+                self.register_screen("ai", AIInterfaceScreen(self.api_client))
+                # Set AI interface as default screen
+                self.active_screen = "ai"
+            
+            # Initialize all screens
+            for name, screen in self.screens.items():
+                if not screen.init():
+                    logger.warning(f"Failed to initialize screen: {name}")
+            
             # Set initial screen
             if self.screens:
-                self.current_screen = self.screens["main"]
+                if self.active_screen in self.screens:
+                    self.current_screen = self.screens[self.active_screen]
+                else:
+                    self.current_screen = self.screens["main"]
+                    self.active_screen = "main"
         except Exception as e:
             logger.error(f"Screen initialization error: {e}")
 
@@ -194,34 +216,50 @@ class Screen:
     def switch_screen(self, screen_name: str):
         if screen_name in self.screens:
             if self.session_manager.validate_session() or screen_name == "login":
+                # Hide current screen if it exists
+                if self.current_screen:
+                    self.current_screen.hide()
+                    
+                # Update active screen
                 self.active_screen = screen_name
+                self.current_screen = self.screens[screen_name]
+                
+                # Show new screen
+                self.current_screen.show()
+                
                 logger.info(f"Switched to screen: {screen_name}")
 
     @contextmanager
     def frame(self):
-        """Context manager for rendering frames based on mode"""
+        """Context manager for rendering a frame"""
         frame_processed = False
+        if not self.is_initialized or not self.renderer:
+            yield
+            return
+            
         try:
-            if self.render_mode == RenderMode.OPENGL and self.ui_state.imgui_manager.is_initialized:
-                # Process inputs before starting the frame
-                if self.renderer:
-                    self.renderer.process_inputs()
+            # Process inputs before starting the frame
+            if self.renderer:
+                self.renderer.process_inputs()
                 
-                # Use the ImGui manager for safe frame handling
+            # Gebruik de juiste rendering aanpak op basis van mode
+            if self.render_mode == RenderMode.OPENGL and self.ui_state.imgui_manager.is_initialized:
+                # Gebruik de ImGui manager voor veilige frame handling
+                # De ImGuiManager zorgt voor alles wat met frames te maken heeft
                 with self.ui_state.imgui_manager.frame():
                     frame_processed = True
                     yield
                     
-                # Only render if we have a renderer and ImGui is properly initialized
+                # Render de ImGui draw data
                 import imgui
                 if self.renderer and imgui.get_draw_data():
-                    self.renderer.render(imgui.get_draw_data())
+                    self.renderer.render({"imgui_draw_data": imgui.get_draw_data()})
             else:
                 # Text mode rendering
                 frame_processed = True
                 yield
                 if self.renderer:
-                    self.renderer.render(None)  # No ImGui draw data in text mode
+                    self.renderer.render({"text_messages": []})  # No ImGui draw data in text mode
         except Exception as e:
             logger.error(f"Frame error: {e}")
             # Always yield to avoid breaking context manager if not already yielded
@@ -234,14 +272,18 @@ class Screen:
             return
 
         try:
+            # Voeg de ImGuiManager toe aan de frame_data
+            frame_data["imgui_manager"] = self.ui_state.imgui_manager
+            
             with self.frame():
                 current_screen = self.screens.get(self.active_screen)
                 if current_screen:
                     current_screen.render(frame_data)
         except Exception as e:
             logger.error(f"Render error: {e}")
-
+            
     def handle_input(self, input_data: Dict[str, Any]) -> None:
+        """Handle input events"""
         # Add quit handling
         if input_data.get("type") == "quit":
             self.should_quit = True
@@ -260,10 +302,29 @@ class Screen:
             logger.error(f"Error adding message: {e}")
 
     def set_llm(self, llm: LLMCore):
+        """Set the LLM instance"""
         self.llm = llm
-
+        
     def set_model_manager(self, model_manager: ModelManager):
+        """Set the model manager instance"""
         self.model_manager = model_manager
+        
+    def set_api_client(self, api_client):
+        """Set the API client instance"""
+        self.api_client = api_client
+        
+        # If screens are already initialized, update them
+        if hasattr(self, 'screens') and self.screens:
+            # Add AI interface screen if not already present
+            if 'ai' not in self.screens:
+                self.register_screen("ai", AIInterfaceScreen(self.api_client))
+                if self.screens["ai"].init():
+                    logger.info("AI interface screen initialized")
+                    
+            # Update API client in existing screens
+            for name, screen in self.screens.items():
+                if hasattr(screen, 'api_client'):
+                    screen.api_client = api_client
 
     def process_frame(self, frame_data: Dict[str, Any]) -> bool:
         """Process a single frame. Returns False if window should close."""

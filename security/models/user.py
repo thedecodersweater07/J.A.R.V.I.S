@@ -6,6 +6,7 @@ from typing import Optional, Dict, List
 class User:
     id: str
     username: str
+    password_hash: str
     role: str = "user"
     created_at: datetime = datetime.now()
     last_login: Optional[datetime] = None

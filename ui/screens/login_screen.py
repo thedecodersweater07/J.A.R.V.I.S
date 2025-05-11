@@ -4,6 +4,8 @@ import logging
 from datetime import datetime, timedelta
 import socket
 from security.auth.auth_service import AuthService
+import glfw
+from OpenGL import GL
 from ui.themes.theme_manager import ThemeManager
 from .base_screen import BaseScreen
 
@@ -12,6 +14,7 @@ logger = logging.getLogger(__name__)
 class LoginScreen(BaseScreen):
     def __init__(self, auth_service: AuthService):
         super().__init__()
+        self.initialized = False
         self.auth_service = auth_service
         self.username = ""
         self.password = ""
@@ -31,7 +34,17 @@ class LoginScreen(BaseScreen):
 
     def render(self, frame_data: Dict[str, Any]) -> None:
         imgui.set_next_window_size(400, 200)
-        imgui.set_next_window_centered()
+        # Center window with GLFW
+        window = glfw.get_current_context() if hasattr(glfw, 'get_current_context') else None
+        if window:
+            monitor = glfw.get_primary_monitor()
+            if monitor:
+                vidmode = glfw.get_video_mode(monitor)
+                if vidmode:
+                    x = int((vidmode.size.width - 400) / 2)
+                    y = int((vidmode.size.height - 200) / 2)
+                    glfw.set_window_pos(window, x, y)
+
         
         imgui.begin("Nova Industries Security", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)
         

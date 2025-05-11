@@ -1,20 +1,22 @@
 from typing import List, Dict, Any
 import logging
+import glfw
+from OpenGL import GL
 from pathlib import Path
 from contextlib import contextmanager
-from core.logging import get_logger, logger
 from core.constants import OPENGL_AVAILABLE
 from core.config import ConfigValidator
 from core.session import SessionManager
 from core.command.command_parser import CommandParser
 from core.command.executor import CommandExecutor
 from core.config.models import ChatConfig, UIConfig
-
 import imgui
 from .base_screen import BaseScreen
 from ..components.chat_input import ChatInput
 from ..components.chat_history import ChatHistory
 from ..components.status_bar import StatusBar
+
+logger = logging.getLogger(__name__)
 
 class ChatScreen(BaseScreen):
     def __init__(self, llm_pipeline):
@@ -65,22 +67,28 @@ class ChatScreen(BaseScreen):
             self.initialized = False
             
     def render(self, frame_data: Dict[str, Any]) -> None:
-        imgui.set_next_window_size(self.ui_config.width, self.ui_config.height)
-        imgui.begin(self.config.window_title, 
-                   flags=imgui.WINDOW_NO_COLLAPSE | imgui.WINDOW_NO_RESIZE)
-        
-        # Chat history area with scrolling
-        self.chat_history.render()
-        
-        # Input area with auto-focus
-        if self.chat_input.render():
-            message = self.chat_input.get_text()
-            self._process_message(message)
+        # Haal de ImGuiManager uit de frame_data
+        imgui_manager = frame_data.get("imgui_manager")
+        if not imgui_manager:
+            logger.error("No ImGuiManager provided in frame_data")
+            return
             
-        # Status bar
-        self.status_bar.render(self.llm.get_status())
+        # Stel venstergrootte in
+        imgui.set_next_window_size(self.ui_config.width, self.ui_config.height)
         
-        imgui.end()
+        # Gebruik de veilige window contextmanager van ImGuiManager
+        with imgui_manager.window(self.config.window_title, 
+                                 flags=imgui.WINDOW_NO_COLLAPSE | imgui.WINDOW_NO_RESIZE):
+            # Chat history area with scrolling
+            self.chat_history.render()
+            
+            # Input area with auto-focus
+            if self.chat_input.render():
+                message = self.chat_input.get_text()
+                self._process_message(message)
+                
+            # Status bar
+            self.status_bar.render(self.llm.get_status())
 
     def _process_message(self, message: str) -> None:
         try:

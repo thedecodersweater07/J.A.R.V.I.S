@@ -4,6 +4,8 @@ import logging
 import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
 
+from .renderer_base import RendererBase
+
 logger = logging.getLogger(__name__)
 
 class InputEvent:
@@ -13,7 +15,7 @@ class InputEvent:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-class OpenGLRenderer:
+class OpenGLRenderer(RendererBase):
     """OpenGL-based renderer using GLFW and ImGui"""
     
     def __init__(self, width: int = 800, height: int = 600, title: str = "JARVIS"):
@@ -34,6 +36,7 @@ class OpenGLRenderer:
             import imgui
             from imgui.integrations.glfw import GlfwRenderer
             import OpenGL.GL as gl
+            from .imGUI_manager import ImGuiManager
             
             # Initialize GLFW
             if not glfw.init():
@@ -65,8 +68,8 @@ class OpenGLRenderer:
             # Enable vsync
             glfw.swap_interval(1)
             
-            # Setup ImGui
-            self.impl = GlfwRenderer(self.window)
+            # We don't need the old ImGui integration anymore
+            # self.impl = GlfwRenderer(self.window)
             
             # Set callbacks
             glfw.set_key_callback(self.window, self._key_callback)
@@ -137,7 +140,7 @@ class OpenGLRenderer:
         self.input_events.clear()
         return events
             
-    def render(self, draw_data: Any) -> None:
+    def render(self, frame_data: Dict[str, Any] = None) -> None:
         """Render ImGui frame"""
         try:
             import OpenGL.GL as gl
@@ -151,8 +154,8 @@ class OpenGLRenderer:
             gl.glClear(gl.GL_COLOR_BUFFER_BIT)
             
             # Render ImGui
-            if self.impl and draw_data:
-                self.impl.render(draw_data)
+            if self.impl and frame_data:
+                self.impl.render(frame_data.get('imgui_draw_data'))
                 
             # Swap buffers
             glfw.swap_buffers(self.window)
@@ -176,6 +179,26 @@ class OpenGLRenderer:
                 glfw.poll_events()
         except Exception as e:
             logger.error(f"Error processing events: {e}")
+            
+    def begin_frame(self):
+        """Setup for frame rendering"""
+        try:
+            import imgui
+            if self.is_initialized and self.impl:
+                self.impl.process_inputs()
+                imgui.new_frame()
+        except Exception as e:
+            logger.error(f"Error beginning frame: {e}")
+            
+    def end_frame(self):
+        """Cleanup after frame rendering"""
+        try:
+            import imgui
+            if self.is_initialized:
+                imgui.render()
+                self.render({'imgui_draw_data': imgui.get_draw_data()})
+        except Exception as e:
+            logger.error(f"Error ending frame: {e}")
             
     def cleanup(self) -> None:
         """Clean up resources"""

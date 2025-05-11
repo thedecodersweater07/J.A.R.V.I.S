@@ -3,14 +3,14 @@ from db import DatabaseManager
 import imgui
 from typing import Dict, Any
 import logging
-import tkinter as tk
-from tkinter import ttk
+import glfw
+from OpenGL import GL
 
 logger = logging.getLogger(__name__)
 
 class DataScreen(BaseScreen):
-    def __init__(self, master=None):
-        super().__init__(master)
+    def __init__(self):
+        super().__init__()
         self.db = DatabaseManager()
         self.metrics = {}
         self.initialized = False

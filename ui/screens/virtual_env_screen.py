@@ -1,10 +1,15 @@
 import imgui
 from typing import Dict, Any
+import glfw
+from OpenGL import GL
 from ui.screens.base_screen import BaseScreen
 
 class VirtualEnvScreen(BaseScreen):
     def __init__(self):
         super().__init__()
+        self.initialized = False
+        self.simulations = []
+        self.error = None
         self.active_simulations = {}
         self.overall_progress = 0.0
         

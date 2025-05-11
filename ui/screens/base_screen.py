@@ -1,5 +1,3 @@
-import tkinter as tk
-from tkinter import ttk
 import logging
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
@@ -7,9 +5,8 @@ from typing import Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 class BaseScreen(ABC):
-    def __init__(self, container: Optional[Any] = None):
-        self.container = container
-        self.frame = ttk.Frame(container) if container else None
+    def __init__(self):
+        self.parent = None
         self.is_visible = False
         self.initialized = False
         self.width = 800
@@ -34,12 +31,10 @@ class BaseScreen(ABC):
         
     def show(self):
         """Show this screen"""
-        self.frame.pack(fill=tk.BOTH, expand=True)
         self.is_visible = True
         
     def hide(self):
         """Hide this screen"""
-        self.frame.pack_forget()
         self.is_visible = False
         
     def add_message(self, message: str, is_user: bool = False):
@@ -49,3 +44,7 @@ class BaseScreen(ABC):
     def cleanup(self) -> None:
         """Cleanup resources - override in subclasses if needed"""
         self.initialized = False
+        
+    def set_parent(self, parent):
+        """Set the parent screen manager"""
+        self.parent = parent

@@ -72,6 +72,9 @@ class Screen:
             return False
 
     def _init_screens(self):
+        # Zorg dat LoginScreen de juiste dependency krijgt
+        if self.auth_service is None:
+            self.auth_service = AuthService()
         self.register_screen("login", LoginScreen(self.auth_service))
         self.register_screen("chat", ChatScreen(self.llm_pipeline))
         self.register_screen("settings", SettingsScreen())
