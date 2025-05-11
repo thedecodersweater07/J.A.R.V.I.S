@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Any, Optional
 
 @dataclass
@@ -18,6 +18,22 @@ class JarvisConfig:
     initializer_range: float = 0.02
     use_cache: bool = True
 
+    # Add missing attributes
+    num_classes: int = 2  # Default for binary classification
+    embedding_size: int = 768  # Same as hidden_size by default
+    max_seq_length: int = 512
+    type_vocab_size: int = 2
+    pad_token_id: int = 0
+    bos_token_id: int = 1
+    eos_token_id: int = 2
+
+    # Task-specific configurations
+    classification_classes: Dict[str, int] = field(default_factory=lambda: {
+        "intent": 10,
+        "sentiment": 3,
+        "topic": 5
+    })
+
 JARVIS_CONFIGS = {
     "jarvis-small": JarvisConfig(
         name="jarvis-small",
@@ -31,7 +47,8 @@ JARVIS_CONFIGS = {
         hidden_size=768,
         num_hidden_layers=12,
         num_attention_heads=12,
-        intermediate_size=3072
+        intermediate_size=3072,
+        num_classes=10  # Set reasonable default
     ),
     "jarvis-large": JarvisConfig(
         name="jarvis-large",

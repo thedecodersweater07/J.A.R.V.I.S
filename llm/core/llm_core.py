@@ -37,8 +37,8 @@ class LLMCore:
         if "name" not in self.config["model"]:
             raise ValueError("Model name not specified in configuration")
 
-    def _load_config(self, config_path: Optional[Path]) -> Dict[str, Any]:
-        """Load configuration from file"""
+    def _load_config(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Load configuration from dictionary or file"""
         default_config = {
             "model": {
                 "name": "nl_core_news_lg",
@@ -46,22 +46,65 @@ class LLMCore:
             }
         }
         
-        if config_path and config_path.exists():
-            with open(config_path) as f:
-                loaded_config = yaml.safe_load(f)
-                return {**default_config, **loaded_config}
+        if isinstance(config, dict):
+            return {**default_config, **config}
+            
+        config_path = Path("config/llm.yaml")
+        if config_path.exists():
+            try:
+                with open(config_path) as f:
+                    loaded_config = yaml.safe_load(f)
+                    return {**default_config, **loaded_config}
+            except Exception as e:
+                logger.warning(f"Failed to load config file: {e}")
                 
         return default_config
 
     def _initialize_model(self) -> None:
-        """Initialize spaCy model"""
+        """Initialize model with better error handling and transformer support"""
         try:
-            model_name = self.config.get("model", {}).get("name", "nl_core_news_lg")
-            self.model = spacy.load(model_name)
-            logger.info(f"Loaded spaCy model: {model_name}")
+            model_config = self.config.get("model", {})
+            model_name = model_config.get("name", "nl_core_news_sm")
+            model_type = model_config.get("type", "spacy")
+
+            if model_type == "spacy":
+                try:
+                    self.model = spacy.load(model_name)
+                except OSError:
+                    logger.info(f"Model {model_name} not found, attempting to download...")
+                    try:
+                        spacy.cli.download(model_name)
+                        self.model = spacy.load(model_name)
+                    except Exception as e:
+                        logger.warning(f"Failed to download {model_name}: {e}")
+                        # Try downloading smaller model as fallback
+                        fallback_model = "nl_core_news_sm"
+                        logger.info(f"Attempting to download fallback model {fallback_model}")
+                        spacy.cli.download(fallback_model)
+                        self.model = spacy.load(fallback_model)
+                        
+                logger.info(f"Successfully loaded spaCy model: {self.model.meta['name']}")
+                
+            elif model_type == "transformer":
+                from transformers import AutoModelForCausalLM, AutoTokenizer
+                try:
+                    self.model = AutoModelForCausalLM.from_pretrained(model_name)
+                    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                    logger.info(f"Successfully loaded transformer model: {model_name}")
+                except Exception as e:
+                    logger.warning(f"Failed to load transformer {model_name}: {e}")
+                    # Fallback to smaller transformer model
+                    fallback_model = "gpt2"
+                    logger.info(f"Attempting to load fallback model {fallback_model}")
+                    self.model = AutoModelForCausalLM.from_pretrained(fallback_model)
+                    self.tokenizer = AutoTokenizer.from_pretrained(fallback_model)
+                    
+            else:
+                raise ValueError(f"Unsupported model type: {model_type}")
+                
         except Exception as e:
-            logger.error(f"Failed to load model: {e}")
-            raise
+            logger.error(f"Failed to initialize model: {e}")
+            raise RuntimeError(f"Could not initialize any suitable model: {str(e)}")
 
     def generate_response(self, prompt: str, context: Optional[Dict] = None) -> str:
         # Get relevant context from memory

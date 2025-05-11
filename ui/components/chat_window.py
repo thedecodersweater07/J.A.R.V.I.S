@@ -1,6 +1,6 @@
 import tkinter as tk
-from ...llm.manager import LLMManager
-from ...data.db.database import DatabaseManager
+from llm.manager import LLMManager
+from db.database_manager import DatabaseManager
 
 class ChatWindow(tk.Frame):
     def __init__(self, master=None):

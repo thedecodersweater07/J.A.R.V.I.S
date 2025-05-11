@@ -1,7 +1,7 @@
 from pathlib import Path
 import numpy as np
 from typing import Any, Dict, Optional
-from .model_manager import ModelManager
+from ml.models.model_manager import ModelManager
 from ..data.manager import DataManager
 
 class ModelTrainer:

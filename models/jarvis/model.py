@@ -7,6 +7,10 @@ from ..gpt.transformer import TransformerLayer
 from ml.models.model_manager import ModelManager
 from nlp.pipeline import NLPPipeline
 from llm.core import LLMCore
+from transformers import AutoTokenizer
+import logging
+
+logger = logging.getLogger(__name__)
 
 class JarvisModel(BaseModel):
     def __init__(self, config_name: str):
@@ -38,25 +42,39 @@ class JarvisModel(BaseModel):
         self.nlp_pipeline = NLPPipeline()
         self.llm_core = LLMCore()
         
-        # Task routing
+        # Task routing with dynamic head sizes
         self.task_heads = nn.ModuleDict({
-            'classification': nn.Linear(config.hidden_size, config.num_classes),
+            'classification': nn.ModuleDict({
+                task: nn.Linear(config.hidden_size, num_classes)
+                for task, num_classes in config.classification_classes.items()
+            }),
             'generation': self.lm_head,
             'embedding': nn.Linear(config.hidden_size, config.embedding_size),
             'qa': nn.Linear(config.hidden_size, 2)  # start/end position
         })
+        
+        # Initialize tokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained('bert-base-multilingual-cased')
         
         self.init_integrations()
         
     def init_integrations(self):
         """Initialize integration with ML/NLP/LLM components"""
         # Connect ML models
-        self.ml_models = {
-            'classifier': self.model_manager.load_model('classifier'),
-            'regressor': self.model_manager.load_model('regressor'),
-            'clustering': self.model_manager.load_model('clustering')
-        }
+        self.ml_models = {}
+        model_types = ['classifier', 'regressor', 'clustering']
         
+        for model_type in model_types:
+            try:
+                model = self.model_manager.load_model(model_type)
+                if model:
+                    self.ml_models[model_type] = model
+                else:
+                    logger.warning(f"Could not load {model_type} model")
+            except Exception as e:
+                logger.error(f"Error loading {model_type} model: {e}")
+                continue
+                
         # Setup NLP pipeline
         self.nlp_processors = {
             'tokenizer': self.nlp_pipeline.get_tokenizer(),
@@ -64,11 +82,13 @@ class JarvisModel(BaseModel):
             'ner': self.nlp_pipeline.get_ner()
         }
         
-        # Configure LLM integration
-        self.llm_core.register_model(self)
-        
     def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
         hidden_states = self.embeddings(input_ids)
+        if attention_mask is not None:
+            hidden_states = hidden_states * attention_mask.unsqueeze(-1)
+        
+        all_hidden_states = []
+        all_attentions = []
         
         all_hidden_states = []
         all_attentions = []
@@ -95,38 +115,88 @@ class JarvisModel(BaseModel):
         if task_name not in self.task_heads:
             raise ValueError(f"Unknown task: {task_name}")
             
-        task_output = self.task_heads[task_name](hidden_states)
-        outputs[f"{task_name}_output"] = task_output
-        
-        return outputs
-        
     def process_pipeline(self, text: str, tasks: List[str]) -> Dict[str, Any]:
         """Process text through multiple pipeline stages"""
         results = {}
         
-        # NLP preprocessing
-        tokens = self.nlp_processors['tokenizer'](text)
-        parsed = self.nlp_processors['parser'](tokens)
-        entities = self.nlp_processors['ner'](tokens)
-        
-        # Convert to tensor inputs
-        inputs = self.prepare_inputs(tokens)
-        
-        # Process each requested task
-        for task in tasks:
-            results[task] = self.route_task(task, inputs)
+        try:
+            # NLP preprocessing
+            tokens = self.nlp_processors['tokenizer'](text)
+            results['parsed'] = self.nlp_processors['parser'](tokens)
+            results['entities'] = self.nlp_processors['ner'](tokens)
             
-        # Post-process with ML models if needed
-        if 'ml_analysis' in tasks:
-            ml_features = self.extract_features(results)
-            for model_name, model in self.ml_models.items():
-                results[f"ml_{model_name}"] = model.predict(ml_features)
+            # Convert to tensor inputs
+            inputs = self.prepare_inputs(text)  # Changed from tokens to text
+            
+            # Process each requested task
+            for task in tasks:
+                try:
+                    results[task] = self.route_task(task, inputs)
+                except Exception as e:
+                    logger.error(f"Error processing task {task}: {e}")
+                    results[task] = {"error": str(e)}
+            
+            # Post-process with ML models if needed
+            if 'ml_analysis' in tasks:
+                ml_features = self.extract_features(results)
                 
-        return results
+            return results
+            
+        except Exception as e:
+            logger.error(f"Pipeline error: {e}")
+            return {"error": str(e)}
 
-    def prepare_inputs(self, tokens: List[str]) -> Dict[str, torch.Tensor]:
-        """Convert tokens to model inputs"""
-        # ...existing code...
+    def prepare_inputs(self, text: str) -> Dict[str, torch.Tensor]:
+        """Convert text to model inputs"""
+        # Tokenize with padding and truncation
+        encoded = self.tokenizer(
+            text,
+            padding=True,
+            truncation=True,
+            max_length=512,
+            return_tensors="pt"
+        )
+        
+        # Move to model device if needed
+        if hasattr(self, 'device'):
+            encoded = {k: v.to(self.device) for k, v in encoded.items()}
+            
+        return encoded
+
+    def generate(self, prompt: str, max_length: int = 100) -> str:
+        """Generate text from prompt"""
+        # Tokenize input
+        input_ids = self.tokenizer(prompt, return_tensors="pt")["input_ids"].to(self.device)
+        attention_mask = torch.ones_like(input_ids)
+        
+        # Generate
+        with torch.no_grad():
+            outputs = self.forward(input_ids, attention_mask)
+            logits = outputs["logits"]
+            
+            # Sample from logits
+            next_token_logits = logits[:, -1, :]
+            next_token = torch.argmax(next_token_logits, dim=-1)
+            
+            generated = [next_token.item()]
+            current_length = 1
+            
+            while current_length < max_length:
+                current_input = torch.cat([input_ids, torch.tensor([generated]).to(self.device)], dim=1)
+                current_mask = torch.ones_like(current_input)
+                
+                outputs = self.forward(current_input, current_mask)
+                next_token_logits = outputs["logits"][:, -1, :]
+                next_token = torch.argmax(next_token_logits, dim=-1)
+                
+                generated.append(next_token.item())
+                current_length += 1
+                
+                if next_token.item() == self.config.get("eos_token_id", 0):
+                    break
+                    
+        # Decode generated tokens
+        return self.tokenizer.decode(generated)
 
 class JarvisEmbeddings(nn.Module):
     def __init__(self, config: JarvisConfig):

@@ -1,0 +1,25 @@
+{
+  "topic": "ai",
+  "experiment_id": "exp_ai_1746973037",
+  "total_steps": 5,
+  "validation_successes": 3,
+  "performance": {
+    "total_time": 0.8471906185150146,
+    "steps_per_second": 5.901859499771344,
+    "efficiency_score": 0.703963299263439
+  },
+  "report": {
+    "experiment_id": "exp_ai_1746973037",
+    "topic": "ai",
+    "timestamp": "2025-05-11T16:17:18.571365",
+    "summary": {
+      "total_steps": 5,
+      "success_rate": 0.6,
+      "performance_rating": "Good"
+    },
+    "recommendations": [
+      "Increase validation steps for topic 'ai' to improve accuracy",
+      "Consider fine-tuning model parameters for better performance"
+    ]
+  }
+}

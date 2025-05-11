@@ -7,6 +7,7 @@ from typing import Dict, Any, List
 from pathlib import Path
 from datetime import datetime
 import torch
+import yaml
 
 # Import core components
 from core.logging import setup_logging, get_logger
@@ -38,6 +39,13 @@ class JARVIS:
         self.logger = get_logger(__name__)  # Initialize instance logger
         
         try:
+            # Run installation/configuration if needed
+            if not Path("config/installed.flag").exists():
+                from core.setup.installer import SystemInstaller
+                installer = SystemInstaller()
+                installer.install()
+                Path("config/installed.flag").touch()
+                
             # Setup logging first
             setup_logging(log_dir="logs", level="DEBUG" if "--debug" in sys.argv else "INFO")
             
@@ -135,9 +143,26 @@ class JARVIS:
             self.brain = Cerebrum()
             self._init_systems()
             
+            # Load LLM config with fallback options
+            llm_config = self.config.get('llm', {})
+            if not llm_config:
+                yaml_path = Path("config/llm.yaml")
+                if yaml_path.exists():
+                    try:
+                        with open(yaml_path) as f:
+                            llm_config = yaml.safe_load(f)
+                    except Exception as e:
+                        self.logger.warning(f"Failed to load LLM config: {e}")
+                        llm_config = {"model": {"name": "nl_core_news_lg", "type": "spacy"}}
+                        
             # Initialize LLM with config
-            llm_config = self.config.get('llm', self._get_default_config()['llm'])
-            self.llm = LLMCore(config=llm_config)
+            try:
+                self.llm = LLMCore(config=llm_config)
+            except Exception as e:
+                self.logger.error(f"Failed to initialize primary LLM: {e}")
+                # Try fallback configuration
+                fallback_config = {"model": {"name": "nl_core_news_sm", "type": "spacy"}}
+                self.llm = LLMCore(config=fallback_config)
             
             self.logger.info("Core components initialized")
             
@@ -180,10 +205,17 @@ class JARVIS:
                 self.model = self.model.to('cuda')
                 self.logger.info("Using CUDA for model acceleration")
                 
-            # Connect pipelines
-            tasks = ["classification", "generation", "qa"]
-            text = "Initialize system check"
-            results = self.model.process_pipeline(text, tasks)
+            # Initialize model manager first
+            self.model_manager = ModelManager()
+            
+            # Connect pipelines - with error handling
+            try:
+                text = "Initialize system check"
+                tasks = ["classification", "generation", "qa"]
+                results = self.model.process_pipeline(text, tasks)
+                self.logger.info("Pipeline test successful")
+            except Exception as e:
+                self.logger.warning(f"Pipeline test failed: {e}, continuing initialization")
             
             self.logger.info("ML components initialized")
         except Exception as e:
@@ -210,6 +242,39 @@ class JARVIS:
             return self.model.process_pipeline(text, tasks)
         except Exception as e:
             self.logger.error(f"Error processing input: {e}")
+            return {"error": str(e)}
+            
+    def _get_system_metrics(self) -> Dict[str, Any]:
+        """Get system metrics for UI display"""
+        try:
+            metrics = {
+                "cpu_usage": 0.0,
+                "memory_usage": 0.0,
+                "gpu_usage": 0.0 if torch.cuda.is_available() else None,
+                "model_loaded": hasattr(self, "model"),
+                "llm_loaded": hasattr(self, "llm"),
+                "uptime_seconds": 0  # Would need to track start time
+            }
+            
+            # Try to get more detailed metrics if psutil is available
+            try:
+                import psutil
+                process = psutil.Process(os.getpid())
+                metrics["cpu_usage"] = process.cpu_percent()
+                metrics["memory_usage"] = process.memory_info().rss / (1024 * 1024)  # MB
+            except ImportError:
+                pass
+                
+            # Get GPU metrics if available
+            if torch.cuda.is_available():
+                try:
+                    metrics["gpu_usage"] = torch.cuda.memory_allocated() / torch.cuda.memory_reserved() * 100
+                except:
+                    pass
+                    
+            return metrics
+        except Exception as e:
+            self.logger.error(f"Error getting system metrics: {e}")
             return {"error": str(e)}
 
     def run(self):

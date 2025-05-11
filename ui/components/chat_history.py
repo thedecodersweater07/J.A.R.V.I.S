@@ -2,8 +2,9 @@ import imgui
 from typing import List, Dict
 
 class ChatHistory:
-    def __init__(self):
+    def __init__(self, max_messages: int = 1000):
         self.messages: List[Dict] = []
+        self.max_messages = max_messages
         
     def render(self):
         imgui.begin_child("ChatHistory", 0, -60, border=True)
@@ -16,6 +17,12 @@ class ChatHistory:
         
     def add_user_message(self, text: str):
         self.messages.append({"text": text, "is_user": True})
+        self._trim_history()
         
     def add_assistant_message(self, text: str):
         self.messages.append({"text": text, "is_user": False})
+        self._trim_history()
+        
+    def _trim_history(self):
+        if len(self.messages) > self.max_messages:
+            self.messages = self.messages[-self.max_messages:]

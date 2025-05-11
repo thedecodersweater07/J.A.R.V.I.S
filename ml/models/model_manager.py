@@ -1,17 +1,12 @@
 import logging
 from typing import Dict, Optional, Any
 import torch
-from ..training.trainer import ModelTrainer
-from ..optimization.optimizer import ModelOptimizer
+from core.ml.model_manager import ModelManager as CoreModelManager
 
-class ModelManager:
+class ModelManager(CoreModelManager):
+    """Extended ModelManager for ML models"""
     def __init__(self):
+        super().__init__()
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.models = {}
-        
-        # Initialize with empty configurations
-        default_config = {"epochs": 10, "batch_size": 32}
-        self.trainer = ModelTrainer(config=default_config)
-        self.optimizer = ModelOptimizer(config=default_config)
 
-    # ...existing code...
+    # The load_model method is inherited from CoreModelManager

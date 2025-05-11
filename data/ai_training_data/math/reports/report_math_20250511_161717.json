@@ -1,0 +1,25 @@
+{
+  "topic": "math",
+  "experiment_id": "exp_math_1746973036",
+  "total_steps": 5,
+  "validation_successes": 1,
+  "performance": {
+    "total_time": 0.843503475189209,
+    "steps_per_second": 5.927657854496016,
+    "efficiency_score": 0.7588343828431992
+  },
+  "report": {
+    "experiment_id": "exp_math_1746973036",
+    "topic": "math",
+    "timestamp": "2025-05-11T16:17:17.716500",
+    "summary": {
+      "total_steps": 5,
+      "success_rate": 0.2,
+      "performance_rating": "Good"
+    },
+    "recommendations": [
+      "Increase validation steps for topic 'math' to improve accuracy",
+      "Consider fine-tuning model parameters for better performance"
+    ]
+  }
+}
