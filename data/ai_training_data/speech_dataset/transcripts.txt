@@ -1,5 +1,0 @@
-audio_0.wav: This is transcript 0
-audio_1.wav: This is transcript 1
-audio_2.wav: This is transcript 2
-audio_3.wav: This is transcript 3
-audio_4.wav: This is transcript 4

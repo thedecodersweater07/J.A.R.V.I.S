@@ -1,5 +1,0 @@
-{"prompt": "Hello, how are you?", "response": "I'm doing well, thank you!", "category": "greeting"}
-{"prompt": "What's the weather like?", "response": "It's a sunny day today.", "category": "weather"}
-{"prompt": "Can you help me with programming?", "response": "I'd be happy to help! What language are you working with?", "category": "programming"}
-{"prompt": "What time is it?", "response": "I can't tell real-time, but I can help you with time-related queries!", "category": "time"}
-{"prompt": "Tell me a joke", "response": "Why don't programmers like nature? It has too many bugs!", "category": "entertainment"}
