@@ -156,22 +156,30 @@ def genereer_trainingsmatrices():
 
 def scrap_nieuws_data(aantal_paginas=3):
     """Scrap nieuwsartikelen van nu.nl"""
+    logger = logging.getLogger(__name__)
+    
     # Map wordt gemaakt binnen data/ai_training_data
-    os.makedirs('nieuws_data', exist_ok=True)
+    nieuws_dir = Path('nieuws_data')
+    nieuws_dir.mkdir(parents=True, exist_ok=True)
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
     
     artikelen = []
+    timeout = 10  # Timeout in seconds for requests
+    max_retries = 3
     
-    try:
-        for pagina in range(1, aantal_paginas + 1):
-            url = f"https://www.nu.nl/algemeen/{pagina}"
-            print(f"Bezig met scrapen van pagina {pagina}...")
-            
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
+    for pagina in range(1, aantal_paginas + 1):
+        url = f"https://www.nu.nl/algemeen/{pagina}"
+        logger.info(f"Bezig met scrapen van pagina {pagina}...")
+        
+        # Implement retry logic
+        for retry in range(max_retries):
+            try:
+                response = requests.get(url, headers=headers, timeout=timeout)
+                response.raise_for_status()  # Raise exception for 4XX/5XX responses
+                
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
                 # Zoek alle artikellinks
@@ -194,21 +202,41 @@ def scrap_nieuws_data(aantal_paginas=3):
                         # Voeg toe aan lijst als het nog niet bestaat
                         if artikel_info not in artikelen:
                             artikelen.append(artikel_info)
-            
-            # Wacht even om de server niet te overbelasten
-            time.sleep(1)
+                
+                # Success, break the retry loop
+                break
+                
+            except requests.exceptions.Timeout:
+                if retry < max_retries - 1:
+                    logger.warning(f"Timeout bij het ophalen van {url}. Poging {retry + 1}/{max_retries}. Opnieuw proberen...")
+                    time.sleep(2)  # Wait before retrying
+                else:
+                    logger.error(f"Timeout bij het ophalen van {url} na {max_retries} pogingen.")
+                    raise
+            except requests.exceptions.HTTPError as e:
+                logger.error(f"HTTP-fout bij het ophalen van {url}: {e}")
+                break  # Don't retry for HTTP errors
+            except requests.exceptions.RequestException as e:
+                if retry < max_retries - 1:
+                    logger.warning(f"Fout bij het ophalen van {url}: {e}. Poging {retry + 1}/{max_retries}. Opnieuw proberen...")
+                    time.sleep(2)  # Wait before retrying
+                else:
+                    logger.error(f"Fout bij het ophalen van {url} na {max_retries} pogingen: {e}")
+                    raise
+        
+        # Wacht even om de server niet te overbelasten
+        time.sleep(1)
         
         # Sla de geschraapte data op
         with open('nieuws_data/nieuws_artikelen.json', 'w', encoding='utf-8') as f:
             json.dump(artikelen, f, indent=2, ensure_ascii=False)
         
-        print(f"Succesvol {len(artikelen)} nieuwsartikelen geschraapt en opgeslagen.")
-    
-    except Exception as e:
-        print(f"Fout bij het scrapen van nieuws: {e}")
+        logger.info(f"Succesvol {len(artikelen)} nieuwsartikelen geschraapt en opgeslagen.")
 
 def scrap_wikipedia_artikelen(onderwerpen=None):
     """Scrap informatie van Nederlandse Wikipedia-artikelen"""
+    logger = logging.getLogger(__name__)
+    
     if onderwerpen is None:
         onderwerpen = [
             'Nederland', 'Amsterdam', 'Kunstmatige_intelligentie', 
@@ -216,7 +244,8 @@ def scrap_wikipedia_artikelen(onderwerpen=None):
         ]
     
     # Map wordt gemaakt binnen data/ai_training_data
-    os.makedirs('wiki_data', exist_ok=True)
+    wiki_dir = Path('wiki_data')
+    wiki_dir.mkdir(parents=True, exist_ok=True)
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -226,61 +255,64 @@ def scrap_wikipedia_artikelen(onderwerpen=None):
     
     for onderwerp in onderwerpen:
         url = f"https://nl.wikipedia.org/wiki/{onderwerp}"
-        print(f"Bezig met scrapen van Wikipedia-artikel: {onderwerp}")
+        logger.info(f"Bezig met scrapen van Wikipedia-artikel: {onderwerp}")
         
         try:
             response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                
-                # Verwijder tabellen, navigatie en andere niet-relevante elementen
-                for div in soup.find_all(['table', 'div', 'script', 'style']):
-                    div.decompose()
-                
-                # Haal titel op
-                titel_element = soup.find('h1', {'id': 'firstHeading'})
-                titel = titel_element.text if titel_element else onderwerp
-                
-                # Haal inhoud op
-                content_div = soup.find('div', {'class': 'mw-parser-output'})
-                
-                if content_div:
-                    paragrafen = []
-                    for p in content_div.find_all('p'):
-                        tekst = p.text.strip()
-                        if tekst and len(tekst) > 50:  # Skip korte paragrafen
-                            paragrafen.append(tekst)
-                    
-                    inhoud = '\n\n'.join(paragrafen)
-                    
-                    # Sla op in de dictionary
-                    wiki_data[onderwerp] = {
-                        'titel': titel,
-                        'inhoud': inhoud,
-                        'url': url
-                    }
-                    
-                    # Sla elk artikel ook op als apart tekstbestand
-                    with open(f'wiki_data/{onderwerp}.txt', 'w', encoding='utf-8') as f:
-                        f.write(f"TITEL: {titel}\n\n")
-                        f.write(f"BRON: {url}\n\n")
-                        f.write(inhoud)
+            response.raise_for_status()  # Raise exception for 4XX/5XX responses
             
-            # Wacht even om de server niet te overbelasten
-            time.sleep(2)
+            soup = BeautifulSoup(response.text, 'html.parser')
             
-        except Exception as e:
-            print(f"Fout bij het scrapen van {onderwerp}: {e}")
+            # Verwijder tabellen, navigatie en andere niet-relevante elementen
+            for div in soup.find_all(['table', 'div', 'script', 'style']):
+                div.decompose()
+            
+            # Haal titel op
+            titel_element = soup.find('h1', {'id': 'firstHeading'})
+            titel = titel_element.text if titel_element else onderwerp
+            
+            # Haal inhoud op
+            content_div = soup.find('div', {'class': 'mw-parser-output'})
+            
+            if content_div:
+                paragrafen = []
+                for p in content_div.find_all('p'):
+                    tekst = p.text.strip()
+                    if tekst and len(tekst) > 50:  # Skip korte paragrafen
+                        paragrafen.append(tekst)
+                
+                inhoud = '\n\n'.join(paragrafen)
+                
+                # Sla op in de dictionary
+                wiki_data[onderwerp] = {
+                    'titel': titel,
+                    'inhoud': inhoud,
+                    'url': url
+                }
+                
+                # Sla elk artikel ook op als apart tekstbestand
+                with open(f'wiki_data/{onderwerp}.txt', 'w', encoding='utf-8') as f:
+                    f.write(f"TITEL: {titel}\n\n")
+                    f.write(f"BRON: {url}\n\n")
+                    f.write(inhoud)
+        
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Fout bij het scrapen van {onderwerp}: {e}")
     
     # Sla alle data op in één JSON-bestand
     with open('wiki_data/wikipedia_artikelen.json', 'w', encoding='utf-8') as f:
         json.dump(wiki_data, f, indent=2, ensure_ascii=False)
     
-    print(f"Succesvol {len(wiki_data)} Wikipedia-artikelen geschraapt en opgeslagen.")
+    logger.info(f"Succesvol {len(wiki_data)} Wikipedia-artikelen geschraapt en opgeslagen.")
 
 def genereer_prompt_dataset():
     """Genereer een dataset met voorbeeldprompts voor AI-training"""
+    logger = logging.getLogger(__name__)
+    
     # Map wordt gemaakt binnen data/ai_training_data
+    prompt_dir = Path('prompt_data')
+    prompt_dir.mkdir(parents=True, exist_ok=True)
+    
     prompts = [
         {
             "type": "creatief",
@@ -355,19 +387,21 @@ def genereer_prompt_dataset():
     alle_prompts = prompts + extra_prompts
     
     # Sla de dataset op in data/ai_training_data/prompt_data
-    os.makedirs('prompt_data', exist_ok=True)
     with open('prompt_data/nl_prompts.json', 'w', encoding='utf-8') as f:
         json.dump(alle_prompts, f, indent=2, ensure_ascii=False)
     
-    print(f"Dataset met {len(alle_prompts)} AI-prompts gegenereerd.")
+    logger.info(f"Dataset met {len(alle_prompts)} AI-prompts gegenereerd.")
 
 def hoofdfunctie():
-    # Maak de hoofdmap structuur 'data/ai_training_data'
-    os.makedirs('data/ai_training_data', exist_ok=True)
-    os.chdir('data/ai_training_data')
+    # Configure logging
+    logger = logging.getLogger(__name__)
     
-    print("Beginnen met het genereren van datasets...")
-
+    # Maak de hoofdmap structuur 'data/ai_training_data'
+    target_dir = Path('data/ai_training_data')
+    target_dir.mkdir(parents=True, exist_ok=True)
+    
+    logger.info("Beginnen met het genereren van datasets...")
+    
     # Oorspronkelijke generators
     genereer_tabulaire_data()
     genereer_nlp_data()
@@ -384,24 +418,49 @@ def hoofdfunctie():
     genereer_prompt_dataset()
     
     # Web scraping functies
-    print("\nBeginnen met web scraping...")
+    logger.info("\nBeginnen met web scraping...")
     scrap_nieuws_data(aantal_paginas=2)
     scrap_wikipedia_artikelen()
 
-    print("\nDataset generatie compleet!")
-    print("Alle datasets zijn opgeslagen in de map 'data/ai_training_data'")
+    logger.info("\nDataset generatie compleet!")
+    logger.info("Alle datasets zijn opgeslagen in de map 'data/ai_training_data'")
 
 if __name__ == "__main__":
+    # Configure logging
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    
     try:
         # Controleer of we al in de juiste directory zijn
         huidige_dir = os.getcwd()
         if huidige_dir.endswith('data/ai_training_data'):
-            print(f"Let op: Je bent al in de map '{huidige_dir}'.")
-            print("Script zal worden uitgevoerd in de huidige map.")
+            logger.info(f"Let op: Je bent al in de map '{huidige_dir}'.")
+            logger.info("Script zal worden uitgevoerd in de huidige map.")
             # Reset naar de oorspronkelijke directory
             os.chdir(os.path.dirname(os.path.dirname(huidige_dir)))
         
+        # Run the main function
         hoofdfunctie()
+        
+    except FileNotFoundError as e:
+        logger.error(f"Bestand of map niet gevonden: {e}")
+        logger.info("Controleer of alle benodigde mappen bestaan en toegankelijk zijn.")
+        sys.exit(1)
+    except PermissionError as e:
+        logger.error(f"Geen toegang tot bestand of map: {e}")
+        logger.info("Controleer of je de juiste rechten hebt voor de bestanden en mappen.")
+        sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Netwerkfout bij het ophalen van gegevens: {e}")
+        logger.info("Controleer je internetverbinding en probeer het opnieuw.")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        logger.error(f"Fout bij het verwerken van JSON-gegevens: {e}")
+        logger.info("Een JSON-bestand heeft een ongeldig formaat.")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        logger.info("\nScript onderbroken door gebruiker.")
+        sys.exit(0)
     except Exception as e:
-        print(f"Er is een fout opgetreden: {e}")
+        logger.error(f"Er is een onverwachte fout opgetreden: {e}", exc_info=True)
+        logger.info("Controleer de logbestanden voor meer informatie.")
         sys.exit(1)

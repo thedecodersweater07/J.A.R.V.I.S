@@ -5,6 +5,14 @@ import os
 from typing import Dict, Any, List, Union
 from pathlib import Path
 
+
+#voeg core hier aan toe 
+from data.core.manager import DataManager
+from data.core.storage import StorageManager
+from data.core.validation import ValidationManager
+from data.core.caching import CacheManager
+from data.core.processing import ProcessingManager
+
 class DataManager:
     def __init__(self, data_dir: str = "ai_training_data"):
         self.data_dir = Path(data_dir)

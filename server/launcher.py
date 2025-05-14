@@ -26,7 +26,15 @@ def import_app():
         return app
     except ImportError as e:
         logger.error(f"Failed to import server app: {e}")
-        return None
+        logger.error(traceback.format_exc())
+        # Try alternative import path
+        try:
+            logger.info("Trying alternative import path...")
+            from app import app
+            return app
+        except ImportError as e2:
+            logger.error(f"Alternative import also failed: {e2}")
+            return None
 
 def start_server(host="127.0.0.1", port=8000, debug=False):
     """Start the server with the specified configuration"""

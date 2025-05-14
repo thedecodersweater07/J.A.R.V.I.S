@@ -1,0 +1,25 @@
+{
+  "topic": "physics",
+  "experiment_id": "exp_physics_1747070080",
+  "total_steps": 5,
+  "validation_successes": 2,
+  "performance": {
+    "total_time": 1.1105625629425049,
+    "steps_per_second": 4.50222271742367,
+    "efficiency_score": 0.8427458916546746
+  },
+  "report": {
+    "experiment_id": "exp_physics_1747070080",
+    "topic": "physics",
+    "timestamp": "2025-05-12T19:14:41.687184",
+    "summary": {
+      "total_steps": 5,
+      "success_rate": 0.4,
+      "performance_rating": "Average"
+    },
+    "recommendations": [
+      "Increase validation steps for topic 'physics' to improve accuracy",
+      "Consider fine-tuning model parameters for better performance"
+    ]
+  }
+}

@@ -30,6 +30,16 @@ from llm.knowledge import KnowledgeManager
 from llm.learning.learning_manager import LearningManager
 from llm.inference.inference_engine import InferenceEngine
 from ml.models import ModelManager
+
+# Import new AI architecture components
+try:
+    from core.ai.coordinator import AICoordinator
+    from core.ai.model_registry import ModelRegistry
+    from core.ai.pipeline import PipelineManager
+    from core.ai.events import EventBus
+    from core.ai.resource_manager import ResourceManager
+except ImportError:
+    print("New AI architecture components not found, using legacy components")
 # Import optional components with error handling
 APIClient = None
 server_launcher = None
@@ -102,7 +112,7 @@ class JARVIS:
         return {
             "system": {
                 "name": "JARVIS",
-                "version": "0.0.0",
+                "version": "1.0.0",
                 "language": "nl-NL",
                 "log_level": "INFO",
                 "memory_limit": "16G",
@@ -136,6 +146,28 @@ class JARVIS:
                 "type": "sqlite",
                 "path": "data/db",
                 "connection": "sqlite:///data/db/jarvis.db"
+            },
+            "resources": {
+                "memory_limit": "80%",
+                "cpu_limit": 0.8,
+                "gpu_memory_limit": 0.8,
+                "enable_monitoring": True,
+                "monitoring_interval": 5.0
+            },
+            "models": {
+                "model_paths": [
+                    "llm/models",
+                    "ml/models",
+                    "nlp/models"
+                ]
+            },
+            "pipelines": {
+                "default_timeout": 30.0,
+                "enable_metrics": True
+            },
+            "events": {
+                "async_mode": True,
+                "max_history": 100
             }
         }
 
@@ -168,7 +200,26 @@ class JARVIS:
     def _init_core_components(self):
         """Initialize core AI components"""
         try:
-            # Initialize brain first
+            # Initialize AI Coordinator and related components first
+            from core.ai.coordinator import AICoordinator
+            from core.ai.model_registry import ModelRegistry
+            from core.ai.pipeline import PipelineManager
+            from core.ai.events import EventBus
+            from core.ai.resource_manager import ResourceManager
+            
+            # Initialize resource manager first to optimize resource allocation
+            self.resource_manager = ResourceManager(config=self.config.get('resources', {}))
+            
+            # Initialize event bus for component communication
+            self.event_bus = EventBus(config=self.config.get('events', {}))
+            
+            # Initialize model registry
+            self.model_registry = ModelRegistry(config=self.config.get('models', {}))
+            
+            # Initialize pipeline manager
+            self.pipeline_manager = PipelineManager(config=self.config.get('pipelines', {}))
+            
+            # Initialize brain
             self.brain = Cerebrum()
             self._init_systems()
             
@@ -192,8 +243,40 @@ class JARVIS:
                 # Try fallback configuration
                 fallback_config = {"model": {"name": "nl_core_news_sm", "type": "spacy"}}
                 self.llm = LLMCore(config=fallback_config)
+                
+            # Initialize AI Coordinator last, after all components are ready
+            # Skip AI coordinator initialization for now to avoid errors
+            self.logger.info("Skipping AI Coordinator initialization for compatibility")
+            self.ai_coordinator = None
             
-            self.logger.info("Core components initialized")
+            # Initialize resource manager directly if possible
+            try:
+                from core.ai.resource_manager import ResourceManager
+                self.resource_manager = ResourceManager(config=self.config.get('resources', {}))
+                self.logger.info("Resource manager initialized successfully")
+            except Exception as e:
+                self.logger.warning(f"Resource manager initialization failed: {e}")
+                self.resource_manager = None
+                
+            # Initialize event bus directly if possible
+            try:
+                from core.ai.events import EventBus
+                self.event_bus = EventBus(config=self.config.get('events', {}))
+                self.logger.info("Event bus initialized successfully")
+            except Exception as e:
+                self.logger.warning(f"Event bus initialization failed: {e}")
+                self.event_bus = None
+                
+            # Initialize model registry directly if possible
+            try:
+                from core.ai.model_registry import ModelRegistry
+                self.model_registry = ModelRegistry(config=self.config.get('models', {}))
+                self.logger.info("Model registry initialized successfully")
+            except Exception as e:
+                self.logger.warning(f"Model registry initialization failed: {e}")
+                self.model_registry = None
+            
+            self.logger.info("Core AI components initialized")
             
         except Exception as e:
             self.logger.error(f"Core components initialization failed: {e}", exc_info=True)
@@ -224,32 +307,108 @@ class JARVIS:
             raise
 
     def _init_ml_components(self):
+        """Initialize machine learning components with improved error handling"""
         try:
-            # Initialize model
-            model_name = self.config.get("model", "jarvis-base")
-            self.model = JarvisModel(model_name)
-            
-            # Verify CUDA availability
-            if torch.cuda.is_available():
-                self.model = self.model.to('cuda')
-                self.logger.info("Using CUDA for model acceleration")
-                
-            # Initialize model manager first
-            self.model_manager = ModelManager()
-            
-            # Connect pipelines - with error handling
+            # Initialize model with error handling
             try:
-                text = "Initialize system check"
-                tasks = ["classification", "generation", "qa"]
-                results = self.model.process_pipeline(text, tasks)
-                self.logger.info("Pipeline test successful")
-            except Exception as e:
-                self.logger.warning(f"Pipeline test failed: {e}, continuing initialization")
+                model_name = self.config.get("model", "jarvis-base")
+                self.model = JarvisModel(model_name)
+                
+                # Verify CUDA availability
+                if torch.cuda.is_available():
+                    try:
+                        self.model = self.model.to('cuda')
+                        self.logger.info("Using CUDA for model acceleration")
+                    except Exception as cuda_error:
+                        self.logger.warning(f"Failed to move model to CUDA: {cuda_error}")
+                        self.logger.info("Continuing with CPU model")
+            except Exception as model_error:
+                self.logger.error(f"Failed to initialize main model: {model_error}")
+                self.model = None
+                
+            # Initialize AI Coordinator with improved error handling
+            try:
+                from core.ai.coordinator import AICoordinator
+                import traceback
+                
+                # Create a comprehensive config for the coordinator
+                ai_config = {
+                    "llm": self.config.get("llm", {}),
+                    "nlp": self.config.get("nlp", {}),
+                    "ml": {
+                        "base_path": os.path.abspath("data/models")
+                    },
+                    "resources": self.config.get("resources", {}),
+                    "events": self.config.get("events", {}),
+                    "models": self.config.get("models", {})
+                }
+                
+                # Initialize the AI coordinator
+                self.ai_coordinator = AICoordinator(config=ai_config)
+                self.ai_coordinator.initialize()
+                
+                # Get components from the coordinator
+                self.model_manager = self.ai_coordinator.get_component("model_manager")
+                self.nlp_processor = self.ai_coordinator.get_component("nlp")
+                
+                self.logger.info("AI Coordinator initialized successfully")
+            except Exception as ai_error:
+                self.logger.error(f"AI Coordinator initialization failed: {ai_error}")
+                self.logger.error(traceback.format_exc())
+                self.ai_coordinator = None
+                
+                # Fall back to direct initialization if coordinator fails
+                try:
+                    # Initialize model manager directly
+                    from ml.model_manager import ModelManager
+                    model_path = os.path.abspath("data/models")
+                    self.model_manager = ModelManager(base_path=model_path)
+                    self.logger.info(f"ModelManager initialized directly with path: {model_path}")
+                except Exception as mm_error:
+                    self.logger.error(f"Direct ModelManager initialization failed: {mm_error}")
+                    self.model_manager = None
+                
+                try:
+                    # Initialize NLP processor directly
+                    from nlp.processor import NLPProcessor
+                    nlp_model = self.config.get("nlp", {}).get("model", "nl_core_news_sm")
+                    self.nlp_processor = NLPProcessor(model_name=nlp_model)
+                    self.logger.info(f"NLPProcessor initialized directly with model: {nlp_model}")
+                except Exception as nlp_error:
+                    self.logger.error(f"Direct NLPProcessor initialization failed: {nlp_error}")
+                    self.nlp_processor = None
             
-            self.logger.info("ML components initialized")
+            # Test pipeline if main model is available
+            if self.model:
+                try:
+                    text = "Initialize system check"
+                    tasks = ["classification", "generation", "qa"]
+                    results = self.model.process_pipeline(text, tasks)
+                    self.logger.info("Pipeline test successful")
+                except Exception as pipeline_error:
+                    self.logger.warning(f"Pipeline test failed: {pipeline_error}, continuing initialization")
+            
+            # Log initialization status
+            components_status = []
+            if self.model:
+                components_status.append("JarvisModel")
+            if self.ai_coordinator:
+                components_status.append("AICoordinator")
+            if self.model_manager:
+                components_status.append("ModelManager")
+            if self.nlp_processor:
+                components_status.append("NLPProcessor")
+                
+            if components_status:
+                self.logger.info(f"ML components initialized: {', '.join(components_status)}")
+            else:
+                self.logger.warning("No ML components were successfully initialized")
+                
         except Exception as e:
             self.logger.error(f"ML initialization failed: {e}")
-            raise
+            self.logger.error(traceback.format_exc())
+            # Don't raise the exception to allow the system to continue with limited functionality
+            self.logger.warning("Continuing with limited ML functionality")
             
     def _start_server_backend(self):
         """Start the server backend in a separate thread"""
@@ -419,8 +578,59 @@ class JARVIS:
             self.logger.critical(f"Fatal error in main loop: {e}", exc_info=True)
             raise
         finally:
-            self._cleanup()
+            self.shutdown()
             self.logger.info("JARVIS shutdown complete")
+
+    def shutdown(self):
+        """Properly shut down JARVIS"""
+        self.logger.info("Shutting down JARVIS...")
+        
+        # Stop server if running
+        if self.server_thread and self.server_thread.is_alive():
+            self.logger.info("Stopping server...")
+            # Signal server to stop
+            
+        # Shut down AI components in the correct order if they were initialized
+        if hasattr(self, 'ai_coordinator') and self.ai_coordinator:
+            try:
+                self.logger.info("Shutting down AI coordinator...")
+                self.ai_coordinator.shutdown()
+            except Exception as e:
+                self.logger.warning(f"Error shutting down AI coordinator: {e}")
+            
+        if hasattr(self, 'pipeline_manager') and self.pipeline_manager:
+            try:
+                self.logger.info("Shutting down pipeline manager...")
+                # No explicit shutdown needed
+            except Exception as e:
+                self.logger.warning(f"Error shutting down pipeline manager: {e}")
+            
+        if hasattr(self, 'event_bus') and self.event_bus:
+            try:
+                self.logger.info("Shutting down event bus...")
+                self.event_bus.shutdown()
+            except Exception as e:
+                self.logger.warning(f"Error shutting down event bus: {e}")
+            
+        if hasattr(self, 'resource_manager') and self.resource_manager:
+            try:
+                self.logger.info("Shutting down resource manager...")
+                self.resource_manager.shutdown()
+            except Exception as e:
+                self.logger.warning(f"Error shutting down resource manager: {e}")
+            
+        # Close database connections
+        if hasattr(self, 'db_manager') and self.db_manager:
+            self.logger.info("Closing database connections...")
+            self.db_manager.close()
+            
+        # Shut down UI
+        if hasattr(self, 'screen') and self.screen:
+            self.logger.info("Shutting down UI...")
+            self.screen.shutdown()
+            
+        self.logger.info("JARVIS shutdown complete")
+        logging.shutdown()
 
     def _cleanup(self):
         self.logger.info("Starting cleanup...")
@@ -431,5 +641,20 @@ class JARVIS:
             self.logger.error(f"Error during cleanup: {e}")
 
 if __name__ == "__main__":
-    jarvis = JARVIS()
-    jarvis.run()
+    try:
+        print("Starting JARVIS initialization...")
+        jarvis = JARVIS()
+        print("JARVIS initialized successfully, starting run...")
+        jarvis.run()
+    except Exception as e:
+        import traceback
+        error_msg = f"Error during JARVIS initialization or run: {e}"
+        print(error_msg)
+        
+        # Write error to a file we can access
+        with open("error_log.txt", "w") as f:
+            f.write(error_msg + "\n\n")
+            f.write(traceback.format_exc())
+        
+        print(f"Detailed error information has been written to error_log.txt")
+        traceback.print_exc()

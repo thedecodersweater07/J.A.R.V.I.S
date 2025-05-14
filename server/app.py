@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 import uvicorn
+import traceback
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
@@ -71,13 +72,17 @@ ModelManager = None
 NLPProcessor = None
 DatabaseManager = None
 
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("jarvis-server")
+
 try:
     from llm.core.llm_core import LLMCore
 except ImportError:
     logger.warning("LLMCore not found, LLM features will be disabled")
 
 try:
-    from ml.models.model_manager import ModelManager
+    from ml.model_manager import ModelManager
 except ImportError:
     logger.warning("ModelManager not found, ML features will be disabled")
 
@@ -96,7 +101,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("jarvis-server")
 
 # Initialize FastAPI app
-app = FastAPI(title="JARVIS API Server", version="1.0.0")
+app = FastAPI(
+    title="JARVIS API Server",
+    version="1.0.0",
+    description="API server for JARVIS AI Assistant",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
+)
 
 # Add CORS middleware
 app.add_middleware(
@@ -107,40 +119,60 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# OAuth2 scheme
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# Import security components
+try:
+    from server.security.middleware import SecurityMiddleware, APIKeyMiddleware
+    from server.security.security_manager import SecurityManager
+    from server.security.auth import create_auth_dependencies
+    from server.security.router import create_security_router
+    SECURITY_COMPONENTS_AVAILABLE = True
+    logger.info("Security components available")
+except ImportError as e:
+    logger.warning(f"Security components not available: {e}")
+    SECURITY_COMPONENTS_AVAILABLE = False
 
-# Models
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    user_id: str
-    username: str
-    role: str
+# Import API routers
+try:
+    from server.api import auth, ai, system
+    from server.api.dependencies import oauth2_scheme
+    HAS_API_ROUTERS = True
+except ImportError as e:
+    logger.warning(f"API routers not found, using legacy routes: {e}")
+    HAS_API_ROUTERS = False
+    # OAuth2 scheme for legacy routes
+    oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+    
+    # Legacy models
+    class Token(BaseModel):
+        access_token: str
+        token_type: str
+        user_id: str
+        username: str
+        role: str
 
-class TokenData(BaseModel):
-    username: Optional[str] = None
-    role: Optional[str] = None
+    class TokenData(BaseModel):
+        username: Optional[str] = None
+        role: Optional[str] = None
 
-class UserCreate(BaseModel):
-    username: str
-    password: str
-    role: str = "user"
+    class UserCreate(BaseModel):
+        username: str
+        password: str
+        role: str = "user"
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
+    class LoginRequest(BaseModel):
+        username: str
+        password: str
 
-class AIRequest(BaseModel):
-    query: str
-    context: Optional[Dict[str, Any]] = None
-    request_type: str = "text"  # text, nlp, ml, full
+    class AIRequest(BaseModel):
+        query: str
+        context: Optional[Dict[str, Any]] = None
+        request_type: str = "text"  # text, nlp, ml, full
 
-class AIResponse(BaseModel):
-    response: Union[str, Dict[str, Any]]
-    request_id: str
-    processing_time: float
-    timestamp: str
+    class AIResponse(BaseModel):
+        response: Union[str, Dict[str, Any]]
+        request_id: str
+        processing_time: float
+        timestamp: str
 
 # Global components
 security_config = None
@@ -148,75 +180,176 @@ db_manager = None
 llm_core = None
 model_manager = None
 nlp_processor = None
+security_manager = None
+auth_dependencies = None
 user_store = {}  # In-memory user store for development
 failed_attempts = {}  # Track failed login attempts
 
 # Initialize components
 def init_components():
-    global security_config, db_manager, llm_core, model_manager, nlp_processor
+    global security_config, db_manager, llm_core, model_manager, nlp_processor, security_manager, auth_dependencies
     
-    # Load security config
-    security_config = SecurityConfig(
-        jwt_secret=os.environ.get("JWT_SECRET", "your-secret-key-should-be-in-env-vars"),
-        token_expiry_hours=12,
-        max_login_attempts=3,
-        lockout_duration_minutes=15
-    )
+    # Initialize security components
+    if SECURITY_COMPONENTS_AVAILABLE:
+        try:
+            # Initialize security manager
+            security_config = {
+                "jwt_secret": os.environ.get("JWT_SECRET", "your-secret-key-should-be-in-env-vars"),
+                "token_expiry_hours": 12,
+                "max_login_attempts": 3,
+                "lockout_duration_minutes": 15
+            }
+            security_manager = SecurityManager(config=security_config)
+            
+            # Create auth dependencies
+            auth_dependencies = create_auth_dependencies(security_manager)
+            
+            # Add security middleware
+            app.add_middleware(SecurityMiddleware, security_manager=security_manager)
+            
+            # Add API key middleware if API keys are defined
+            api_keys = os.environ.get("API_KEYS", "").split(",")
+            if api_keys and api_keys[0]:
+                api_key_dict = {key: True for key in api_keys}
+                app.add_middleware(APIKeyMiddleware, api_keys=api_key_dict)
+            
+            logger.info("Security components initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize security components: {e}")
+            logger.error(traceback.format_exc())
+            security_manager = None
+            auth_dependencies = None
+    else:
+        # Fall back to basic security config
+        security_config = SecurityConfig(
+            jwt_secret=os.environ.get("JWT_SECRET", "your-secret-key-should-be-in-env-vars"),
+            token_expiry_hours=12,
+            max_login_attempts=3,
+            lockout_duration_minutes=15
+        )
     
     # Initialize database
     try:
-        db_manager = DatabaseManager()
-        logger.info("Database manager initialized")
+        if DatabaseManager:
+            db_manager = DatabaseManager()
+            logger.info("Database manager initialized")
+        else:
+            logger.warning("DatabaseManager not available")
+            db_manager = None
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
+        logger.error(traceback.format_exc())
         db_manager = None
     
     # Initialize LLM
     try:
-        llm_config = {
-            "model": {
-                "name": "gpt2",  # Use a reliable fallback model
-                "type": "transformer"
+        if LLMCore:
+            llm_config = {
+                "model": {
+                    "name": "gpt2",  # Use a reliable fallback model
+                    "type": "transformer"
+                }
             }
-        }
-        llm_core = LLMCore(config=llm_config)
-        logger.info("LLM core initialized")
+            llm_core = LLMCore(config=llm_config)
+            logger.info("LLM core initialized")
+        else:
+            logger.warning("LLMCore not available")
+            llm_core = None
     except Exception as e:
         logger.error(f"Failed to initialize LLM: {e}")
+        logger.error(traceback.format_exc())
         llm_core = None
     
     # Initialize ML components
     try:
-        model_manager = ModelManager()
-        logger.info("Model manager initialized")
+        if ModelManager:
+            # ModelManager expects base_path parameter, not config
+            model_path = os.environ.get("MODEL_PATH", os.path.abspath("data/models"))
+            # Ensure directory exists
+            os.makedirs(model_path, exist_ok=True)
+            model_manager = ModelManager(base_path=model_path)
+            logger.info(f"Model manager initialized with path: {model_path}")
+        else:
+            logger.warning("ModelManager not available")
+            model_manager = None
     except Exception as e:
         logger.error(f"Failed to initialize model manager: {e}")
+        logger.error(traceback.format_exc())
         model_manager = None
     
     # Initialize NLP processor
     try:
-        nlp_processor = NLPProcessor()
-        logger.info("NLP processor initialized")
+        if NLPProcessor:
+            # NLPProcessor expects model_name parameter, not config
+            nlp_model = os.environ.get("NLP_MODEL", "nl_core_news_sm")
+            nlp_processor = NLPProcessor(model_name=nlp_model)
+            logger.info(f"NLP processor initialized with model: {nlp_model}")
+        else:
+            logger.warning("NLPProcessor not available")
+            nlp_processor = None
     except Exception as e:
         logger.error(f"Failed to initialize NLP processor: {e}")
+        logger.error(traceback.format_exc())
         nlp_processor = None
+        
+# Function to get AI components for use in API routes
+def get_ai_components():
+    """Get AI components for use in API routes"""
+    global llm_core, model_manager, nlp_processor
+    return llm_core, model_manager, nlp_processor
     
-    # Add default admin user for testing
-    add_default_user()
-
-def add_default_user():
-    """Add a default admin user for testing"""
-    try:
-        password_hash = bcrypt.hashpw("admin123".encode(), bcrypt.gensalt()).decode()
+# Add default admin user for testing if using legacy routes
+if not HAS_API_ROUTERS:
+    # Add the default admin user
+    if not user_store:
         user_store["admin"] = {
-            "id": "user_0",
+            "id": "1",
             "username": "admin",
-            "password_hash": password_hash,
-            "role": "admin"
+            "password_hash": get_password_hash("admin"),
+            "role": "admin",
+            "is_active": True
         }
-        logger.info("Default admin user created")
+        logger.info("Added default admin user")
+
+# Helper functions for legacy routes
+def get_user(username: str) -> Optional[Dict[str, Any]]:
+    """Get user from store"""
+    if username in user_store:
+        return user_store[username]
+    return None
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify password against hash"""
+    try:
+        return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
     except Exception as e:
-        logger.error(f"Failed to create default user: {e}")
+        logger.error(f"Password verification error: {e}")
+        return False
+
+def get_password_hash(password: str) -> str:
+    """Generate password hash"""
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+# Function to create a new user
+def create_new_user(username: str, password: str, role: str = "user") -> Dict[str, Any]:
+    """Create a new user and add to user store"""
+    try:
+        user_id = f"user_{len(user_store)}"
+        password_hash = get_password_hash(password)
+        
+        user_store[username] = {
+            "id": user_id,
+            "username": username,
+            "password_hash": password_hash,
+            "role": role,
+            "is_active": True,
+            "created_at": datetime.now()
+        }
+        logger.info(f"Created new user: {username} with role: {role}")
+        return user_store[username]
+    except Exception as e:
+        logger.error(f"Failed to create user {username}: {e}")
+        return None
 
 # Helper functions
 def get_user(username: str) -> Optional[Dict[str, Any]]:
@@ -292,9 +425,15 @@ async def get_current_active_user(current_user: Dict[str, Any] = Depends(get_cur
 
 # Routes
 @app.get("/")
-async def root():
+def root():
     """Root endpoint"""
-    return {"message": "Welcome to JARVIS API Server", "status": "online"}
+    return {
+        "message": "Welcome to JARVIS API Server", 
+        "version": "1.0.0",
+        "status": "online",
+        "timestamp": datetime.now().isoformat(),
+        "docs": "/docs"
+    }
 
 @app.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
@@ -532,13 +671,47 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     """Initialize components on startup"""
-    init_components()
-    logger.info("JARVIS API Server started")
+    try:
+        init_components()
+        logger.info("Server components initialized successfully")
+        
+        # Include API routers if available
+        if HAS_API_ROUTERS:
+            # Include API routers
+            app.include_router(auth.router)
+            app.include_router(ai.router)
+            app.include_router(system.router)
+            logger.info("API routers registered")
+            
+        # Include security router if available
+        if SECURITY_COMPONENTS_AVAILABLE and security_manager and auth_dependencies:
+            # Create and include security router
+            security_router = create_security_router(
+                security_manager=security_manager,
+                auth_handler=auth_dependencies
+            )
+            app.include_router(security_router)
+            logger.info("Security router registered")
+            
+            # Add default admin user
+            security_manager.add_default_user()
+    except Exception as e:
+        logger.error(f"Error during startup: {e}")
+        logger.error(traceback.format_exc())
 
+# Cleanup on shutdown
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Cleanup on shutdown"""
-    logger.info("JARVIS API Server shutting down")
+    logger.info("Server shutting down")
+    # Add cleanup code here
+    try:
+        # Close database connections
+        if db_manager and hasattr(db_manager, 'close'):
+            await db_manager.close()
+            logger.info("Database connections closed")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
+        logger.error(traceback.format_exc())
 
 def start_server(host="0.0.0.0", port=8000):
     """Start the server"""

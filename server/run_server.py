@@ -2,7 +2,17 @@ import os
 import sys
 import logging
 import argparse
-from app import start_server
+import traceback
+
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import the server app with proper error handling
+try:
+    from server.app import start_server
+except ImportError as e:
+    print(f"Error importing server app: {e}")
+    sys.exit(1)
 
 # Configure logging
 logging.basicConfig(

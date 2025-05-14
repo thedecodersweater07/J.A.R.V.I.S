@@ -8,7 +8,7 @@ import pandas as pd
 from .config import ConfigManager
 from .templates import PromptTemplate
 from .processor import ResponseProcessor
-from data.manager import DataManager
+from data.core.manager import DataManager
 
 logger = logging.getLogger(__name__)
 
