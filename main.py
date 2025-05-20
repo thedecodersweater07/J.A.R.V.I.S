@@ -476,31 +476,28 @@ class JARVIS:
             height = ui_config.get('height', 600)
             title = ui_config.get('title', 'JARVIS Interface')
             
-            # Initialize screen manager
-            self.screen = Screen(width=width, height=height, title=title)
+            # Initialize screen with render mode
+            from ui.rendering.renderer_factory import RenderMode
+            render_mode = RenderMode.OPENGL if OPENGL_AVAILABLE else RenderMode.TEXT
             
-            # Connect components
-            if hasattr(self.screen, 'set_llm'):
-                self.screen.set_llm(self.llm)
-            else:
-                self.screen.llm = self.llm
-                
-            if hasattr(self.screen, 'set_model_manager'):
-                self.screen.set_model_manager(self.model_manager)
-            else:
-                self.screen.model_manager = self.model_manager
-                
-            # Connect API client
-            if self.api_client:
-                if hasattr(self.screen, 'set_api_client'):
-                    self.screen.set_api_client(self.api_client)
-                else:
-                    self.screen.api_client = self.api_client
+            self.screen = Screen(
+                width=width, 
+                height=height, 
+                title=title
+            )
             
-            # Initialize UI
+            # Initialize renderer first
             if not self.screen.init():
-                self.logger.error("Failed to initialize UI")
+                self.logger.error("Failed to initialize Screen")
                 return False
+            
+            # Set components after renderer is initialized
+            if self.llm:
+                self.screen.set_llm(self.llm)
+            if self.model_manager:
+                self.screen.set_model_manager(self.model_manager)
+            if self.api_client:
+                self.screen.set_api_client(self.api_client)
                 
             self.logger.info("UI initialized successfully")
             return True

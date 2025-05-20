@@ -25,6 +25,11 @@ class APIClient:
             "on_auth_change": []
         }
         self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'JARVIS-UI/1.0',
+            'Accept': 'application/json'
+        })
+        logger.debug(f"APIClient initialized with base URL: {base_url}")
     
     def login(self, username: str, password: str) -> Dict[str, Any]:
         """

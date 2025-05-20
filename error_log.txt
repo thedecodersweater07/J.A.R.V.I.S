@@ -1,16 +1,26 @@
-Error during JARVIS initialization or run: NLPProcessor.__init__() got an unexpected keyword argument 'config'
+Error during JARVIS initialization or run: 'DatabaseManager' object has no attribute 'close'
 
 Traceback (most recent call last):
-  File "C:\nova_industrie\jarvis\main.py", line 536, in <module>
-    jarvis = JARVIS()
-             ^^^^^^^^
-  File "C:\nova_industrie\jarvis\main.py", line 87, in __init__
-    self._init_core_components()
-  File "C:\nova_industrie\jarvis\main.py", line 255, in _init_core_components
-    self.ai_coordinator.initialize()
-  File "C:\nova_industrie\jarvis\core\ai\coordinator.py", line 100, in initialize
-    self._init_component(name, component_info)
-  File "C:\nova_industrie\jarvis\core\ai\coordinator.py", line 117, in _init_component
-    component_instance = component_info["class"](config=component_config)
-                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-TypeError: NLPProcessor.__init__() got an unexpected keyword argument 'config'
+  File "c:\nova_industrie\jarvis\main.py", line 560, in run
+    if not self.screen.process_frame({
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Screen' object has no attribute 'process_frame'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 570, in run
+    raise RuntimeError("Too many errors in main loop")
+RuntimeError: Too many errors in main loop
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "c:\nova_industrie\jarvis\main.py", line 645, in <module>
+    jarvis.run()
+  File "c:\nova_industrie\jarvis\main.py", line 578, in run
+    self.shutdown()
+  File "c:\nova_industrie\jarvis\main.py", line 622, in shutdown
+    self.db_manager.close()
+    ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'DatabaseManager' object has no attribute 'close'

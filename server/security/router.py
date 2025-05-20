@@ -36,20 +36,18 @@ class SecurityStatusResponse(BaseModel):
 
 # Create router factory function
 def create_security_router(security_manager, auth_handler):
-    """
-    Create a security router with the given security manager and auth handler
-    
-    Args:
-        security_manager: Security manager instance
-        auth_handler: Authentication handler instance
+    if not security_manager or not auth_handler:
+        raise ValueError("Security manager and auth handler are required")
         
-    Returns:
-        FastAPI router with security endpoints
-    """
     router = APIRouter(
         prefix="/security",
         tags=["security"],
-        responses={404: {"description": "Not found"}},
+        responses={
+            404: {"description": "Not found"},
+            500: {"description": "Internal server error"},
+            401: {"description": "Unauthorized"},
+            403: {"description": "Forbidden"}
+        },
     )
     
     @router.post("/token", response_model=TokenResponse)
@@ -58,7 +56,16 @@ def create_security_router(security_manager, auth_handler):
         request: Request = None
     ):
         """Login and get access token"""
-        return await auth_handler.login(form_data, request)
+        try:
+            return await auth_handler.login(form_data, request)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Login error: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An error occurred during login"
+            )
     
     @router.post("/users", response_model=UserResponse)
     async def create_user(

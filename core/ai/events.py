@@ -63,33 +63,39 @@ class EventBus:
                 self.logger.error(f"Error processing event: {e}", exc_info=True)
                 
     def _dispatch_event(self, event: Dict[str, Any]):
-        """
-        Dispatch an event to subscribers.
-        
-        Args:
-            event: Event to dispatch
-        """
-        event_type = event["type"]
-        
-        # Store in history
-        if event_type not in self.event_history:
-            self.event_history[event_type] = []
+        """Dispatch an event to subscribers with validation."""
+        try:
+            if not isinstance(event, dict) or 'type' not in event:
+                self.logger.error("Invalid event format")
+                return
+                
+            event_type = event["type"]
+            if not event_type:
+                self.logger.error("Empty event type")
+                return
+                
+            # Store in history
+            if event_type not in self.event_history:
+                self.event_history[event_type] = []
+                
+            history = self.event_history[event_type]
+            history.append(event)
             
-        history = self.event_history[event_type]
-        history.append(event)
-        
-        # Trim history if needed
-        if len(history) > self.max_history:
-            history.pop(0)
+            # Trim history if needed
+            if len(history) > self.max_history:
+                history.pop(0)
+                
+            # Notify subscribers
+            if event_type in self.subscribers:
+                for callback in self.subscribers[event_type]:
+                    try:
+                        callback(event)
+                    except Exception as e:
+                        self.logger.error(f"Error in event subscriber: {e}", exc_info=True)
+                        
+        except Exception as e:
+            self.logger.error(f"Error dispatching event: {e}", exc_info=True)
             
-        # Notify subscribers
-        if event_type in self.subscribers:
-            for callback in self.subscribers[event_type]:
-                try:
-                    callback(event)
-                except Exception as e:
-                    self.logger.error(f"Error in event subscriber: {e}", exc_info=True)
-                    
     def subscribe(self, event_type: str, callback: Callable[[Dict[str, Any]], None]) -> str:
         """
         Subscribe to an event type.

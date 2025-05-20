@@ -12,12 +12,14 @@ from pathlib import Path
 
 # Import core components
 from core.logging import get_logger
+from core.knowledge.graph_manager import KnowledgeGraphManager
 
 # Import AI component imports
 from llm.core.llm_core import LLMCore
 
 # Import adapters
 from core.ai.adapters import NLPProcessorAdapter, ModelManagerAdapter
+from server.knowledge_graph.manager import KnowledgeGraphManager
 
 class AICoordinator:
     """
@@ -42,6 +44,7 @@ class AICoordinator:
         
         # Initialize component registry
         self._init_component_registry()
+        self.knowledge_graph = KnowledgeGraphManager()
         
     def _init_component_registry(self):
         """Initialize the component registry with available AI components."""
@@ -55,12 +58,12 @@ class AICoordinator:
                 "fallback_config": {"model": {"name": "nl_core_news_sm", "type": "spacy"}}
             },
             "nlp": {
-                "class": NLPProcessorAdapter,  # Use adapter instead of direct class
+                "class": NLPProcessorAdapter,
                 "config_key": "nlp",
                 "required": True,
                 "instance": None,
-                "init_params": ["config"],
-                "fallback_config": {"model": "nl_core_news_sm"}
+                "init_params": ["model_name"],  # Changed from config to model_name
+                "fallback_config": {"model_name": "nl_core_news_sm"}  # Simplified config
             },
             "model_manager": {
                 "class": ModelManagerAdapter,  # Use adapter instead of direct class
@@ -74,7 +77,7 @@ class AICoordinator:
         
         # Add optional components if available
         try:
-            from knowledge_graph.manager import KnowledgeGraphManager
+            from server.knowledge_graph.manager import KnowledgeGraphManager  # Adjust the import path based on your project structure
             self.component_registry["knowledge_graph"] = {
                 "class": KnowledgeGraphManager,
                 "config_key": "knowledge_graph",
@@ -139,10 +142,14 @@ class AICoordinator:
             component_config = self.config.get(config_key, {})
             component_class = component_info["class"]
             
-            self.logger.debug(f"Initializing {name} component")
-            
-            # All components now use a consistent interface with config parameter
-            component_instance = component_class(config=component_config)
+            # Handle different initialization parameters
+            if name == "nlp":
+                # Special handling for NLP processor
+                model_name = component_config.get("model", "nl_core_news_sm")
+                component_instance = component_class(model_name=model_name)
+            else:
+                # Default initialization with config
+                component_instance = component_class(config=component_config)
             
             # Store the initialized component
             component_info["instance"] = component_instance
@@ -360,3 +367,16 @@ class AICoordinator:
             status["components"][name] = component_status
             
         return status
+    
+    def shutdown(self):
+        """Shutdown all AI components gracefully"""
+        try:
+            # Shutdown components in reverse initialization order
+            for component_name in reversed(list(self._components.keys())):
+                component = self._components.get(component_name)
+                if hasattr(component, 'shutdown'):
+                    component.shutdown()
+            self._components.clear()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Error during AI coordinator shutdown: {e}")

@@ -301,10 +301,22 @@ class ResourceManager:
         }
         
     def shutdown(self):
-        """Shut down the resource manager."""
+        """Shut down the resource manager with proper cleanup."""
+        self.logger.info("Shutting down resource manager...")
         self.running = False
         
+        # Release all allocations
+        with self.allocation_lock:
+            for component_id in list(self.allocations.keys()):
+                try:
+                    self.release_resources(component_id)
+                except Exception as e:
+                    self.logger.error(f"Error releasing resources for {component_id}: {e}")
+    
+        # Stop monitoring thread
         if self.monitoring_thread and self.monitoring_thread.is_alive():
             self.monitoring_thread.join(timeout=1.0)
-            
-        self.logger.debug("Resource manager shut down")
+            if self.monitoring_thread.is_alive():
+                self.logger.warning("Monitoring thread did not stop cleanly")
+                
+        self.logger.info("Resource manager shut down complete")

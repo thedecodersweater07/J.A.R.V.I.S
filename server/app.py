@@ -16,6 +16,15 @@ import json
 import asyncio
 import threading
 import time
+from server.security.security_manager import get_password_hash
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger("jarvis-server")
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -71,10 +80,6 @@ LLMCore = None
 ModelManager = None
 NLPProcessor = None
 DatabaseManager = None
-
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("jarvis-server")
 
 try:
     from llm.core.llm_core import LLMCore

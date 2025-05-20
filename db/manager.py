@@ -14,6 +14,7 @@ class DatabaseManager:
         self.config = config or {}
         self.db = Database.get_instance()
         self._ensure_directories()
+        self.connections = {}
         
         # Apply configuration
         if self.config.get('path'):
@@ -95,3 +96,13 @@ class DatabaseManager:
     def get_cached_query(self, query: str) -> Any:
         """Get cached query result"""
         return self.db.get_cached_query(query)
+    
+    def close(self):
+        """Close all database connections"""
+        try:
+            for conn in self.connections.values():
+                if hasattr(conn, 'close'):
+                    conn.close()
+            self.connections.clear()
+        except Exception as e:
+            logger.error(f"Error closing database connections: {e}")

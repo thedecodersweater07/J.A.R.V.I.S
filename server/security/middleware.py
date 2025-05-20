@@ -5,7 +5,7 @@ Provides request/response security features
 import time
 import logging
 from typing import Callable, Dict, Any
-from fastapi import Request, Response
+from fastapi import Request, Response, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
@@ -202,3 +202,31 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
     def _validate_api_key(self, api_key: str) -> bool:
         """Validate API key"""
         return api_key in self.api_keys
+
+
+class CombinedMiddleware:
+    """
+    Combined security middleware for JARVIS server
+    Integrates security features from multiple middleware classes
+    """
+    
+    def __init__(self, app, security_manager, api_keys=None):
+        self.app = app
+        self.security_manager = security_manager
+        self.api_keys = api_keys or {}
+        self.protected_paths = ["/api/", "/v1/"]
+        
+        # Initialize middleware components
+        self.security_middleware = SecurityMiddleware(app, security_manager)
+        self.api_key_middleware = APIKeyMiddleware(app, api_keys)
+    
+    async def __call__(self, request: Request, call_next: Callable):
+        """Process the request through combined middleware"""
+        # Use security middleware for initial processing
+        response = await self.security_middleware.dispatch(request, call_next)
+        
+        # Further processing with API key middleware if needed
+        if response.status_code != 403 and response.status_code != 429:
+            response = await self.api_key_middleware.dispatch(request, call_next)
+        
+        return response

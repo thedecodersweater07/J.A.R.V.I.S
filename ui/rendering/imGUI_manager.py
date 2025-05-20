@@ -1,8 +1,16 @@
 import logging
 import time
 import glfw
+
 from typing import Optional, Dict, Any, List, Tuple
 from contextlib import contextmanager
+
+# Try to import imgui, but don't fail if not available
+try:
+    import imgui
+    IMGUI_AVAILABLE = True
+except ImportError:
+    IMGUI_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +21,8 @@ class ImGuiManager:
     """
     
     def __init__(self):
+        if not IMGUI_AVAILABLE:
+            raise ImportError("ImGui is not available. Please install with: pip install imgui")
         self.impl = None
         self.context = None
         self.window = None
@@ -26,20 +36,10 @@ class ImGuiManager:
     def init(self, window_handle=None) -> bool:
         """Initialize ImGui context with direct GLFW integration"""
         try:
-            import imgui
             from imgui.integrations.glfw import GlfwRenderer
             
             # Store the window handle
             self.window = window_handle
-            
-            # Clean up any existing context
-            if self.context:
-                try:
-                    if self.impl:
-                        self.impl.shutdown()
-                    imgui.destroy_context(self.context)
-                except Exception as e:
-                    logger.debug(f"Error cleaning up previous context: {e}")
             
             # Create a fresh ImGui context
             self.context = imgui.create_context()
@@ -48,38 +48,23 @@ class ImGuiManager:
             # Initialize the GLFW implementation if we have a window
             if self.window:
                 self.impl = GlfwRenderer(self.window)
-            
-            # Configure style
-            style = imgui.get_style()
-            style.window_rounding = 5.0
-            style.frame_rounding = 3.0
-            style.scrollbar_rounding = 5.0
-            style.frame_border_size = 1.0
-            style.item_spacing = imgui.Vec2(8, 6)
-            style.scrollbar_size = 14
-            
-            # Dark theme with better readability
-            imgui.style_colors_dark()
-            colors = style.colors
-            colors[imgui.COLOR_TEXT] = (1.00, 1.00, 1.00, 1.00)
-            colors[imgui.COLOR_TEXT_DISABLED] = (0.60, 0.60, 0.60, 1.00)
-            colors[imgui.COLOR_WINDOW_BACKGROUND] = (0.10, 0.10, 0.12, 1.00)
-            colors[imgui.COLOR_FRAME_BACKGROUND] = (0.20, 0.20, 0.22, 0.90)
-            colors[imgui.COLOR_FRAME_BACKGROUND_HOVERED] = (0.30, 0.30, 0.32, 1.00)
-            colors[imgui.COLOR_FRAME_BACKGROUND_ACTIVE] = (0.15, 0.60, 0.90, 1.00)
-            
-            # IO configuration
-            io = imgui.get_io()
-            io.config_flags |= imgui.CONFIG_NAV_ENABLE_KEYBOARD
-            
-            self.is_initialized = True
-            self.frame_active = False
-            logger.info("ImGui initialized successfully with direct GLFW integration")
-            return True
                 
-        except ImportError as e:
-            logger.error(f"ImGui or GLFW not available: {e}")
-            return False
+                # Configure ImGui style
+                style = imgui.get_style()
+                style.window_rounding = 5.0
+                style.frame_rounding = 3.0
+                style.scrollbar_rounding = 5.0
+                style.frame_border_size = 1.0
+                
+                # Set dark theme with better contrast
+                imgui.style_colors_dark()
+                colors = style.colors
+                colors[imgui.COLOR_TEXT] = (0.95, 0.95, 0.95, 1.00)
+                colors[imgui.COLOR_WINDOW_BACKGROUND] = (0.10, 0.10, 0.12, 1.00)
+                
+            self.is_initialized = True
+            return True
+            
         except Exception as e:
             logger.error(f"ImGui initialization error: {e}")
             return False
@@ -87,7 +72,6 @@ class ImGuiManager:
     def set_window(self, window_handle) -> bool:
         """Set or update the GLFW window handle"""
         try:
-            import imgui
             from imgui.integrations.glfw import GlfwRenderer
             
             self.window = window_handle
@@ -118,8 +102,6 @@ class ImGuiManager:
             return False
             
         try:
-            import imgui
-            
             # Check for valid context
             if not imgui.get_current_context():
                 logger.error("No valid ImGui context in begin_frame")
@@ -156,8 +138,6 @@ class ImGuiManager:
             return False
             
         try:
-            import imgui
-            
             # Close any open windows or tab bars
             self._close_open_elements()
             
@@ -197,7 +177,6 @@ class ImGuiManager:
     def begin_window(self, name: str, **kwargs) -> bool:
         """Begin a new ImGui window with tracking"""
         try:
-            import imgui
             result = imgui.begin(name, **kwargs)
             self.window_stack.append(name)
             return result
@@ -208,7 +187,6 @@ class ImGuiManager:
     def end_window(self) -> None:
         """End the current ImGui window with tracking"""
         try:
-            import imgui
             imgui.end()
             if self.window_stack:
                 self.window_stack.pop()
@@ -218,7 +196,6 @@ class ImGuiManager:
     def begin_tab_bar(self, name: str, **kwargs) -> bool:
         """Begin a new ImGui tab bar with tracking"""
         try:
-            import imgui
             result = imgui.begin_tab_bar(name, **kwargs)
             if result:
                 self.tab_bar_stack.append(name)
@@ -230,7 +207,6 @@ class ImGuiManager:
     def end_tab_bar(self) -> None:
         """End the current ImGui tab bar with tracking"""
         try:
-            import imgui
             imgui.end_tab_bar()
             if self.tab_bar_stack:
                 self.tab_bar_stack.pop()
@@ -314,7 +290,6 @@ class ImGuiManager:
     def set_next_window_centered(self):
         """Center the next window on screen - replacement for missing ImGui function"""
         try:
-            import imgui
             import glfw
             
             # Get window size
@@ -337,8 +312,6 @@ class ImGuiManager:
     def cleanup(self):
         """Clean up ImGui resources"""
         try:
-            import imgui
-            
             # End any active frame
             if self.frame_active:
                 try:

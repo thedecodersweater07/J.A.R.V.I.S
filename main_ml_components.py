@@ -8,6 +8,7 @@ from typing import Dict, Any, List, Optional
 
 # Import core components
 from core.logging import get_logger
+from models.jarvis.model import JarvisModel  # Import from the models directory
 
 class MLComponentsManager:
     """Manager class for ML components initialization and management"""
