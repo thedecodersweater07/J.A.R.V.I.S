@@ -22,10 +22,12 @@ class Screen:
         self.height = height
         self.title = title
         self.ui_state = UIState()
-        self.is_initialized = False
         self.should_quit = False
         self.active_screen = "main"
         self.screens = {}
+        self.llm = None
+        self.model_manager = None
+        self.api_client = None
 
     def init(self) -> bool:
         """Initialize the screen and renderers"""
@@ -51,7 +53,6 @@ class Screen:
                 return False
                 
             self._init_screens()
-            self.is_initialized = True
             return True
             
         except Exception as e:
@@ -66,7 +67,7 @@ class Screen:
             return False
 
     def render(self, frame_data: Dict[str, Any]) -> None:
-        if not self.is_initialized:
+        if not self.ui_state.is_initialized:
             return
 
         try:
@@ -97,7 +98,6 @@ class Screen:
                 self.ui_state.renderer.cleanup()
                 self.ui_state.renderer = None
                 
-            self.is_initialized = False
             logger.info("Screen cleanup complete")
             
         except Exception as e:
@@ -111,6 +111,18 @@ class Screen:
             'debug': {'active': False}
         }
 
+    def set_llm(self, llm):
+        """Set LLM component"""
+        self.llm = llm
+        
+    def set_model_manager(self, model_manager):
+        """Set model manager component"""
+        self.model_manager = model_manager
+        
+    def set_api_client(self, api_client):
+        """Set API client component"""
+        self.api_client = api_client
+
     def process_frame(self, data: dict) -> bool:
         """Process a single frame with the given data"""
         try:
@@ -121,3 +133,8 @@ class Screen:
         except Exception as e:
             logger.error(f"Error processing frame: {e}")
             return True
+            
+    def shutdown(self):
+        """Clean shutdown of screen components"""
+        if self.ui_state.renderer:
+            self.ui_state.renderer.cleanup()

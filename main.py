@@ -298,8 +298,12 @@ class JARVIS:
                 knowledge_manager=self.knowledge_manager
             )
             
-            # Initialize other components
-            self.inference_engine = InferenceEngine(self.knowledge_manager)
+            # Initialize inference engine with knowledge manager
+            inference_config = {
+                'knowledge_manager': self.knowledge_manager,
+                **self.config.get('inference', {})
+            }
+            self.inference_engine = InferenceEngine(inference_config)
             
             self.logger.info("System components initialized")
         except Exception as e:

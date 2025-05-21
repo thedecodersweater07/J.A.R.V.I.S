@@ -4,10 +4,11 @@ import os
 import gc
 from pathlib import Path
 import yaml
-import spacy
 from typing import Optional, Dict, Any, Union, Callable
 from functools import lru_cache
 import threading
+import psutil
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +20,12 @@ class LLMCore:
             self.config = self._load_config(config)
             self._validate_config()
             
-            # Extract configs
-            model_config = self.config.get("model", {})
-            
-            # Setup memory management
-            self._setup_memory_management()
+            # Add resource optimization settings
+            self.config["model"].update({
+                "low_cpu_mem_usage": True,
+                "torch_dtype": torch.float32 if not torch.cuda.is_available() else torch.float16,
+                "max_memory": {"cpu": "2GB", "gpu": "2GB"} if torch.cuda.is_available() else {"cpu": "2GB"}
+            })
             
             # Initialize components with lazy loading
             self.model = None
@@ -31,17 +33,25 @@ class LLMCore:
             self._model_lock = threading.RLock()
             self._model_initialized = False
             
-            # Only initialize immediately if auto_load is True
-            if self.config.get("auto_load", True):
+            # Initialize only if auto_load and system has resources
+            if self.config.get("auto_load", True) and self._check_system_resources():
                 self._initialize_model()
                 logger.info("LLMCore initialized successfully")
             else:
                 logger.info("LLMCore created with lazy loading enabled")
-            
+                
         except Exception as e:
             logger.error(f"Failed to initialize LLMCore: {str(e)}", exc_info=True)
             raise
-            
+
+    def _check_system_resources(self) -> bool:
+        """Check if system has enough resources"""
+        cpu_percent = psutil.cpu_percent()
+        memory = psutil.virtual_memory()
+        
+        # Only initialize if CPU usage is below 80% and memory usage below 85%
+        return cpu_percent < 80 and memory.percent < 85
+
     def _setup_memory_management(self):
         """Setup memory management parameters"""
         # Get memory management settings from config
@@ -77,8 +87,11 @@ class LLMCore:
         """Load configuration from dictionary or file"""
         default_config = {
             "model": {
-                "name": "nl_core_news_lg",
-                "type": "spacy"
+                "name": "gpt2",  # Changed from nl_core_news_lg to gpt2 as safer default
+                "type": "transformer",
+                "max_length": 100,
+                "temperature": 0.7,
+                "low_cpu_mem_usage": True
             }
         }
         
@@ -92,117 +105,47 @@ class LLMCore:
                     loaded_config = yaml.safe_load(f)
                     return {**default_config, **loaded_config}
             except Exception as e:
-                logger.warning(f"Failed to load config file: {e}")
-                
+                self.logger.warning(f"Failed to load config file: {e}")
+
         return default_config
 
     def _initialize_model(self) -> None:
-        """Initialize model with better error handling, memory optimization and lazy loading"""
+        """Initialize model with better error handling and fallbacks"""
         with self._model_lock:
             if self._model_initialized:
                 return
-                
-            try:
-                # Clear any existing model from memory
-                if self.model is not None:
-                    del self.model
-                    if self.tokenizer is not None:
+
+            for model_name in [self.config["model"]["name"]] + self.fallback_models:
+                try:
+                    logger.info(f"Attempting to load model: {model_name}")
+                    
+                    # Clear existing model
+                    if hasattr(self, 'model'):
+                        del self.model
+                    if hasattr(self, 'tokenizer'):
                         del self.tokenizer
+                        
                     # Force garbage collection
                     gc.collect()
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
-                
-                model_config = self.config.get("model", {})
-                model_name = model_config.get("name", "nl_core_news_sm")
-                model_type = model_config.get("type", "spacy")
-                use_gpu = model_config.get("use_gpu", True) and torch.cuda.is_available()
-                load_in_8bit = model_config.get("load_in_8bit", False)
-                
-                # Get memory optimization settings
-                optimize_memory = model_config.get("optimize_memory", True)
-                
-                if model_type == "spacy":
-                    try:
-                        # Check if model exists before loading
-                        if not spacy.util.is_package(model_name):
-                            logger.info(f"Model {model_name} not found, attempting to download...")
-                            try:
-                                spacy.cli.download(model_name)
-                            except Exception as e:
-                                logger.warning(f"Failed to download {model_name}: {e}")
-                                # Try downloading smaller model as fallback
-                                fallback_model = "nl_core_news_sm"
-                                logger.info(f"Attempting to download fallback model {fallback_model}")
-                                spacy.cli.download(fallback_model)
-                                model_name = fallback_model
-                        
-                        # Load with optimized settings
-                        exclude = []
-                        if optimize_memory:
-                            # Exclude components that aren't needed for basic NLP tasks
-                            exclude = ["ner", "textcat", "entity_linker", "entity_ruler"]
-                            
-                        self.model = spacy.load(model_name, exclude=exclude)
-                        logger.info(f"Successfully loaded spaCy model: {self.model.meta['name']}")
-                    except Exception as e:
-                        logger.error(f"Failed to load spaCy model: {e}")
-                        raise
-                    
-                elif model_type == "transformer":
-                    from transformers import AutoModelForCausalLM, AutoTokenizer
-                    
-                    try:
-                        # Configure loading options for memory optimization
-                        load_options = {}
-                        
-                        if optimize_memory:
-                            if use_gpu:
-                                # Use more memory-efficient options
-                                if load_in_8bit:
-                                    load_options["load_in_8bit"] = True
-                                else:
-                                    load_options["torch_dtype"] = torch.float16
-                                    
-                                # Use device map for efficient memory usage
-                                load_options["device_map"] = "auto"
-                            else:
-                                # CPU optimizations
-                                load_options["low_cpu_mem_usage"] = True
-                        
-                        # Load tokenizer first (smaller memory footprint)
-                        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-                        
-                        # Load model with optimized settings
-                        self.model = AutoModelForCausalLM.from_pretrained(model_name, **load_options)
-                        
-                        # Move to appropriate device if not using device_map="auto"
-                        if use_gpu and "device_map" not in load_options:
-                            self.model = self.model.to(self.device)
-                            
-                        logger.info(f"Successfully loaded transformer model: {model_name}")
-                    except Exception as e:
-                        logger.warning(f"Failed to load transformer {model_name}: {e}")
-                        # Fallback to smaller transformer model
-                        fallback_model = "gpt2"
-                        logger.info(f"Attempting to load fallback model {fallback_model}")
-                        
-                        try:
-                            self.tokenizer = AutoTokenizer.from_pretrained(fallback_model)
-                            self.model = AutoModelForCausalLM.from_pretrained(fallback_model, low_cpu_mem_usage=True)
-                            if use_gpu:
-                                self.model = self.model.to(self.device)
-                        except Exception as fallback_error:
-                            logger.error(f"Failed to load fallback model: {fallback_error}")
-                            raise
-                else:
-                    raise ValueError(f"Unsupported model type: {model_type}")
-                    
-                self._model_initialized = True
-                    
-            except Exception as e:
-                logger.error(f"Failed to initialize model: {e}")
-                raise RuntimeError(f"Could not initialize any suitable model: {str(e)}")
+
+                    # Load model with optimizations
+                    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        model_name,
+                        **self.config["model"]
+                    )
+
+                    self._model_initialized = True
+                    logger.info(f"Successfully loaded model: {model_name}")
+                    break
+                except Exception as e:
+                    logger.warning(f"Failed to load model {model_name}: {e}")
+                    continue
+
+            if not self._model_initialized:
+                raise RuntimeError("Failed to initialize model with any available fallbacks")
 
     @lru_cache(maxsize=32)
     def _cached_tokenize(self, text: str):
@@ -230,41 +173,35 @@ class LLMCore:
         # Prepare input with context
         enhanced_prompt = self._prepare_prompt(prompt, context_data)
         
-        # Generate response based on model type
-        if hasattr(self.model, "meta") and "spacy" in self.model.meta.get("lang", ""):
-            # spaCy model
-            doc = self.model(enhanced_prompt)
-            response = " ".join([token.text for token in doc])
-        else:
-            # Transformer model
-            try:
-                # Use cached tokenization
-                inputs = self._cached_tokenize(enhanced_prompt)
+        # Generate response
+        try:
+            # Use cached tokenization
+            inputs = self._cached_tokenize(enhanced_prompt)
+            
+            # Move inputs to the correct device
+            if hasattr(inputs, "to") and self.device == "cuda":
+                inputs = inputs.to(self.device)
+            
+            # Generate with memory optimization
+            with torch.no_grad():  # Disable gradient calculation to save memory
+                outputs = self.model.generate(
+                    inputs["input_ids"] if isinstance(inputs, dict) else inputs,
+                    max_length=self.config.get("max_length", 100),
+                    num_return_sequences=1,
+                    pad_token_id=self.tokenizer.eos_token_id
+                )
+            
+            # Decode the generated text
+            response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
+            # Clean up memory
+            del inputs, outputs
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
                 
-                # Move inputs to the correct device
-                if hasattr(inputs, "to") and self.device == "cuda":
-                    inputs = inputs.to(self.device)
-                
-                # Generate with memory optimization
-                with torch.no_grad():  # Disable gradient calculation to save memory
-                    outputs = self.model.generate(
-                        inputs["input_ids"] if isinstance(inputs, dict) else inputs,
-                        max_length=self.config.get("max_length", 100),
-                        num_return_sequences=1,
-                        pad_token_id=self.tokenizer.eos_token_id
-                    )
-                
-                # Decode the generated text
-                response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-                
-                # Clean up memory
-                del inputs, outputs
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                    
-            except Exception as e:
-                logger.error(f"Error generating response: {e}")
-                response = f"Error generating response: {str(e)}"
+        except Exception as e:
+            logger.error(f"Error generating response: {e}")
+            response = f"Error generating response: {str(e)}"
         
         # Store interaction in memory if available
         if hasattr(self, 'memory'):

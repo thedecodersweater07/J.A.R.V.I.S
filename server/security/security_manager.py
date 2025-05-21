@@ -5,6 +5,7 @@ Integrates core security components with the server
 import os
 import logging
 import jwt
+import bcrypt
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, Security
@@ -49,11 +50,13 @@ class SecurityManager:
     
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """Verify password against hash"""
-        return self.pwd_context.verify(plain_password, hashed_password)
+        return bcrypt.checkpw(plain_password.encode('utf-8'), 
+                             hashed_password.encode('utf-8'))
         
     def get_password_hash(self, password: str) -> str:
         """Generate password hash"""
-        return self.pwd_context.hash(password)
+        salt = bcrypt.gensalt()
+        return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
         
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
         """Create JWT token"""

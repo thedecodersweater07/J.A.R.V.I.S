@@ -1,26 +1,9 @@
-Error during JARVIS initialization or run: 'DatabaseManager' object has no attribute 'close'
+Error during JARVIS initialization or run: setup_logging() got an unexpected keyword argument 'log_dir'
 
 Traceback (most recent call last):
-  File "c:\nova_industrie\jarvis\main.py", line 560, in run
-    if not self.screen.process_frame({
-           ^^^^^^^^^^^^^^^^^^^^^^^^^
-AttributeError: 'Screen' object has no attribute 'process_frame'
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "c:\nova_industrie\jarvis\main.py", line 570, in run
-    raise RuntimeError("Too many errors in main loop")
-RuntimeError: Too many errors in main loop
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "c:\nova_industrie\jarvis\main.py", line 645, in <module>
-    jarvis.run()
-  File "c:\nova_industrie\jarvis\main.py", line 578, in run
-    self.shutdown()
-  File "c:\nova_industrie\jarvis\main.py", line 622, in shutdown
-    self.db_manager.close()
-    ^^^^^^^^^^^^^^^^^^^^^
-AttributeError: 'DatabaseManager' object has no attribute 'close'
+  File "c:\nova_industrie\jarvis\main.py", line 647, in <module>
+    jarvis = JARVIS()
+             ^^^^^^^^
+  File "c:\nova_industrie\jarvis\main.py", line 80, in __init__
+    setup_logging(log_dir="logs", level="DEBUG" if "--debug" in sys.argv else "INFO")
+TypeError: setup_logging() got an unexpected keyword argument 'log_dir'

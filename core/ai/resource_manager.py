@@ -31,10 +31,23 @@ class ResourceManager:
         self.logger = get_logger(__name__)
         self.config = config or {}
         
-        # Resource limits
-        self.memory_limit = self._parse_memory_limit(self.config.get("memory_limit", "80%"))
-        self.cpu_limit = self.config.get("cpu_limit", 0.8)  # 80% by default
+        # More conservative resource limits
+        self.memory_limit = self._parse_memory_limit(self.config.get("memory_limit", "60%"))
+        self.cpu_limit = self.config.get("cpu_limit", 0.6)  # 60% by default
+        self.gpu_memory_limit = self.config.get("gpu_memory_limit", 0.6)
         
+        # Add dynamic scaling thresholds
+        self.memory_scale_threshold = 0.75  # Start scaling at 75%
+        self.memory_critical_threshold = 0.85  # Critical at 85%
+        
+        # Add CPU throttling
+        self.cpu_throttle_threshold = 0.8
+        self.throttle_interval = 0.1  # seconds
+        
+        # Add better memory management
+        self.min_memory_chunk = 1024 * 1024 * 100  # 100MB minimum chunks
+        self.memory_scale_factor = 0.8  # Scale to 80% when reducing
+
         # Resource allocation
         self.allocations = {}
         self.allocation_lock = threading.Lock()
@@ -46,7 +59,6 @@ class ResourceManager:
         
         # GPU support
         self.gpu_enabled = self.config.get("gpu_enabled", torch.cuda.is_available())
-        self.gpu_memory_limit = self.config.get("gpu_memory_limit", 0.8)  # 80% by default
         
         # Initialize monitoring
         self._init_monitoring()
@@ -137,6 +149,18 @@ class ResourceManager:
             current_usage: Current usage of the resource
             device: Device ID for GPU resources
         """
+        # Add CPU throttling
+        if resource_type == "cpu" and current_usage > self.cpu_throttle_threshold:
+            time.sleep(self.throttle_interval)
+            
+        if resource_type == "memory":
+            if current_usage > self.memory_critical_threshold:
+                # More aggressive memory reduction
+                self._reduce_memory_aggressive()
+            elif current_usage > self.memory_scale_threshold:
+                # Gradual memory reduction
+                self._reduce_memory_graceful()
+
         with self.allocation_lock:
             # Sort allocations by priority (lower is higher priority)
             sorted_allocations = sorted(

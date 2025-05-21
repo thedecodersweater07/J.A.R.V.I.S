@@ -22,9 +22,22 @@ class ModelManager(CoreModelManager):
         self._model_usage_count: Dict[str, int] = {}
         self._last_accessed: Dict[str, float] = {}
         
+        # Create model type directories
+        self._init_model_dirs(['classifier', 'regressor', 'clustering'])
+        
         # Configure GPU memory management if available
         self._setup_gpu_memory_management()
         
+    def _init_model_dirs(self, model_types: List[str]):
+        """Initialize model type directories"""
+        try:
+            for model_type in model_types:
+                model_dir = Path(self.base_path) / model_type
+                model_dir.mkdir(parents=True, exist_ok=True)
+                self.logger.info(f"Created model directory: {model_dir}")
+        except Exception as e:
+            self.logger.error(f"Failed to create model directories: {e}")
+            
     def _setup_gpu_memory_management(self):
         """Setup GPU memory management"""
         if torch.cuda.is_available():

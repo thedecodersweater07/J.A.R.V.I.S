@@ -23,7 +23,7 @@ class NLPProcessorAdapter:
     The adapter handles the different constructor signature of NLPProcessor.
     """
     
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Dict[str, Any] = None, model_name: str = None):
         """
         Initialize the NLPProcessor adapter with configuration.
         
@@ -32,39 +32,31 @@ class NLPProcessorAdapter:
         """
         self.logger = get_logger(__name__)
         self.config = config or {}
-        self.processor = None
+        
+        # Handle both config and direct model_name initialization
+        if model_name:
+            self.model = model_name
+        else:
+            self.model = self.config.get('model', 'nl_core_news_sm')
         
         try:
-            # Extract model name from config - NLPProcessor takes model_name not config
-            model_name = self.config.get("model", "nl_core_news_sm")
-            
-            # Initialize the actual processor with the correct parameter
-            self.processor = NLPProcessor(model_name=model_name)
-            self.logger.info(f"NLPProcessor adapter initialized with model: {model_name}")
+            self.processor = NLPProcessor(model_name=self.model)
+            self.logger.info(f"NLPProcessor adapter initialized with model: {self.model}")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize NLPProcessor: {e}")
+            self.processor = self._create_fallback_processor()
+
+    def initialize(self):
+        """Initialize the NLP processor"""
+        try:
+            self.processor = NLPProcessor(model_name=self.model)
+            self.logger.info(f"NLPProcessor adapter initialized with model: {self.model}")
+            return True
         except Exception as e:
             self.logger.error(f"Failed to initialize NLPProcessor: {e}")
             self.logger.error(traceback.format_exc())
-            # Create a fallback processor with a basic model
-            self.processor = self._create_fallback_processor()
-        
-    def _create_fallback_processor(self):
-        """Create a fallback processor when initialization fails"""
-        try:
-            # Try with a minimal model
-            self.logger.info("Attempting to initialize NLPProcessor with fallback model")
-            return NLPProcessor(model_name="nl_core_news_sm")
-        except Exception as e:
-            self.logger.error(f"Fallback NLPProcessor initialization failed: {e}")
-            # If that fails, create a mock processor for graceful degradation
-            self.logger.warning("Creating mock NLP processor for graceful degradation")
-            from unittest.mock import MagicMock
-            mock = MagicMock()
-            # Set up basic mock behavior
-            mock.process.return_value = {"error": "NLP processor unavailable"}
-            mock.extract_keywords.return_value = []
-            mock.classify_text.return_value = {}
-            return mock
-        
+            return False
+
     def process(self, text: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Process text with NLP pipeline.
@@ -132,7 +124,7 @@ class ModelManagerAdapter:
     The adapter handles the different constructor signature of ModelManager.
     """
     
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
         Initialize the ModelManager adapter with configuration.
         
@@ -143,60 +135,17 @@ class ModelManagerAdapter:
         self.config = config or {}
         self.manager = None
         
+    def initialize(self):
+        """Initialize the model manager"""
         try:
-            # Extract base_path from config - ModelManager takes base_path not config
-            base_path = self.config.get("base_path", "../data/ai_training_data/models")
-            
-            # Make sure the path is absolute
-            if not os.path.isabs(base_path):
-                # Convert to absolute path relative to project root
-                base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", base_path))
-            
-            # Ensure the directory exists
-            Path(base_path).mkdir(parents=True, exist_ok=True)
-            
-            # Initialize the actual manager with the correct parameter
+            base_path = self.config.get('base_path', 'data/models')
             self.manager = ModelManager(base_path=base_path)
             self.logger.info(f"ModelManager adapter initialized with base path: {base_path}")
+            return True
         except Exception as e:
             self.logger.error(f"Failed to initialize ModelManager: {e}")
             self.logger.error(traceback.format_exc())
-            # Create a fallback manager
-            self.manager = self._create_fallback_manager()
-    
-    def _create_fallback_manager(self):
-        """Create a fallback model manager when initialization fails"""
-        try:
-            # Try with a default path
-            default_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/models"))
-            self.logger.info(f"Attempting to initialize ModelManager with fallback path: {default_path}")
-            Path(default_path).mkdir(parents=True, exist_ok=True)
-            return ModelManager(base_path=default_path)
-        except Exception as e:
-            self.logger.error(f"Fallback ModelManager initialization failed: {e}")
-            # If that fails, create a mock manager for graceful degradation
-            self.logger.warning("Creating mock ModelManager for graceful degradation")
-            from unittest.mock import MagicMock
-            mock = MagicMock()
-            # Set up basic mock behavior
-            mock.initialize.return_value = None
-            mock.load_models.return_value = {}
-            mock.load_model.return_value = None
-            mock.get_model.return_value = None
-            mock.models = {}
-            return mock
-        
-    def initialize(self):
-        """Initialize the model manager."""
-        if not self.manager:
-            self.logger.error("Cannot initialize: ModelManager not available")
-            return None
-            
-        try:
-            return self.manager.initialize()
-        except Exception as e:
-            self.logger.error(f"Error initializing model manager: {e}")
-            return None
+            return False
         
     def load_models(self):
         """Load all required models."""

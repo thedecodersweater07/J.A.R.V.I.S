@@ -12,30 +12,36 @@ class NLPProcessor:
     """
     
     def __init__(self, model_name: str = "nl_core_news_sm"):
+        self.fallback_models = [
+            "en_core_web_sm",
+            "nl_core_news_sm",
+            "xx_ent_wiki_sm"
+        ]
+        
         self.model_name = model_name
         self.nlp = None
         self._initialize_model()
         logger.info(f"NLP Processor initialized with model: {model_name}")
         
     def _initialize_model(self):
-        """Initialize the spaCy NLP model"""
-        try:
-            # Try to load the model
-            self.nlp = spacy.load(self.model_name)
-            logger.info(f"Loaded spaCy model: {self.model_name}")
-        except OSError:
-            # If model not found, try to download it
+        """Initialize the spaCy NLP model with fallbacks"""
+        for name in [self.model_name] + self.fallback_models:
             try:
-                logger.info(f"Model {self.model_name} not found, downloading...")
-                spacy.cli.download(self.model_name)
-                self.nlp = spacy.load(self.model_name)
-                logger.info(f"Downloaded and loaded model: {self.model_name}")
-            except Exception as e:
-                # If download fails, use a fallback approach
-                logger.error(f"Failed to download model {self.model_name}: {e}")
-                logger.info("Using blank model as fallback")
-                self.nlp = spacy.blank("nl")
+                logger.info(f"Attempting to load model: {name}")
                 
+                if not spacy.util.is_package(name):
+                    logger.info(f"Downloading model {name}")
+                    spacy.cli.download(name)
+                    
+                self.nlp = spacy.load(name)
+                logger.info(f"Successfully loaded model: {name}")
+                return
+            except Exception as e:
+                logger.warning(f"Failed to load model {name}: {e}")
+                continue
+                
+        raise RuntimeError("Failed to load any NLP model")
+        
     def process(self, text: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Process text with NLP pipeline

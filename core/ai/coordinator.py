@@ -55,23 +55,33 @@ class AICoordinator:
                 "required": True,
                 "instance": None,
                 "init_params": ["config"],
-                "fallback_config": {"model": {"name": "nl_core_news_sm", "type": "spacy"}}
+                "fallback_config": {
+                    "model": {
+                        "name": "distilgpt2",  # Smaller model
+                        "type": "transformer",
+                        "low_cpu_mem_usage": True
+                    }
+                }
             },
             "nlp": {
                 "class": NLPProcessorAdapter,
                 "config_key": "nlp",
                 "required": True,
                 "instance": None,
-                "init_params": ["model_name"],  # Changed from config to model_name
-                "fallback_config": {"model_name": "nl_core_news_sm"}  # Simplified config
+                "init_params": ["model_name"],
+                "fallback_config": {"model_name": "en_core_web_sm"}  # Smaller model
             },
             "model_manager": {
-                "class": ModelManagerAdapter,  # Use adapter instead of direct class
+                "class": ModelManagerAdapter,
                 "config_key": "ml",
                 "required": True,
                 "instance": None,
                 "init_params": ["config"],
-                "fallback_config": {"base_path": "data/models"}
+                "fallback_config": {
+                    "base_path": "data/models",
+                    "max_loaded_models": 2,  # Reduce memory usage
+                    "use_gpu": False
+                }
             }
         }
         

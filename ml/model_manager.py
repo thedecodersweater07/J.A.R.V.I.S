@@ -15,13 +15,33 @@ class ModelManager:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.models = {}
         
-        # Initialize with empty configurations
-        default_config = {"epochs": 10, "batch_size": 32}
+        # Ensure absolute path
+        self.base_path = Path(base_path)
+        if not self.base_path.is_absolute():
+            self.base_path = Path(os.getcwd()) / base_path
+        
+        # Create model directories
+        self._init_model_dirs()
+        
+        # Default configs with lower resource usage
+        default_config = {
+            "epochs": 5,  # Reduced from 10
+            "batch_size": 16,  # Reduced from 32
+            "use_gpu": False  # Default to CPU
+        }
         self.trainer = ModelTrainer(config=default_config)
         self.optimizer = ModelOptimizer(config=default_config)
-        
-        self.base_path = Path(base_path)
-        self.base_path.mkdir(parents=True, exist_ok=True)
+
+    def _init_model_dirs(self):
+        """Initialize required model directories"""
+        try:
+            model_types = ['classifier', 'regressor', 'clustering']
+            for model_type in model_types:
+                model_dir = self.base_path / model_type
+                model_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            self.logger.error(f"Failed to create model directories: {e}")
+            raise
 
     def initialize(self):
         """Initialize the model manager and load default models"""

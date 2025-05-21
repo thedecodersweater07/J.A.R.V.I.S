@@ -1,5 +1,11 @@
 import json
-import jsonschema
+try:
+    import jsonschema
+    JSONSCHEMA_AVAILABLE = True
+except ImportError:
+    JSONSCHEMA_AVAILABLE = False
+    import warnings
+    warnings.warn("jsonschema not installed, validation will be limited")
 from typing import Dict, Any
 import logging
 from pathlib import Path
@@ -21,6 +27,10 @@ class ConfigValidator:
     def validate(self, config: Dict[str, Any], schema_name: str) -> bool:
         """Validate config against schema"""
         try:
+            if not JSONSCHEMA_AVAILABLE:
+                logger.warning("jsonschema not available, skipping validation")
+                return True
+                
             schema = self.schemas.get(f"{schema_name}_config_schema")
             if not schema:
                 logger.error(f"Schema {schema_name} not found")
@@ -28,6 +38,6 @@ class ConfigValidator:
                 
             jsonschema.validate(instance=config, schema=schema)
             return True
-        except jsonschema.exceptions.ValidationError as e:
+        except Exception as e:
             logger.error(f"Config validation failed: {e}")
             return False

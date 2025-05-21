@@ -111,25 +111,31 @@ class JarvisModel(BaseModel):
         
     def init_integrations(self):
         """Initialize integration with ML/NLP/LLM components"""
-        # Connect ML models
+        # Connect ML models with better error handling
         self.ml_models = {}
         model_types = ['classifier', 'regressor', 'clustering']
         
-        # Maak dummy modellen aan voor het geval echte modellen niet beschikbaar zijn
+        # Create dummy models first as ultimate fallback
         self._create_dummy_models()
+        
+        # Initialize model manager if not already done
+        if not hasattr(self, 'model_manager'):
+            self.model_manager = ModelManager()
         
         for model_type in model_types:
             try:
-                model = self.model_manager.load_model(model_type)
-                if model:
+                # Try loading the model
+                model = self.model_manager.load_model(f"{model_type}_latest")
+                if model is not None:
                     self.ml_models[model_type] = model
+                    logger.info(f"Loaded {model_type} model")
                 else:
+                    # Use dummy model if load fails
                     logger.warning(f"Could not load {model_type} model, using dummy model")
-                    # Gebruik het dummy model als fallback
                     self.ml_models[model_type] = self.dummy_models[model_type]
             except Exception as e:
                 logger.error(f"Error loading {model_type} model: {e}")
-                # Gebruik het dummy model als fallback
+                # Use dummy model as fallback
                 self.ml_models[model_type] = self.dummy_models[model_type]
                 
         # Setup NLP pipeline met fallbacks
@@ -341,3 +347,31 @@ class JarvisEmbeddings(nn.Module):
         embeddings = self.dropout(embeddings)
         
         return embeddings
+
+    def _load_models(self):
+        try:
+            from ml.models import ModelManager
+            self.manager = ModelManager()
+            
+            model_types = ['classifier', 'regressor', 'clustering']
+            for model_type in model_types:
+                try:
+                    self.models[model_type] = self.manager.load_model(f"{model_type}_latest")
+                except Exception as e:
+                    logger.warning(f"Could not load {model_type} model: {e}")
+                    self.models[model_type] = None
+        except Exception as e:
+            logger.error(f"Error loading models: {e}")
+            
+    def process_pipeline(self, text, tasks):
+        results = {}
+        for task in tasks:
+            try:
+                if task in self.models and self.models[task]:
+                    results[task] = self.models[task].predict([text])[0]
+                else:
+                    results[task] = None
+            except Exception as e:
+                logger.error(f"Error in {task} processing: {e}")
+                results[task] = None
+        return results
