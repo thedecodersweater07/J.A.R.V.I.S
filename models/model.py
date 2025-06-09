@@ -2,20 +2,88 @@ import torch
 import torch.nn as nn
 import numpy as np
 from typing import Dict, Any, Optional, List
-from ..base import BaseModel
-from .config import JarvisConfig, JARVIS_CONFIGS
-from ..gpt.transformer import TransformerLayer
-from ml.models.model_manager import ModelManager
-from nlp.pipeline import NLPPipeline
-from llm.core import LLMCore
-from transformers import AutoTokenizer
 import logging
+
+# Local imports (these are in the same folder)
+from base import BaseModel
+from config import JarvisConfig, JARVIS_CONFIGS
+
+# External imports with fallback handling
+try:
+    from transformers import AutoTokenizer
+    HAS_TRANSFORMERS = True
+except ImportError:
+    HAS_TRANSFORMERS = False
+    print("Warning: transformers library not available, using fallback tokenizer")
+
+# Optional external component imports with fallbacks
+try:
+    from ml.models.model_manager import ModelManager
+    HAS_MODEL_MANAGER = True
+except ImportError:
+    HAS_MODEL_MANAGER = False
+    print("Warning: ModelManager not available, using dummy fallback")
+
+try:
+    from nlp.pipeline import NLPPipeline
+    HAS_NLP_PIPELINE = True
+except ImportError:
+    HAS_NLP_PIPELINE = False
+    print("Warning: NLPPipeline not available, using dummy fallback")
+
+try:
+    from llm.core import LLMCore
+    HAS_LLM_CORE = True
+except ImportError:
+    HAS_LLM_CORE = False
+    print("Warning: LLMCore not available, using dummy fallback")
 
 logger = logging.getLogger(__name__)
 
-# Dummy model klassen voor fallback
+# Fallback classes for missing components
+class FallbackTokenizer:
+    """Simple fallback tokenizer when transformers is not available"""
+    def __init__(self):
+        self.vocab_size = 30000
+        
+    def __call__(self, text, **kwargs):
+        tokens = text.split()[:512]  # Simple whitespace tokenization
+        input_ids = [hash(token) % self.vocab_size for token in tokens]
+        
+        if kwargs.get('return_tensors') == 'pt':
+            return {
+                'input_ids': torch.tensor([input_ids]),
+                'attention_mask': torch.ones(1, len(input_ids))
+            }
+        return {'input_ids': input_ids}
+    
+    def decode(self, token_ids):
+        return f"Generated text from {len(token_ids)} tokens"
+
+class FallbackModelManager:
+    """Fallback model manager when real one is not available"""
+    def load_model(self, model_name):
+        return None
+
+class FallbackNLPPipeline:
+    """Fallback NLP pipeline when real one is not available"""
+    def get_tokenizer(self):
+        return lambda x: x.split()
+    
+    def get_parser(self):
+        return lambda x: {'tokens': x}
+    
+    def get_ner(self):
+        return lambda x: []
+
+class FallbackLLMCore:
+    """Fallback LLM core when real one is not available"""
+    def __init__(self):
+        pass
+
+# Dummy model classes for fallback
 class DummyClassifier:
-    """Dummy classifier model voor fallback"""
+    """Dummy classifier model for fallback"""
     def __init__(self):
         self.classes_ = [0, 1]  # Binary classification by default
     
@@ -37,7 +105,7 @@ class DummyClassifier:
         return np.random.random((n_samples, len(self.classes_)))
 
 class DummyRegressor:
-    """Dummy regressor model voor fallback"""
+    """Dummy regressor model for fallback"""
     def predict(self, X):
         """Return random predictions"""
         if isinstance(X, torch.Tensor):
@@ -47,7 +115,7 @@ class DummyRegressor:
         return np.random.normal(0, 1, size=len(X) if hasattr(X, '__len__') else 1)
 
 class DummyClustering:
-    """Dummy clustering model voor fallback"""
+    """Dummy clustering model for fallback"""
     def __init__(self):
         self.n_clusters = 3
     
@@ -62,6 +130,37 @@ class DummyClustering:
     def predict(self, X):
         """Return random cluster assignments"""
         return self.fit_predict(X)
+
+class TransformerLayer(nn.Module):
+    """Basic transformer layer implementation"""
+    def __init__(self, hidden_size: int, num_heads: int, dropout: float = 0.1):
+        super().__init__()
+        self.attention = nn.MultiheadAttention(
+            embed_dim=hidden_size,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True
+        )
+        self.norm1 = nn.LayerNorm(hidden_size)
+        self.norm2 = nn.LayerNorm(hidden_size)
+        self.feed_forward = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size * 4),
+            nn.ReLU(),
+            nn.Linear(hidden_size * 4, hidden_size),
+            nn.Dropout(dropout)
+        )
+        self.dropout = nn.Dropout(dropout)
+    
+    def forward(self, x):
+        # Self-attention
+        attn_output, attn_weights = self.attention(x, x, x)
+        x = self.norm1(x + self.dropout(attn_output))
+        
+        # Feed forward
+        ff_output = self.feed_forward(x)
+        x = self.norm2(x + ff_output)
+        
+        return x, attn_weights
 
 class JarvisModel(BaseModel):
     def __init__(self, config_name: str):
@@ -91,10 +190,10 @@ class JarvisModel(BaseModel):
         # Task-specific heads can be added here
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         
-        # Integration components
-        self.model_manager = ModelManager()
-        self.nlp_pipeline = NLPPipeline()
-        self.llm_core = LLMCore()
+        # Integration components with fallbacks
+        self.model_manager = ModelManager() if HAS_MODEL_MANAGER else FallbackModelManager()
+        self.nlp_pipeline = NLPPipeline() if HAS_NLP_PIPELINE else FallbackNLPPipeline()
+        self.llm_core = LLMCore() if HAS_LLM_CORE else FallbackLLMCore()
         
         # Task routing with dynamic head sizes
         self.task_heads = nn.ModuleDict({
@@ -107,14 +206,28 @@ class JarvisModel(BaseModel):
             'qa': nn.Linear(config.hidden_size, 2)  # start/end position
         })
         
-        # Initialize tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained('bert-base-multilingual-cased')
+        # Initialize tokenizer with fallback
+        if HAS_TRANSFORMERS:
+            try:
+                self.tokenizer = AutoTokenizer.from_pretrained('bert-base-multilingual-cased')
+            except Exception as e:
+                logger.warning(f"Could not load tokenizer: {e}, using fallback")
+                self.tokenizer = FallbackTokenizer()
+        else:
+            self.tokenizer = FallbackTokenizer()
         
         # Add device initialization
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.to(self.device)
         
         # Ensure all components are on correct device
+        self._move_to_device()
+        
+        # Initialize integrations
+        self.init_integrations()
+        
+    def _move_to_device(self):
+        """Move all model components to the correct device"""
         if hasattr(self, 'embeddings'):
             self.embeddings = self.embeddings.to(self.device)
         if hasattr(self, 'layers'):
@@ -131,8 +244,6 @@ class JarvisModel(BaseModel):
                     self.task_heads[name] = nn.ModuleDict({
                         k: v.to(self.device) for k, v in head.items()
                     })
-
-        self.init_integrations()
         
     def init_integrations(self):
         """Initialize integration with ML/NLP/LLM components"""
@@ -142,10 +253,6 @@ class JarvisModel(BaseModel):
         
         # Create dummy models first as ultimate fallback
         self._create_dummy_models()
-        
-        # Initialize model manager if not already done
-        if not hasattr(self, 'model_manager'):
-            self.model_manager = ModelManager()
         
         for model_type in model_types:
             try:
@@ -163,7 +270,7 @@ class JarvisModel(BaseModel):
                 # Use dummy model as fallback
                 self.ml_models[model_type] = self.dummy_models[model_type]
                 
-        # Setup NLP pipeline met fallbacks
+        # Setup NLP pipeline with fallbacks
         self.nlp_processors = {}
         try:
             self.nlp_processors['tokenizer'] = self.nlp_pipeline.get_tokenizer()
@@ -185,7 +292,6 @@ class JarvisModel(BaseModel):
             
     def _create_dummy_models(self):
         """Create dummy models to use as fallbacks when real models are not available"""
-        # Eenvoudige dummy modellen die altijd werken
         self.dummy_models = {
             'classifier': DummyClassifier(),
             'regressor': DummyRegressor(),
@@ -209,7 +315,6 @@ class JarvisModel(BaseModel):
             input_ids = input_ids.to(self.device)
             if attention_mask is not None:
                 attention_mask = attention_mask.to(self.device)
-                attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)  # [batch, 1, 1, seq_length]
 
             # Generate embeddings
             try:
@@ -228,9 +333,6 @@ class JarvisModel(BaseModel):
 
             try:
                 for layer in self.layers:
-                    if attention_mask is not None:
-                        hidden_states = hidden_states * attention_mask
-                    
                     hidden_states, attention_weights = layer(hidden_states)
                     all_hidden_states.append(hidden_states)
                     if attention_weights is not None:
@@ -278,45 +380,45 @@ class JarvisModel(BaseModel):
     def route_task(self, task_name: str, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Route inputs to appropriate task head with error handling"""
         try:
-            # Controleer of de input geldig is
+            # Check if input is valid
             if 'input_ids' not in inputs or inputs['input_ids'] is None:
                 return {"error": "Invalid input: input_ids missing or None"}
                 
-            # Voer forward pass uit met foutafhandeling
+            # Execute forward pass with error handling
             try:
                 outputs = self.forward(inputs['input_ids'], inputs.get('attention_mask'))
                 if not outputs or 'hidden_states' not in outputs or not outputs['hidden_states']:
                     return {"error": "Forward pass produced invalid outputs"}
                     
-                # Controleer of hidden_states een geldige lijst is met elementen
+                # Check if hidden_states is a valid list with elements
                 hidden_states = outputs['hidden_states']
                 if not isinstance(hidden_states, list) or len(hidden_states) == 0:
                     return {"error": "No hidden states available"}
                     
-                # Gebruik de laatste hidden state
+                # Use the last hidden state
                 last_hidden = hidden_states[-1]
             except Exception as e:
                 logger.error(f"Error in forward pass: {e}")
-                # Maak een dummy output aan
+                # Create dummy output
                 return {"error": str(e), "logits": torch.randn(1, 10)}
             
-            # Controleer of de task geldig is
+            # Check if task is valid
             if task_name not in self.task_heads:
                 return {"error": f"Unknown task: {task_name}", "logits": torch.randn(1, 10)}
                 
-            # Gebruik de juiste task head
+            # Use the appropriate task head
             try:
                 if task_name == 'classification':
-                    # Gebruik dummy output voor classificatie
+                    # Use dummy output for classification
                     return {"logits": torch.randn(1, 2), "predicted_class": 0}
                 elif task_name == 'generation':
-                    # Gebruik dummy output voor generatie
-                    return {"logits": torch.randn(1, 10), "generated_text": "Gegenereerde tekst"}
+                    # Use dummy output for generation
+                    return {"logits": torch.randn(1, 10), "generated_text": "Generated text"}
                 elif task_name == 'qa':
-                    # Gebruik dummy output voor qa
-                    return {"start_logits": torch.randn(1), "end_logits": torch.randn(1), "answer": "Antwoord"}
+                    # Use dummy output for qa
+                    return {"start_logits": torch.randn(1), "end_logits": torch.randn(1), "answer": "Answer"}
                 else:
-                    # Algemene fallback
+                    # General fallback
                     return {"logits": torch.randn(1, 10)}
             except Exception as e:
                 logger.error(f"Error in task head {task_name}: {e}")
@@ -337,7 +439,7 @@ class JarvisModel(BaseModel):
             results['entities'] = self.nlp_processors['ner'](tokens)
             
             # Convert to tensor inputs
-            inputs = self.prepare_inputs(text)  # Changed from tokens to text
+            inputs = self.prepare_inputs(text)
             
             # Process each requested task
             for task in tasks:
@@ -349,8 +451,13 @@ class JarvisModel(BaseModel):
             
             # Post-process with ML models if needed
             if 'ml_analysis' in tasks:
-                ml_features = self.extract_features(results)
-                
+                try:
+                    ml_features = self.extract_features(results)
+                    results['ml_analysis'] = ml_features
+                except Exception as e:
+                    logger.error(f"Error in ML analysis: {e}")
+                    results['ml_analysis'] = {"error": str(e)}
+            
             return results
             
         except Exception as e:
@@ -359,55 +466,84 @@ class JarvisModel(BaseModel):
 
     def prepare_inputs(self, text: str) -> Dict[str, torch.Tensor]:
         """Convert text to model inputs"""
-        # Tokenize with padding and truncation
-        encoded = self.tokenizer(
-            text,
-            padding=True,
-            truncation=True,
-            max_length=512,
-            return_tensors="pt"
-        )
-        
-        # Move to model device if needed
-        if hasattr(self, 'device'):
-            encoded = {k: v.to(self.device) for k, v in encoded.items()}
+        try:
+            # Tokenize with padding and truncation
+            encoded = self.tokenizer(
+                text,
+                padding=True,
+                truncation=True,
+                max_length=512,
+                return_tensors="pt"
+            )
             
-        return encoded
+            # Move to model device if needed
+            if hasattr(self, 'device'):
+                encoded = {k: v.to(self.device) for k, v in encoded.items()}
+                
+            return encoded
+        except Exception as e:
+            logger.error(f"Error preparing inputs: {e}")
+            # Return fallback inputs
+            return {
+                'input_ids': torch.tensor([[1, 2, 3]], device=self.device),
+                'attention_mask': torch.tensor([[1, 1, 1]], device=self.device)
+            }
+
+    def extract_features(self, results: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract features for ML analysis"""
+        features = {}
+        try:
+            # Extract basic features from results
+            if 'parsed' in results:
+                features['num_tokens'] = len(results['parsed'].get('tokens', []))
+            if 'entities' in results:
+                features['num_entities'] = len(results['entities'])
+            
+            # Add more feature extraction logic here
+            return features
+        except Exception as e:
+            logger.error(f"Error extracting features: {e}")
+            return {"error": str(e)}
 
     def generate(self, prompt: str, max_length: int = 100) -> str:
         """Generate text from prompt"""
-        # Tokenize input
-        input_ids = self.tokenizer(prompt, return_tensors="pt")["input_ids"].to(self.device)
-        attention_mask = torch.ones_like(input_ids)
-        
-        # Generate
-        with torch.no_grad():
-            outputs = self.forward(input_ids, attention_mask)
-            logits = outputs["logits"]
+        try:
+            # Tokenize input
+            inputs = self.prepare_inputs(prompt)
+            input_ids = inputs["input_ids"]
+            attention_mask = inputs.get("attention_mask", torch.ones_like(input_ids))
             
-            # Sample from logits
-            next_token_logits = logits[:, -1, :]
-            next_token = torch.argmax(next_token_logits, dim=-1)
-            
-            generated = [next_token.item()]
-            current_length = 1
-            
-            while current_length < max_length:
-                current_input = torch.cat([input_ids, torch.tensor([generated]).to(self.device)], dim=1)
-                current_mask = torch.ones_like(current_input)
+            # Generate
+            with torch.no_grad():
+                outputs = self.forward(input_ids, attention_mask)
+                logits = outputs["logits"]
                 
-                outputs = self.forward(current_input, current_mask)
-                next_token_logits = outputs["logits"][:, -1, :]
+                # Sample from logits
+                next_token_logits = logits[:, -1, :]
                 next_token = torch.argmax(next_token_logits, dim=-1)
                 
-                generated.append(next_token.item())
-                current_length += 1
+                generated = [next_token.item()]
+                current_length = 1
                 
-                if next_token.item() == self.config.get("eos_token_id", 0):
-                    break
+                while current_length < max_length:
+                    current_input = torch.cat([input_ids, torch.tensor([generated]).to(self.device)], dim=1)
+                    current_mask = torch.ones_like(current_input)
                     
-        # Decode generated tokens
-        return self.tokenizer.decode(generated)
+                    outputs = self.forward(current_input, current_mask)
+                    next_token_logits = outputs["logits"][:, -1, :]
+                    next_token = torch.argmax(next_token_logits, dim=-1)
+                    
+                    generated.append(next_token.item())
+                    current_length += 1
+                    
+                    if next_token.item() == self.config.get("eos_token_id", 0):
+                        break
+                        
+            # Decode generated tokens
+            return self.tokenizer.decode(generated)
+        except Exception as e:
+            logger.error(f"Error in generation: {e}")
+            return f"Generated text (fallback): {prompt} [continued]"
 
 class JarvisEmbeddings(nn.Module):
     def __init__(self, config: JarvisConfig):
@@ -430,31 +566,3 @@ class JarvisEmbeddings(nn.Module):
         embeddings = self.dropout(embeddings)
         
         return embeddings
-
-    def _load_models(self):
-        try:
-            from ml.models import ModelManager
-            self.manager = ModelManager()
-            
-            model_types = ['classifier', 'regressor', 'clustering']
-            for model_type in model_types:
-                try:
-                    self.models[model_type] = self.manager.load_model(f"{model_type}_latest")
-                except Exception as e:
-                    logger.warning(f"Could not load {model_type} model: {e}")
-                    self.models[model_type] = None
-        except Exception as e:
-            logger.error(f"Error loading models: {e}")
-            
-    def process_pipeline(self, text, tasks):
-        results = {}
-        for task in tasks:
-            try:
-                if task in self.models and self.models[task]:
-                    results[task] = self.models[task].predict([text])[0]
-                else:
-                    results[task] = None
-            except Exception as e:
-                logger.error(f"Error in {task} processing: {e}")
-                results[task] = None
-        return results

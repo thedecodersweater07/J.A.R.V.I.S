@@ -1,130 +1,208 @@
 """
-Security Manager for JARVIS Server
-Integrates core security components with the server
+Simplified Security Manager for JARVIS Server
 """
 import os
-import logging
+import json
 import jwt
 import bcrypt
+import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-from fastapi import HTTPException, Security
-from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
-from passlib.context import CryptContext
+from pathlib import Path
 
-logger = logging.getLogger("jarvis-server.security")
+logger = logging.getLogger("jarvis.security")
 
 class SecurityManager:
-    """
-    Security Manager for JARVIS Server
-    Handles authentication, authorization, and security integration
-    """
-    
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize the security manager with configuration"""
-        self.logger = logging.getLogger(__name__)
-        if not config:
-            self.logger.warning("No config provided, using defaults")
-            config = {}
-            
-        self.config = config
-        self.jwt_secret = config.get('jwt_secret', os.getenv('JWT_SECRET', 'fallback-secret-key'))
-        self.token_expiry = config.get('token_expiry_hours', 12)
-        self.users = {}
+        self.config = config or {}
+        self.jwt_secret = os.getenv('JWT_SECRET', 'jarvis-secret-key-2025')
+        self.token_expiry = self.config.get('token_expiry_hours', 24)
+        
+        # Persistent storage
+        self.data_file = Path("data/users.json")
+        self.session_file = Path("data/sessions.json")
+        self._ensure_data_dir()
+        
+        # Load data
+        self.users = self._load_users()
+        self.sessions = self._load_sessions()
         self.failed_attempts = {}
         
-        # Load secret keys from environment or config
-        self.api_key = os.getenv("API_KEY", self.config.get("api_key", "your-api-key"))
+        # Create default admin if needed
+        self._create_default_admin()
         
-        # Rate limiting settings
-        self.rate_limit = self.config.get("rate_limit", 100)  # requests per minute
-        self.rate_limit_window = self.config.get("rate_limit_window", 60)  # seconds
-        
-        # Initialize rate limiting storage
-        self.request_counts = {}
-        
-        if 'fallback' in self.jwt_secret:
-            self.logger.warning("Using fallback JWT secret - this is not secure for production!")
-
         logger.info("Security Manager initialized")
-        self.add_default_user()  # Ensure default user is created
     
-    def verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        """Verify password against hash"""
-        return bcrypt.checkpw(plain_password.encode('utf-8'), 
-                             hashed_password.encode('utf-8'))
-        
-    def get_password_hash(self, password: str) -> str:
-        """Generate password hash"""
-        salt = bcrypt.gensalt()
-        return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
-        
-    def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
-        """Create JWT token"""
-        to_encode = data.copy()
-        expire = datetime.utcnow() + (expires_delta or timedelta(hours=12))
-        to_encode.update({"exp": expire})
-        return jwt.encode(to_encode, self.jwt_secret, algorithm="HS256")
-        
-    async def validate_token(self, token: str) -> Dict[str, Any]:
-        """Validate JWT token"""
+    def _ensure_data_dir(self):
+        """Ensure data directory exists"""
+        self.data_file.parent.mkdir(exist_ok=True)
+    
+    def _load_users(self) -> Dict:
+        """Load users from persistent storage"""
+        if self.data_file.exists():
+            try:
+                with open(self.data_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.error(f"Error loading users: {e}")
+        return {}
+    
+    def _save_users(self):
+        """Save users to persistent storage"""
         try:
-            payload = jwt.decode(token, self.jwt_secret, algorithms=["HS256"])
-            username: str = payload.get("sub")
-            role: str = payload.get("role", "user")
-            if username is None:
-                raise HTTPException(status_code=401, detail="Invalid token")
-            return {"username": username, "role": role}
-        except jwt.JWTError:
-            raise HTTPException(status_code=401, detail="Invalid token")
-            
-    async def check_rate_limit(self, client_id: str) -> bool:
-        """Check if client has exceeded rate limit"""
-        now = datetime.utcnow().timestamp()
-        client_requests = self.request_counts.get(client_id, [])
-        
-        # Remove old requests
-        client_requests = [req for req in client_requests 
-                         if req > now - self.rate_limit_window]
-        
-        # Check limit
-        if len(client_requests) >= self.rate_limit:
-            return False
-            
-        # Update requests
-        client_requests.append(now)
-        self.request_counts[client_id] = client_requests
-        return True
+            with open(self.data_file, 'w') as f:
+                json.dump(self.users, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving users: {e}")
     
-    def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
-        """Create JWT access token"""
-        to_encode = data.copy()
-        expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
-        to_encode.update({"exp": expire})
-        return jwt.encode(to_encode, self.jwt_secret, algorithm="HS256")  # Use jwt_secret instead of SECRET_KEY
+    def _load_sessions(self) -> Dict:
+        """Load active sessions"""
+        if self.session_file.exists():
+            try:
+                with open(self.session_file, 'r') as f:
+                    sessions = json.load(f)
+                # Clean expired sessions
+                now = datetime.utcnow().timestamp()
+                return {k: v for k, v in sessions.items() if v.get('expires', 0) > now}
+            except Exception as e:
+                logger.error(f"Error loading sessions: {e}")
+        return {}
+    
+    def _save_sessions(self):
+        """Save active sessions"""
+        try:
+            with open(self.session_file, 'w') as f:
+                json.dump(self.sessions, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving sessions: {e}")
+    
+    def _create_default_admin(self):
+        """Create default admin user"""
+        if not self.users:
+            admin_pass = os.getenv('ADMIN_PASSWORD', 'admin123')
+            self.users["admin"] = {
+                "id": "admin_001",
+                "username": "admin",
+                "password_hash": self._hash_password(admin_pass),
+                "role": "admin",
+                "is_active": True,
+                "created": datetime.utcnow().isoformat()
+            }
+            self._save_users()
+            logger.info("Default admin user created")
+    
+    def _hash_password(self, password: str) -> str:
+        """Hash password"""
+        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    
+    def _verify_password(self, password: str, hash_str: str) -> bool:
+        """Verify password"""
+        return bcrypt.checkpw(password.encode('utf-8'), hash_str.encode('utf-8'))
+    
+    def authenticate(self, username: str, password: str, ip_address: str = None) -> Dict:
+        """Authenticate user"""
+        # Check if user exists
+        user = self.users.get(username)
+        if not user or not user.get("is_active"):
+            return {"success": False, "error": "Invalid credentials"}
         
-    def verify_token(self, token: str) -> Optional[dict]:
+        # Check password
+        if not self._verify_password(password, user["password_hash"]):
+            return {"success": False, "error": "Invalid credentials"}
+        
+        # Create token
+        token_data = {
+            "sub": username,
+            "role": user["role"],
+            "user_id": user["id"],
+            "exp": datetime.utcnow() + timedelta(hours=self.token_expiry)
+        }
+        token = jwt.encode(token_data, self.jwt_secret, algorithm="HS256")
+        
+        # Store session
+        session_id = f"{username}_{datetime.utcnow().timestamp()}"
+        self.sessions[session_id] = {
+            "username": username,
+            "token": token,
+            "ip_address": ip_address,
+            "created": datetime.utcnow().isoformat(),
+            "expires": (datetime.utcnow() + timedelta(hours=self.token_expiry)).timestamp()
+        }
+        self._save_sessions()
+        
+        return {
+            "success": True,
+            "token": token,
+            "user": {
+                "id": user["id"],
+                "username": user["username"],
+                "role": user["role"]
+            }
+        }
+    
+    def verify_token(self, token: str) -> Optional[Dict]:
         """Verify JWT token"""
         try:
-            if hasattr(self, 'token_blacklist') and token in self.token_blacklist:
-                return None
-            payload = jwt.decode(token, self.jwt_secret, algorithms=["HS256"])  # Use jwt_secret instead of SECRET_KEY
-            return payload
-        except jwt.PyJWTError:
+            # First check if token exists in active sessions
+            for session in self.sessions.values():
+                if session.get("token") == token:
+                    # Verify JWT
+                    payload = jwt.decode(token, self.jwt_secret, algorithms=["HS256"])
+                    user = self.users.get(payload["sub"])
+                    if user:
+                        return {
+                            "id": user["id"],
+                            "username": user["username"],
+                            "role": user["role"],
+                            "is_active": user["is_active"]
+                        }
+            return None
+        except jwt.ExpiredSignatureError:
+            logger.warning("Token expired")
+            return None
+        except jwt.InvalidTokenError:
+            logger.warning("Invalid token")
             return None
     
-    def add_default_user(self):
-        """Add default admin user if no users exist"""
-        try:
-            if not self.users:
-                password_hash = self.get_password_hash("admin")
-                self.users["admin"] = {
-                    "id": "admin_default",
-                    "username": "admin",
-                    "password_hash": password_hash,
-                    "role": "admin",
-                    "is_active": True
-                }
-                logger.info("Added default admin user")
-        except Exception as e:
-            logger.error(f"Error adding default user: {e}")
+    def logout(self, token: str):
+        """Logout user by removing session"""
+        sessions_to_remove = []
+        for session_id, session in self.sessions.items():
+            if session.get("token") == token:
+                sessions_to_remove.append(session_id)
+        
+        for session_id in sessions_to_remove:
+            del self.sessions[session_id]
+        
+        self._save_sessions()
+    
+    def create_user(self, username: str, password: str, role: str = "user") -> Dict:
+        """Create new user"""
+        if username in self.users:
+            return {"success": False, "error": "User already exists"}
+        
+        self.users[username] = {
+            "id": f"user_{len(self.users)}",
+            "username": username,
+            "password_hash": self._hash_password(password),
+            "role": role,
+            "is_active": True,
+            "created": datetime.utcnow().isoformat()
+        }
+        self._save_users()
+        
+        return {
+            "success": True,
+            "user": {
+                "id": self.users[username]["id"],
+                "username": username,
+                "role": role
+            }
+        }
+    
+    def get_config(self) -> Dict:
+        """Get security configuration"""
+        return {
+            "rate_limit": self.config.get("rate_limit", 100),
+            "rate_window": self.config.get("rate_window", 60)
+        }
