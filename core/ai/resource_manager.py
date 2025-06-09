@@ -8,9 +8,10 @@ import sys
 import logging
 import threading
 import time
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Union
 import psutil
 import torch
+import gc
 
 # Import core components
 from core.logging import get_logger
@@ -31,77 +32,60 @@ class ResourceManager:
         self.logger = get_logger(__name__)
         self.config = config or {}
         
-        # More conservative resource limits
-        self.memory_limit = self._parse_memory_limit(self.config.get("memory_limit", "60%"))
-        self.cpu_limit = self.config.get("cpu_limit", 0.6)  # 60% by default
-        self.gpu_memory_limit = self.config.get("gpu_memory_limit", 0.6)
-        
-        # Add dynamic scaling thresholds
-        self.memory_scale_threshold = 0.75  # Start scaling at 75%
-        self.memory_critical_threshold = 0.85  # Critical at 85%
-        
-        # Add CPU throttling
-        self.cpu_throttle_threshold = 0.8
-        self.throttle_interval = 0.1  # seconds
-        
-        # Add better memory management
-        self.min_memory_chunk = 1024 * 1024 * 100  # 100MB minimum chunks
-        self.memory_scale_factor = 0.8  # Scale to 80% when reducing
-
-        # Resource allocation
+        # Initialize monitoring parameters
+        self.monitoring_interval = self.config.get('monitoring_interval', 5.0)
+        self.running = True
+        self.allocation_lock = threading.RLock()
         self.allocations = {}
-        self.allocation_lock = threading.Lock()
         
-        # Resource monitoring
-        self.monitoring_interval = self.config.get("monitoring_interval", 5.0)  # seconds
-        self.monitoring_thread = None
-        self.running = False
+        # Convert memory limit to bytes if it's a string percentage
+        self.memory_limit = self._parse_memory_limit(self.config.get('memory_limit', '80%'))
+        self.cpu_limit = self.config.get('cpu_limit', 0.8)
+        self.gpu_memory_limit = self.config.get('gpu_memory_limit', 0.8)
         
-        # GPU support
-        self.gpu_enabled = self.config.get("gpu_enabled", torch.cuda.is_available())
+        # Thresholds for resource management
+        self.memory_critical_threshold = 0.95  # 95% of limit
+        self.memory_scale_threshold = 0.85    # 85% of limit
+        self.cpu_throttle_threshold = 0.9     # 90% of limit
+        self.throttle_interval = 0.1          # 100ms pause
         
-        # Initialize monitoring
-        self._init_monitoring()
+        # GPU configuration
+        self.gpu_enabled = torch.cuda.is_available()
         
-    def _parse_memory_limit(self, limit: str) -> int:
-        """
-        Parse memory limit string to bytes.
-        
-        Args:
-            limit: Memory limit string (e.g., "80%", "8G", "8000M")
-            
-        Returns:
-            Memory limit in bytes
-        """
-        if isinstance(limit, int):
-            return limit
-            
+        # Start monitoring if enabled
+        if self.config.get("enable_monitoring", True):
+            self._setup_monitoring()
+
+    def _parse_memory_limit(self, limit: Union[str, int, float]) -> int:
+        """Convert memory limit to bytes"""
         if isinstance(limit, str):
-            # Percentage of total memory
-            if limit.endswith("%"):
-                percentage = float(limit.rstrip("%")) / 100.0
-                return int(psutil.virtual_memory().total * percentage)
-                
-            # Absolute value with unit
-            unit_multipliers = {
-                "K": 1024,
-                "M": 1024 * 1024,
-                "G": 1024 * 1024 * 1024,
-                "T": 1024 * 1024 * 1024 * 1024
-            }
-            
-            for unit, multiplier in unit_multipliers.items():
-                if limit.upper().endswith(unit):
-                    return int(float(limit[:-1]) * multiplier)
-                    
-            # No unit, assume bytes
+            if limit.endswith('%'):
+                percentage = float(limit.rstrip('%')) / 100.0
+                total_memory = psutil.virtual_memory().total
+                return int(total_memory * percentage)
+            elif limit.endswith('G'):
+                return int(float(limit.rstrip('G')) * 1024**3)
+            elif limit.endswith('M'):
+                return int(float(limit.rstrip('M')) * 1024**2)
+        elif isinstance(limit, (int, float)):
             return int(limit)
-            
-        # Default: 80% of total memory
-        return int(psutil.virtual_memory().total * 0.8)
+        return int(psutil.virtual_memory().total * 0.8)  # Default to 80%
+
+    def _check_resources(self) -> bool:
+        """Check if system has enough resources"""
+        import psutil
         
-    def _init_monitoring(self):
-        """Initialize resource monitoring."""
+        cpu_percent = psutil.cpu_percent()
+        memory = psutil.virtual_memory()
+        
+        # Calculate free memory in GB
+        free_memory_gb = memory.available / (1024**3)
+        
+        return (cpu_percent < self.cpu_limit * 100 and
+                free_memory_gb >= self.min_free_memory)
+
+    def _setup_monitoring(self):
+        """Set up monitoring for resource usage."""
         if self.config.get("enable_monitoring", True):
             self.running = True
             self.monitoring_thread = threading.Thread(target=self._monitor_resources, daemon=True)
@@ -112,19 +96,21 @@ class ResourceManager:
         """Monitor system resources (runs in a separate thread)."""
         while self.running:
             try:
-                # Get current resource usage
-                cpu_percent = psutil.cpu_percent(interval=None) / 100.0
                 memory_info = psutil.virtual_memory()
-                memory_percent = memory_info.percent / 100.0
                 
-                # Check if we're over limits
+                # Now both values are in bytes for comparison
+                if memory_info.used > self.memory_limit:
+                    self.logger.warning(
+                        f"Memory usage ({memory_info.used / 1024**3:.2f} GB) "
+                        f"exceeds limit ({self.memory_limit / 1024**3:.2f} GB)"
+                    )
+                    self._handle_resource_pressure("memory", memory_info.used)
+
+                # Check if we're over CPU limit
+                cpu_percent = psutil.cpu_percent(interval=None) / 100.0
                 if cpu_percent > self.cpu_limit:
                     self.logger.warning(f"CPU usage ({cpu_percent:.2%}) exceeds limit ({self.cpu_limit:.2%})")
                     self._handle_resource_pressure("cpu", cpu_percent)
-                    
-                if memory_info.used > self.memory_limit:
-                    self.logger.warning(f"Memory usage ({memory_info.used / 1024**3:.2f} GB) exceeds limit ({self.memory_limit / 1024**3:.2f} GB)")
-                    self._handle_resource_pressure("memory", memory_info.used)
                     
                 # Check GPU if enabled
                 if self.gpu_enabled and torch.cuda.is_available():
@@ -149,6 +135,11 @@ class ResourceManager:
             current_usage: Current usage of the resource
             device: Device ID for GPU resources
         """
+        # Add immediate memory cleanup if critical
+        if resource_type == "memory" and current_usage > self.memory_critical_threshold:
+            self._reduce_memory_aggressive()
+            return
+            
         # Add CPU throttling
         if resource_type == "cpu" and current_usage > self.cpu_throttle_threshold:
             time.sleep(self.throttle_interval)
@@ -344,3 +335,42 @@ class ResourceManager:
                 self.logger.warning("Monitoring thread did not stop cleanly")
                 
         self.logger.info("Resource manager shut down complete")
+        
+    def _reduce_memory_aggressive(self):
+        """Aggressively reduce memory usage for critical situations."""
+        with self.allocation_lock:
+            # Sort by priority with highest memory users first
+            memory_users = sorted(
+                self.allocations.items(),
+                key=lambda x: (
+                    -float(self._parse_memory_limit(x[1].get("memory", "0"))), 
+                    x[1].get("priority", 5)
+                )
+            )
+            
+            for component_id, allocation in memory_users:
+                if allocation.get("memory_intensive", False):
+                    # Request immediate memory reduction
+                    self._notify_component(component_id, "reduce_memory_critical")
+                    
+                    # Force garbage collection
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+
+    def _reduce_memory_graceful(self):
+        """Gradually reduce memory usage."""
+        with self.allocation_lock:
+            # Sort by priority (lower priority first)
+            memory_users = sorted(
+                self.allocations.items(),
+                key=lambda x: x[1].get("priority", 5)
+            )
+            
+            for component_id, allocation in memory_users:
+                if allocation.get("memory_intensive", False):
+                    # Request gradual memory reduction
+                    self._notify_component(component_id, "reduce_memory_graceful")
+                    
+                    # Minor garbage collection
+                    gc.collect()

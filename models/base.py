@@ -8,7 +8,11 @@ class BaseModel(nn.Module, ABC):
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__()
-        self.config = config
+        # Convert config to dict if not already
+        self.config = config.__dict__ if hasattr(config, '__dict__') else config
+        # Ensure config is a dictionary
+        if not isinstance(self.config, dict):
+            self.config = {"default": self.config}
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
     @abstractmethod

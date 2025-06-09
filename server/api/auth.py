@@ -10,11 +10,17 @@ from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
+from typing import Optional
 
 # Setup logging
 logger = logging.getLogger("jarvis-server.auth")
 
 # Models
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: str = "user"
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -25,15 +31,6 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
     role: Optional[str] = None
-
-class UserCreate(BaseModel):
-    username: str
-    password: str
-    role: str = "user"
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
 
 # Create router
 router = APIRouter(

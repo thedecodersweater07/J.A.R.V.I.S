@@ -47,6 +47,7 @@ class SecurityManager:
             self.logger.warning("Using fallback JWT secret - this is not secure for production!")
 
         logger.info("Security Manager initialized")
+        self.add_default_user()  # Ensure default user is created
     
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """Verify password against hash"""
@@ -94,3 +95,36 @@ class SecurityManager:
         client_requests.append(now)
         self.request_counts[client_id] = client_requests
         return True
+    
+    def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
+        """Create JWT access token"""
+        to_encode = data.copy()
+        expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+        to_encode.update({"exp": expire})
+        return jwt.encode(to_encode, self.jwt_secret, algorithm="HS256")  # Use jwt_secret instead of SECRET_KEY
+        
+    def verify_token(self, token: str) -> Optional[dict]:
+        """Verify JWT token"""
+        try:
+            if hasattr(self, 'token_blacklist') and token in self.token_blacklist:
+                return None
+            payload = jwt.decode(token, self.jwt_secret, algorithms=["HS256"])  # Use jwt_secret instead of SECRET_KEY
+            return payload
+        except jwt.PyJWTError:
+            return None
+    
+    def add_default_user(self):
+        """Add default admin user if no users exist"""
+        try:
+            if not self.users:
+                password_hash = self.get_password_hash("admin")
+                self.users["admin"] = {
+                    "id": "admin_default",
+                    "username": "admin",
+                    "password_hash": password_hash,
+                    "role": "admin",
+                    "is_active": True
+                }
+                logger.info("Added default admin user")
+        except Exception as e:
+            logger.error(f"Error adding default user: {e}")

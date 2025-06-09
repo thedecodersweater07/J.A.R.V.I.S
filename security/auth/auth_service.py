@@ -3,10 +3,14 @@ import logging
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 import bcrypt
+from db.database_manager import DATABASE_PATHS, DatabaseManager
 from db.sql.models.database import Database
 from ..models.user import User
 from ..config.security_config import SecurityConfig
 from .auth_types import LoginResponse
+import os
+import sqlite3
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -16,21 +20,24 @@ class AuthService:
     def __init__(self, security_config: SecurityConfig):
         self.config = security_config
         self.db = Database.get_instance()
+        self.db_manager = DatabaseManager()
         self._init_auth_db()
         logger.info("AuthService initialized")
 
     def _init_auth_db(self):
         """Initialize auth tables"""
         try:
-            conn = self.db.get_client()
+            conn = self.db._get_sqlite_connection("auth")
             cursor = conn.cursor()
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY,
-                username TEXT UNIQUE,
-                password TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )''')
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    username TEXT UNIQUE,
+                    password TEXT,
+                    role TEXT DEFAULT 'user',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             conn.commit()
         except Exception as e:
             logger.error(f"Failed to setup auth database: {e}")

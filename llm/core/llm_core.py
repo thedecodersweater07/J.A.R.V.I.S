@@ -1,10 +1,9 @@
 import torch
 import logging
-import os
 import gc
 from pathlib import Path
 import yaml
-from typing import Optional, Dict, Any, Union, Callable
+from typing import Optional, Dict, Any
 from functools import lru_cache
 import threading
 import psutil
@@ -13,19 +12,38 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 logger = logging.getLogger(__name__)
 
 class LLMCore:
+    _instance = None
+    _lock = threading.Lock()
+    
+    def __new__(cls, *args, **kwargs):
+        with cls._lock:
+            if not cls._instance:
+                cls._instance = super().__new__(cls)
+            return cls._instance
+
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize LLM Core with optimized memory management"""
+        # Initialize logger first
+        self.logger = logging.getLogger(__name__)  # Changed to use standard logging
+        
+        # Then continue with rest of initialization
+        if hasattr(self, '_initialized'):
+            return
+            
         try:
-            # Load and validate config
+            # Define fallback models first
+            self.fallback_models = [
+                "distilgpt2",  # Smaller model first
+                "gpt2",
+                "bert-base-uncased"
+            ]
+
+            # Load and validate config before initialization
             self.config = self._load_config(config)
             self._validate_config()
             
-            # Add resource optimization settings
-            self.config["model"].update({
-                "low_cpu_mem_usage": True,
-                "torch_dtype": torch.float32 if not torch.cuda.is_available() else torch.float16,
-                "max_memory": {"cpu": "2GB", "gpu": "2GB"} if torch.cuda.is_available() else {"cpu": "2GB"}
-            })
+            # Setup memory management first
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            self._setup_memory_management()
             
             # Initialize components with lazy loading
             self.model = None
@@ -33,24 +51,137 @@ class LLMCore:
             self._model_lock = threading.RLock()
             self._model_initialized = False
             
-            # Initialize only if auto_load and system has resources
+            # Initialize memory manager
+            from llm.memory.enhanced_memory import EnhancedMemoryManager
+            self.memory = EnhancedMemoryManager({
+                "cache_size": self.config.get("memory_management", {}).get("cache_size", 1000),
+                "priority_threshold": 0.5,
+                "context_window": 5
+            })
+            
+            # Initialize model if resources available
             if self.config.get("auto_load", True) and self._check_system_resources():
                 self._initialize_model()
-                logger.info("LLMCore initialized successfully")
             else:
                 logger.info("LLMCore created with lazy loading enabled")
                 
+            self._initialized = True
+            
         except Exception as e:
-            logger.error(f"Failed to initialize LLMCore: {str(e)}", exc_info=True)
+            self.logger.error(f"Failed to initialize LLMCore: {str(e)}", exc_info=True)
             raise
 
+    def _load_config(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Load configuration with better validation"""
+        default_config = {
+            "model": {
+                "name": "distilgpt2",
+                "type": "transformer",
+                "max_length": 2048,  # Increased context length
+                "temperature": 0.7,
+                "low_cpu_mem_usage": True,
+                "offload_folder": "models/offload",  # Add disk offloading
+                "load_in_8bit": True,  # Enable 8-bit quantization
+                "device_map": "auto"  # Enable auto device mapping
+            },
+            "memory_management": {
+                "cache_size": 2000,  # Increased cache size
+                "max_memory_usage": 0.9,  # More aggressive memory usage
+                "enable_gc": True,
+                "cpu_threshold": 85.0,  # CPU usage threshold
+                "memory_threshold": 85.0,  # Memory usage threshold
+                "gpu_threshold": 85.0,  # GPU usage threshold
+                "throttle_interval": 0.1  # Seconds between throttle checks
+            },
+            "nlp": {
+                "default_model": "en_core_web_sm",
+                "fallback_models": ["en_core_web_sm", "en_core_web_md"]
+            }
+        }
+
+        # Enhanced config merging
+        if isinstance(config, dict):
+            merged_config = default_config.copy()
+            for key, value in config.items():
+                if isinstance(value, dict) and key in merged_config:
+                    merged_config[key].update(value)
+                else:
+                    merged_config[key] = value
+            return merged_config
+
+        # Try multiple config paths
+        config_paths = [
+            Path("config/llm.yaml"),
+            Path("config/llm.yml"),
+            Path(f"{Path.home()}/.jarvis/config/llm.yaml")
+        ]
+
+        for config_path in config_paths:
+            if config_path.exists():
+                try:
+                    with open(config_path) as f:
+                        loaded_config = yaml.safe_load(f)
+                        if not loaded_config:
+                            continue
+                        merged_config = default_config.copy()
+                        for key, value in loaded_config.items():
+                            if isinstance(value, dict) and key in merged_config:
+                                merged_config[key].update(value)
+                            else:
+                                merged_config[key] = value
+                        return merged_config
+                except Exception as e:
+                    logger.warning(f"Failed to load config from {config_path}: {e}")
+                    continue
+
+        return default_config
+
     def _check_system_resources(self) -> bool:
-        """Check if system has enough resources"""
-        cpu_percent = psutil.cpu_percent()
-        memory = psutil.virtual_memory()
-        
-        # Only initialize if CPU usage is below 80% and memory usage below 85%
-        return cpu_percent < 80 and memory.percent < 85
+        """Enhanced system resource checking"""
+        try:
+            # Get thresholds from config
+            mem_config = self.config.get("memory_management", {})
+            cpu_thresh = mem_config.get("cpu_threshold", 85.0)
+            mem_thresh = mem_config.get("memory_threshold", 85.0)
+            gpu_thresh = mem_config.get("gpu_threshold", 85.0)
+
+            # Check CPU usage with average over 1 second
+            cpu_percent = psutil.cpu_percent(interval=1)
+            
+            # Check memory usage
+            memory = psutil.virtual_memory()
+            swap = psutil.swap_memory()
+
+            # Enhanced GPU memory checking
+            gpu_ok = True
+            if self.device == "cuda":
+                for i in range(torch.cuda.device_count()):
+                    gpu_mem = torch.cuda.memory_allocated(i) / torch.cuda.get_device_properties(i).total_memory * 100
+                    if gpu_mem > gpu_thresh:
+                        logger.warning(f"GPU {i} memory usage ({gpu_mem:.1f}%) exceeds threshold ({gpu_thresh}%)")
+                        gpu_ok = False
+
+            # Log resource usage
+            logger.info(f"Resource usage - CPU: {cpu_percent:.1f}%, Memory: {memory.percent:.1f}%, "
+                       f"Swap: {swap.percent:.1f}%")
+
+            # Return True only if all resources are below thresholds
+            resources_ok = (
+                cpu_percent < cpu_thresh and
+                memory.percent < mem_thresh and
+                swap.percent < 90 and
+                gpu_ok
+            )
+
+            if not resources_ok:
+                logger.warning("System resources exceeded thresholds")
+                self._cleanup_existing_model()  # Attempt to free resources
+
+            return resources_ok
+
+        except Exception as e:
+            logger.error(f"Error checking system resources: {e}")
+            return False
 
     def _setup_memory_management(self):
         """Setup memory management parameters"""
@@ -83,69 +214,52 @@ class LLMCore:
         if "name" not in self.config["model"]:
             raise ValueError("Model name not specified in configuration")
 
-    def _load_config(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Load configuration from dictionary or file"""
-        default_config = {
-            "model": {
-                "name": "gpt2",  # Changed from nl_core_news_lg to gpt2 as safer default
-                "type": "transformer",
-                "max_length": 100,
-                "temperature": 0.7,
-                "low_cpu_mem_usage": True
-            }
-        }
-        
-        if isinstance(config, dict):
-            return {**default_config, **config}
-            
-        config_path = Path("config/llm.yaml")
-        if config_path.exists():
-            try:
-                with open(config_path) as f:
-                    loaded_config = yaml.safe_load(f)
-                    return {**default_config, **loaded_config}
-            except Exception as e:
-                self.logger.warning(f"Failed to load config file: {e}")
-
-        return default_config
-
     def _initialize_model(self) -> None:
         """Initialize model with better error handling and fallbacks"""
         with self._model_lock:
             if self._model_initialized:
                 return
+                
+            transformers_kwargs = {
+                'torch_dtype': 'auto',
+                'device_map': 'auto' if torch.cuda.is_available() else None,
+                'low_cpu_mem_usage': True,
+            }
 
-            for model_name in [self.config["model"]["name"]] + self.fallback_models:
+            errors = []
+            for model_name in [self.config["model"].get("name", "gpt2")] + self.fallback_models:
                 try:
-                    logger.info(f"Attempting to load model: {model_name}")
+                    self.logger.info(f"Attempting to load model: {model_name}")
+                    self._cleanup_existing_model()
                     
-                    # Clear existing model
-                    if hasattr(self, 'model'):
-                        del self.model
-                    if hasattr(self, 'tokenizer'):
-                        del self.tokenizer
-                        
-                    # Force garbage collection
-                    gc.collect()
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
-
-                    # Load model with optimizations
                     self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-                    self.model = AutoModelForCausalLM.from_pretrained(
-                        model_name,
-                        **self.config["model"]
-                    )
+                    self.model = AutoModelForCausalLM.from_pretrained(model_name, **transformers_kwargs)
+
+                    if torch.cuda.is_available():
+                        self.model = self.model.to("cuda")
 
                     self._model_initialized = True
-                    logger.info(f"Successfully loaded model: {model_name}")
-                    break
+                    self.logger.info(f"Successfully loaded model: {model_name}")
+                    return
+                    
                 except Exception as e:
-                    logger.warning(f"Failed to load model {model_name}: {e}")
+                    errors.append(f"Failed to load {model_name}: {str(e)}")
                     continue
 
-            if not self._model_initialized:
-                raise RuntimeError("Failed to initialize model with any available fallbacks")
+            error_details = "\n".join(errors)
+            raise RuntimeError(f"Failed to initialize any model. Errors:\n{error_details}")
+
+    def _cleanup_existing_model(self):
+        """Clean up existing model and free memory"""
+        if hasattr(self, 'model') and self.model is not None:
+            del self.model
+            self.model = None
+        if hasattr(self, 'tokenizer') and self.tokenizer is not None:
+            del self.tokenizer
+            self.tokenizer = None
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     @lru_cache(maxsize=32)
     def _cached_tokenize(self, text: str):

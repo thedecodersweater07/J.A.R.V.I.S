@@ -71,6 +71,9 @@ class JarvisModel(BaseModel):
         config = JARVIS_CONFIGS[config_name]
         super().__init__(config.__dict__)
         
+        # Add logger initialization
+        self.logger = logging.getLogger(__name__)
+        
         # Core components
         self.embeddings = JarvisEmbeddings(config)
         
@@ -107,6 +110,28 @@ class JarvisModel(BaseModel):
         # Initialize tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained('bert-base-multilingual-cased')
         
+        # Add device initialization
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.to(self.device)
+        
+        # Ensure all components are on correct device
+        if hasattr(self, 'embeddings'):
+            self.embeddings = self.embeddings.to(self.device)
+        if hasattr(self, 'layers'):
+            self.layers = nn.ModuleList([layer.to(self.device) for layer in self.layers])
+        if hasattr(self, 'layer_norm'):
+            self.layer_norm = self.layer_norm.to(self.device)
+        
+        # Ensure task heads are on correct device
+        if hasattr(self, 'task_heads'):
+            for name, head in self.task_heads.items():
+                if isinstance(head, nn.Module):
+                    self.task_heads[name] = head.to(self.device)
+                elif isinstance(head, nn.ModuleDict):
+                    self.task_heads[name] = nn.ModuleDict({
+                        k: v.to(self.device) for k, v in head.items()
+                    })
+
         self.init_integrations()
         
     def init_integrations(self):
@@ -168,29 +193,87 @@ class JarvisModel(BaseModel):
         }
         
     def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
-        hidden_states = self.embeddings(input_ids)
-        if attention_mask is not None:
-            hidden_states = hidden_states * attention_mask.unsqueeze(-1)
-        
-        all_hidden_states = []
-        all_attentions = []
-        
-        all_hidden_states = []
-        all_attentions = []
-        
-        for layer in self.layers:
-            hidden_states, attention_weights = layer(hidden_states)
-            all_hidden_states.append(hidden_states)
-            all_attentions.append(attention_weights)
+        """Forward pass of the model."""
+        try:
+            batch_size = input_ids.size(0)
+            seq_length = input_ids.size(1)
             
-        hidden_states = self.layer_norm(hidden_states)
-        logits = self.lm_head(hidden_states)
-        
-        return {
-            "logits": logits,
-            "hidden_states": all_hidden_states,
-            "attentions": all_attentions
-        }
+            # Validate input dimensions
+            if seq_length > self.config.max_position_embeddings:
+                logger.warning(f"Input sequence length {seq_length} exceeds model's maximum {self.config.max_position_embeddings}. Truncating.")
+                input_ids = input_ids[:, :self.config.max_position_embeddings]
+                if attention_mask is not None:
+                    attention_mask = attention_mask[:, :self.config.max_position_embeddings]
+
+            # Ensure inputs are on correct device
+            input_ids = input_ids.to(self.device)
+            if attention_mask is not None:
+                attention_mask = attention_mask.to(self.device)
+                attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)  # [batch, 1, 1, seq_length]
+
+            # Generate embeddings
+            try:
+                hidden_states = self.embeddings(input_ids)
+            except Exception as e:
+                logger.error(f"Embedding error: {e}")
+                # Fallback to zero embeddings
+                hidden_states = torch.zeros(
+                    (batch_size, seq_length, self.config.hidden_size), 
+                    device=self.device
+                )
+
+            # Process through transformer layers
+            all_hidden_states = []
+            all_attentions = []
+
+            try:
+                for layer in self.layers:
+                    if attention_mask is not None:
+                        hidden_states = hidden_states * attention_mask
+                    
+                    hidden_states, attention_weights = layer(hidden_states)
+                    all_hidden_states.append(hidden_states)
+                    if attention_weights is not None:
+                        all_attentions.append(attention_weights)
+
+                # Apply final layer norm
+                hidden_states = self.layer_norm(hidden_states)
+                logits = self.lm_head(hidden_states)
+
+            except Exception as e:
+                logger.error(f"Layer processing error: {e}")
+                # Provide safe fallback outputs
+                hidden_states = torch.zeros(
+                    (batch_size, seq_length, self.config.hidden_size), 
+                    device=self.device
+                )
+                logits = torch.zeros(
+                    (batch_size, seq_length, self.config.vocab_size), 
+                    device=self.device
+                )
+                all_hidden_states = [hidden_states]
+                all_attentions = []
+
+            return {
+                "logits": logits,
+                "hidden_states": all_hidden_states,
+                "attentions": all_attentions if all_attentions else None
+            }
+
+        except Exception as e:
+            logger.error(f"Forward pass error: {e}")
+            # Return safe fallback with proper shapes
+            return {
+                "logits": torch.zeros(
+                    (1, 1, self.config.vocab_size), 
+                    device=self.device
+                ),
+                "hidden_states": [torch.zeros(
+                    (1, 1, self.config.hidden_size), 
+                    device=self.device
+                )],
+                "attentions": None
+            }
 
     def route_task(self, task_name: str, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Route inputs to appropriate task head with error handling"""

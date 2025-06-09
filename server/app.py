@@ -3,11 +3,17 @@ import sys
 import logging
 import uvicorn
 import traceback
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+from pathlib import Path
+
+# Add the project root to the Python path
+project_root = Path(__file__).parent.absolute()
+sys.path.insert(0, str(project_root.parent))
+
+from fastapi import FastAPI, Depends, HTTPException, Security, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from server.websocket_handler import router as websocket_handler_router
 from typing import Dict, Any, Optional, List, Union
 from datetime import datetime, timedelta
 import jwt
@@ -16,7 +22,23 @@ import json
 import asyncio
 import threading
 import time
-from server.security.security_manager import get_password_hash
+from pydantic import BaseModel
+
+# Define AI models
+class AIRequest(BaseModel):
+    query: str
+    request_type: str
+    context: Optional[Dict[str, Any]] = None
+
+class AIResponse(BaseModel):
+    response: Any
+    request_id: str
+    processing_time: float
+    timestamp: str
+
+# Import security models
+from server.models.security import UserCreate, UserResponse, TokenResponse, SecurityStatusResponse
+from server.security.security_manager import SecurityManager
 
 # Configure logging
 logging.basicConfig(
@@ -115,20 +137,30 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def init_middleware(security_manager=None, api_keys=None):
+    """Initialize all middleware before app startup"""
+    # Add CORS middleware first
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
+    # Add security middleware
+    if security_manager:
+        app.add_middleware(SecurityMiddleware, security_manager=security_manager)
+    
+    # Add API key middleware
+    if api_keys:
+        app.add_middleware(APIKeyMiddleware, api_keys=api_keys)
 
 # Import security components
 try:
     from server.security.middleware import SecurityMiddleware, APIKeyMiddleware
     from server.security.security_manager import SecurityManager
-    from server.security.auth import create_auth_dependencies
+    from server.security.auth import create_auth_dependencies, AuthHandler
     from server.security.router import create_security_router
     SECURITY_COMPONENTS_AVAILABLE = True
     logger.info("Security components available")
@@ -168,16 +200,28 @@ except ImportError as e:
         username: str
         password: str
 
-    class AIRequest(BaseModel):
-        query: str
-        context: Optional[Dict[str, Any]] = None
-        request_type: str = "text"  # text, nlp, ml, full
+    class TokenRequest(BaseModel):
+        grant_type: str
+        client_id: Optional[str] = None
+        client_secret: Optional[str] = None
 
-    class AIResponse(BaseModel):
-        response: Union[str, Dict[str, Any]]
-        request_id: str
-        processing_time: float
-        timestamp: str
+    class TokenResponse(BaseModel):
+        access_token: str
+        token_type: str
+        expires_in: int
+
+    class UserResponse(BaseModel):
+        id: str
+        username: str
+        role: str
+
+    class ErrorResponse(BaseModel):
+        error: str
+        error_description: Optional[str] = None
+
+    class StatusResponse(BaseModel):
+        status: str
+        version: str
 
 # Global components
 security_config = None
@@ -208,15 +252,6 @@ def init_components():
             
             # Create auth dependencies
             auth_dependencies = create_auth_dependencies(security_manager)
-            
-            # Add security middleware
-            app.add_middleware(SecurityMiddleware, security_manager=security_manager)
-            
-            # Add API key middleware if API keys are defined
-            api_keys = os.environ.get("API_KEYS", "").split(",")
-            if api_keys and api_keys[0]:
-                api_key_dict = {key: True for key in api_keys}
-                app.add_middleware(APIKeyMiddleware, api_keys=api_key_dict)
             
             logger.info("Security components initialized")
         except Exception as e:
@@ -303,6 +338,11 @@ def get_ai_components():
     global llm_core, model_manager, nlp_processor
     return llm_core, model_manager, nlp_processor
     
+# Helper function for password hashing
+def get_password_hash(password: str) -> str:
+    """Generate password hash"""
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
 # Add default admin user for testing if using legacy routes
 if not HAS_API_ROUTERS:
     # Add the default admin user
@@ -429,19 +469,17 @@ async def get_current_active_user(current_user: Dict[str, Any] = Depends(get_cur
     return current_user
 
 # Routes
-@app.get("/")
-def root():
-    """Root endpoint"""
-    return {
-        "message": "Welcome to JARVIS API Server", 
-        "version": "1.0.0",
-        "status": "online",
-        "timestamp": datetime.now().isoformat(),
-        "docs": "/docs"
-    }
+from fastapi.responses import FileResponse
+from pathlib import Path
 
-@app.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+@app.get("/")
+async def root():
+    """Root endpoint - serves the backup screen"""
+    web_dir = Path(__file__).parent / "web"
+    return FileResponse(web_dir / "index.html")
+
+@app.post("/token")
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """Login endpoint"""
     # Check if account is locked
     username = form_data.username
@@ -682,18 +720,18 @@ async def startup_event():
         
         # Include API routers if available
         if HAS_API_ROUTERS:
-            # Include API routers
             app.include_router(auth.router)
             app.include_router(ai.router)
             app.include_router(system.router)
+            app.include_router(websocket_handler_router)
             logger.info("API routers registered")
             
         # Include security router if available
-        if SECURITY_COMPONENTS_AVAILABLE and security_manager and auth_dependencies:
-            # Create and include security router
+        if SECURITY_COMPONENTS_AVAILABLE and security_manager:
+            # Create and include security router with proper auth handler
             security_router = create_security_router(
                 security_manager=security_manager,
-                auth_handler=auth_dependencies
+                auth_handler=AuthHandler(security_manager)  # Create new AuthHandler instance
             )
             app.include_router(security_router)
             logger.info("Security router registered")
@@ -718,7 +756,7 @@ async def shutdown_event():
         logger.error(f"Error during shutdown: {e}")
         logger.error(traceback.format_exc())
 
-def start_server(host="0.0.0.0", port=8000):
+def start_server(host="127.0.0.1", port=8000):
     """Start the server"""
     uvicorn.run(app, host=host, port=port)
 

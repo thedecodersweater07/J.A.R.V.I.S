@@ -38,29 +38,16 @@ class ImGuiManager:
         try:
             from imgui.integrations.glfw import GlfwRenderer
             
-            # Store the window handle
+            # Store window handle
             self.window = window_handle
             
-            # Create a fresh ImGui context
+            # Create fresh ImGui context
             self.context = imgui.create_context()
             imgui.set_current_context(self.context)
             
-            # Initialize the GLFW implementation if we have a window
             if self.window:
                 self.impl = GlfwRenderer(self.window)
-                
-                # Configure ImGui style
-                style = imgui.get_style()
-                style.window_rounding = 5.0
-                style.frame_rounding = 3.0
-                style.scrollbar_rounding = 5.0
-                style.frame_border_size = 1.0
-                
-                # Set dark theme with better contrast
-                imgui.style_colors_dark()
-                colors = style.colors
-                colors[imgui.COLOR_TEXT] = (0.95, 0.95, 0.95, 1.00)
-                colors[imgui.COLOR_WINDOW_BACKGROUND] = (0.10, 0.10, 0.12, 1.00)
+                self._setup_style()
                 
             self.is_initialized = True
             return True
@@ -68,6 +55,22 @@ class ImGuiManager:
         except Exception as e:
             logger.error(f"ImGui initialization error: {e}")
             return False
+            
+    def _setup_style(self):
+        """Configure ImGui style"""
+        style = imgui.get_style()
+        style.window_rounding = 5.0
+        style.frame_rounding = 3.0
+        style.scrollbar_rounding = 5.0
+        style.grab_rounding = 3.0
+        style.frame_border_size = 1.0
+        
+        # Set dark theme with better contrast
+        imgui.style_colors_dark()
+        colors = style.colors
+        colors[imgui.COLOR_TEXT] = (0.95, 0.95, 0.95, 1.00)
+        colors[imgui.COLOR_WINDOW_BACKGROUND] = (0.10, 0.10, 0.12, 1.00)
+        colors[imgui.COLOR_TITLE_BACKGROUND_ACTIVE] = (0.15, 0.15, 0.17, 1.00)
     
     def set_window(self, window_handle) -> bool:
         """Set or update the GLFW window handle"""

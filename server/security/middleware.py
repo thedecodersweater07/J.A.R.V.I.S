@@ -21,14 +21,21 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.security_manager = security_manager
         self.request_counts = {}
-        self.rate_limit = 100  # requests per minute
-        self.rate_window = 60  # seconds
-        self.sensitive_headers = ["authorization", "cookie"]
-        self.blocked_ips = set()
-        self.suspicious_patterns = [
-            "../../", "SELECT ", "UNION ", "<script>", 
-            "../etc/passwd", "/bin/bash", "eval(", "exec("
-        ]
+        self._initialize_security()
+        
+    def _initialize_security(self):
+        """Initialize security components lazily"""
+        if not self.security_manager:
+            logger.warning("No security manager provided, using default configuration")
+            self.rate_limit = 100
+            self.rate_window = 60
+            self.blocked_ips = set()
+        else:
+            config = self.security_manager.get_config()
+            self.rate_limit = config.get("rate_limit", 100)
+            self.rate_window = config.get("rate_window", 60)
+            self.blocked_ips = set()
+            
         logger.info("Security middleware initialized")
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:

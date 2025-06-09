@@ -46,6 +46,14 @@ class NLPProcessorAdapter:
             self.logger.error(f"Failed to initialize NLPProcessor: {e}")
             self.processor = self._create_fallback_processor()
 
+    def _create_fallback_processor(self) -> NLPProcessor:
+        """Create a fallback processor with minimal model"""
+        try:
+            return NLPProcessor(model_name="xx_ent_wiki_sm")
+        except Exception as e:
+            self.logger.error(f"Failed to create fallback processor: {e}")
+            raise RuntimeError("Could not initialize NLP processor with any model")
+
     def initialize(self):
         """Initialize the NLP processor"""
         try:

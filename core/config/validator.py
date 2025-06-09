@@ -28,8 +28,30 @@ class ConfigValidator:
         return True
         
     def _validate_llm_config(self, config: Dict[str, Any]) -> bool:
-        required = ["model", "max_length"]
-        return all(key in config for key in required)
+        """Validate LLM configuration with defaults"""
+        if not isinstance(config, dict):
+            return False
+            
+        # Check for minimum required fields
+        required = {
+            "model": {
+                "name": str,
+                "type": str
+            }
+        }
+        
+        # Validate model section
+        if "model" not in config:
+            return False
+            
+        model_config = config["model"]
+        if not isinstance(model_config, dict):
+            return False
+            
+        if "name" not in model_config or "type" not in model_config:
+            return False
+            
+        return True
         
     def _validate_ui_config(self, config: Dict[str, Any]) -> bool:
         required = ["width", "height", "title", "theme"]

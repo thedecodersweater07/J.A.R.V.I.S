@@ -41,6 +41,7 @@ class AICoordinator:
         self.pipelines = {}
         self.initialized = False
         self.initialization_errors = {}
+        self._components = {}  # Add components dictionary
         
         # Initialize component registry
         self._init_component_registry()
@@ -140,26 +141,27 @@ class AICoordinator:
                              ", ".join([f"{k}: {v}" for k, v in self.initialization_errors.items()]))
         
     def _init_component(self, name: str, component_info: Dict[str, Any]) -> bool:
-        """
-        Initialize a specific AI component.
-        
-        Returns:
-            bool: True if initialization was successful, False otherwise
-        """
+        """Initialize a specific AI component with improved error handling"""
         success = False
         try:
             config_key = component_info["config_key"]
             component_config = self.config.get(config_key, {})
-            component_class = component_info["class"]
             
-            # Handle different initialization parameters
-            if name == "nlp":
-                # Special handling for NLP processor
-                model_name = component_config.get("model", "nl_core_news_sm")
-                component_instance = component_class(model_name=model_name)
-            else:
-                # Default initialization with config
-                component_instance = component_class(config=component_config)
+            # Apply default/fallback config if needed
+            if not component_config and "fallback_config" in component_info:
+                component_config = component_info["fallback_config"]
+                self.logger.info(f"Using fallback config for {name}")
+
+            # Initialize component
+            component_class = component_info["class"]
+            component_instance = component_class(config=component_config)
+            
+            # Verify component initialization
+            if hasattr(component_instance, 'initialize'):
+                init_success = component_instance.initialize()
+                if not init_success:
+                    self.logger.error(f"Component {name} initialization returned False")
+                    return False
             
             # Store the initialized component
             component_info["instance"] = component_instance
@@ -169,32 +171,20 @@ class AICoordinator:
             success = True
             
         except Exception as e:
-            error_msg = f"Failed to initialize component {name}: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
+            self.logger.error(f"Failed to initialize component {name}: {str(e)}", exc_info=True)
             self.initialization_errors[name] = str(e)
             
-            # Try fallback initialization if available
             if "fallback_config" in component_info:
                 try:
-                    self.logger.info(f"Attempting fallback initialization for {name}")
                     fallback_config = component_info["fallback_config"]
                     component_class = component_info["class"]
                     component_instance = component_class(config=fallback_config)
-                    
-                    # Store the initialized component
-                    component_info["instance"] = component_instance
+                    component_info["instance"] = component_instance 
                     self.components[name] = component_instance
-                    
-                    self.logger.info(f"Successfully initialized {name} component with fallback config")
                     success = True
                 except Exception as fallback_error:
-                    self.logger.error(f"Fallback initialization for {name} also failed: {fallback_error}")
-                    # Component will remain uninitialized
-            
-            if component_info["required"] and not success:
-                self.logger.error(f"Required component {name} could not be initialized")
-                # We don't raise here to allow other components to initialize
-                
+                    self.logger.error(f"Fallback initialization for {name} failed: {fallback_error}")
+        
         return success
     
     def get_component(self, name: str) -> Any:
@@ -379,14 +369,14 @@ class AICoordinator:
         return status
     
     def shutdown(self):
-        """Shutdown all AI components gracefully"""
+        """Shutdown AI coordinator and all components"""
         try:
-            # Shutdown components in reverse initialization order
-            for component_name in reversed(list(self._components.keys())):
-                component = self._components.get(component_name)
-                if hasattr(component, 'shutdown'):
-                    component.shutdown()
+            for name, component in self._components.items():
+                try:
+                    if hasattr(component, 'shutdown'):
+                        component.shutdown()
+                except Exception as e:
+                    self.logger.error(f"Error shutting down component {name}: {e}")
             self._components.clear()
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Error during AI coordinator shutdown: {e}")
+            self.logger.error(f"Error during AI coordinator shutdown: {e}")

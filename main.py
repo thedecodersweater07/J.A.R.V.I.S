@@ -4,6 +4,8 @@ import json
 import signal
 import logging
 import threading
+import time
+import psutil  # Add psutil import
 
 # Suppress TensorFlow oneDNN warnings
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
@@ -40,7 +42,7 @@ try:
     from core.ai.resource_manager import ResourceManager
 except ImportError:
     print("New AI architecture components not found, using legacy components")
-# Import optional components with error handling
+# Try to import optional components with error handling
 APIClient = None
 server_launcher = None
 
@@ -50,10 +52,9 @@ except ImportError:
     print("APIClient not found, API features will be disabled")
 
 try:
-    from server.launcher import start_server
-    server_launcher = start_server
-except ImportError:
-    print("Server launcher not found, server features will be disabled")
+    from server.launcher import start_server as server_launcher
+except ImportError as e:
+    print("Server launcher not found, server features will be disabled", e)
 
 # Set up logger
 logger = get_logger(__name__)
@@ -69,6 +70,10 @@ class JARVIS:
         self.api_client = None
         
         try:
+            # Verify system ready
+            if not self._verify_system_ready():
+                raise RuntimeError("System not ready")
+                
             # Run installation/configuration if needed
             if not Path("config/installed.flag").exists():
                 from core.setup.installer import SystemInstaller
@@ -76,8 +81,11 @@ class JARVIS:
                 installer.install()
                 Path("config/installed.flag").touch()
                 
-            # Setup logging first
-            setup_logging(log_dir="logs", level="DEBUG" if "--debug" in sys.argv else "INFO")
+            # Setup logging first with proper parameters
+            setup_logging(
+                level="DEBUG" if "--debug" in sys.argv else "INFO",
+                log_dir="logs"
+            )
             
             # Initialize config manager first
             self.config_validator = ConfigValidator()
@@ -106,6 +114,30 @@ class JARVIS:
 
         # Set OpenGL config after loading main config
         self.config["use_opengl"] = OPENGL_AVAILABLE and self.config.get("use_opengl", True)
+
+    def _verify_system_ready(self) -> bool:
+        """Verify system is ready for initialization"""
+        try:
+            # Check for essential directories
+            required_dirs = ["config", "data", "logs", "models"]
+            for d in required_dirs:
+                Path(d).mkdir(exist_ok=True)
+                
+            # Verify resource availability
+            mem = psutil.virtual_memory()
+            if mem.available < 2 * 1024 * 1024 * 1024:  # 2GB minimum
+                self.logger.warning("Low memory available")
+                
+            # Check GPU if enabled
+            if self.config.get("system", {}).get("gpu_enabled", False):
+                if not torch.cuda.is_available():
+                    self.logger.warning("GPU enabled but not available")
+                    
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"System verification failed: {e}")
+            return False
 
     def _get_default_config(self) -> Dict[str, Any]:
         """Get default configuration settings"""
@@ -200,6 +232,33 @@ class JARVIS:
     def _init_core_components(self):
         """Initialize core AI components"""
         try:
+            # Initialize LLM with validated config
+            llm_config = {
+                "model": {
+                    "name": "gpt2",
+                    "torch_dtype": "auto",
+                    "use_cache": True
+                },
+                "auto_load": True
+            }
+            
+            try:
+                from llm.core.config import LLMConfigValidator
+                llm_config = LLMConfigValidator.validate_and_fix(llm_config)
+                self.llm = LLMCore(config=llm_config)
+                logger.info("LLM core initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize primary LLM: {e}")
+                # Try fallback with minimal config
+                fallback_config = {
+                    "model": {
+                        "name": "distilgpt2"
+                    },
+                    "auto_load": True
+                }
+                fallback_config = LLMConfigValidator.validate_and_fix(fallback_config)
+                self.llm = LLMCore(config=fallback_config)
+        
             # Initialize AI Coordinator and related components first
             from core.ai.coordinator import AICoordinator
             from core.ai.model_registry import ModelRegistry
@@ -237,13 +296,30 @@ class JARVIS:
                         
             # Initialize LLM with config
             try:
+                llm_config = {
+                    "model": {
+                        "name": "gpt2",
+                        "low_cpu_mem_usage": True,
+                        "torch_dtype": "auto",
+                        "device_map": "auto"
+                    },
+                    "auto_load": True
+                }
                 self.llm = LLMCore(config=llm_config)
+                logger.info("LLM core initialized")
             except Exception as e:
-                self.logger.error(f"Failed to initialize primary LLM: {e}")
+                logger.error(f"Failed to initialize primary LLM: {e}")
                 # Try fallback configuration
-                fallback_config = {"model": {"name": "nl_core_news_sm", "type": "spacy"}}
+                fallback_config = {
+                    "model": {
+                        "name": "distilgpt2",
+                        "low_cpu_mem_usage": True,
+                        "device_map": "auto"
+                    },
+                    "auto_load": True
+                }
                 self.llm = LLMCore(config=fallback_config)
-                
+            
             # Initialize AI Coordinator last, after all components are ready
             # Skip AI coordinator initialization for now to avoid errors
             self.logger.info("Skipping AI Coordinator initialization for compatibility")
@@ -558,26 +634,41 @@ class JARVIS:
             return
 
         try:
+            import glfw
+            if not glfw.init():
+                self.logger.error("Could not initialize GUI system")
+                return
+                
             self.logger.info("Starting main loop...")
+            
+            # Create event processing loop
             while not self.screen.should_quit:
                 try:
-                    if not self.screen.process_frame({
+                    # Process events with timeout to prevent blocking
+                    status_data = {
                         "timestamp": datetime.now(),
                         "status": "running",
                         "metrics": self._get_system_metrics()
-                    }):
-                        break  # Exit if window was closed
+                    }
+                    
+                    # Use non-blocking event processing with timeout
+                    if not self.screen.process_frame(status_data, timeout_ms=100):
+                        # Allow other threads to run
+                        time.sleep(0.01)
+                        continue
+                        
                 except Exception as e:
                     self.logger.error(f"Error in main loop: {e}")
                     self.error_count += 1
-                    if self.error_count > 10:
-                        raise RuntimeError("Too many errors in main loop")
+                    if self.error_count >= self.max_errors:
+                        self.logger.critical("Too many errors, shutting down")
+                        break
+                    time.sleep(1)  # Brief pause after error
                     
         except KeyboardInterrupt:
             self.logger.info("Received shutdown signal")
         except Exception as e:
             self.logger.critical(f"Fatal error in main loop: {e}", exc_info=True)
-            raise
         finally:
             self.shutdown()
             self.logger.info("JARVIS shutdown complete")

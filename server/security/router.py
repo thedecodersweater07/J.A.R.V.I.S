@@ -4,35 +4,13 @@ Provides security-related API endpoints
 """
 import logging
 from typing import Dict, Any, List, Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from pydantic import BaseModel, Field
+from server.models.security import UserCreate, UserResponse, TokenResponse, SecurityStatusResponse
 
 logger = logging.getLogger("jarvis-server.security.router")
-
-# Models
-class UserCreate(BaseModel):
-    username: str
-    password: str
-    role: str = "user"
-
-class UserResponse(BaseModel):
-    id: str
-    username: str
-    role: str
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str
-    user_id: str
-    username: str
-    role: str
-
-class SecurityStatusResponse(BaseModel):
-    status: str
-    active_users: int
-    locked_accounts: int
-    suspicious_ips: int
 
 # Create router factory function
 def create_security_router(security_manager, auth_handler):

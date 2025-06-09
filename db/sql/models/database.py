@@ -1,10 +1,12 @@
 """Database connection utility"""
 import os
 import sqlite3
-from typing import Optional, Union, Any
+from typing import Union, Any
 from pathlib import Path
-import json
 from functools import lru_cache
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     from pymongo import MongoClient
@@ -17,12 +19,23 @@ class Database:
     _instance = None
     
     def __init__(self):
-        self.mongo_client: Optional[Any] = None
+        if Database._instance is not None:
+            raise RuntimeError("Use get_instance() instead")
+        self.client = None
+        self.mongo_client = None
         self.sqlite_connections = {}
-        self.db_root = Path(__file__).parent.parent / "data" / "db"
-        self.db_root.mkdir(parents=True, exist_ok=True)
+        self.db_path = str(Path(__file__).parent.parent.parent.parent / "data" / "db")
+        self._ensure_directories()
         self._init_connection_pool()
-        
+        self._connect()
+
+    def _ensure_directories(self):
+        """Ensure database directories exist"""
+        base_path = Path(self.db_path)
+        base_path.mkdir(parents=True, exist_ok=True)
+        for subdir in ["auth", "knowledge", "memory", "feedback", "cache"]:
+            (base_path / subdir).mkdir(exist_ok=True)
+
     def _init_connection_pool(self):
         """Initialize connection pool for better performance"""
         if MONGO_AVAILABLE:
@@ -36,36 +49,35 @@ class Database:
     @classmethod
     def get_instance(cls):
         if cls._instance is None:
-            cls._instance = Database()
+            cls._instance = cls()
         return cls._instance
-    
-    def connect(self, connection_string: str = "mongodb://localhost:27017/"):
-        """Connect to database (MongoDB if available, otherwise SQLite)"""
-        if MONGO_AVAILABLE:
-            try:
-                self.mongo_client = MongoClient(connection_string)
-                return self.mongo_client
-            except Exception as e:
-                print(f"MongoDB connection failed: {e}. Using SQLite as fallback.")
-                
-        # SQLite fallback
-        return self._get_sqlite_connection("main")
-        
+
     def get_client(self) -> Union[Any, sqlite3.Connection]:
         """Get database client"""
         if MONGO_AVAILABLE and self.mongo_client:
             return self.mongo_client
         
-        if not self.sqlite_connections.get("main"):
-            return self._get_sqlite_connection("main")
-            
-        return self.sqlite_connections["main"]
+        if not self.client:
+            self._connect()
+        return self.client
+        
+    def _connect(self):
+        """Initialize database connection"""
+        try:
+            db_path = Path(self.db_path) / "main.db"
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            self.client = sqlite3.connect(str(db_path))
+            self.client.row_factory = sqlite3.Row
+        except Exception as e:
+            logger.error(f"Database connection failed: {e}")
         
     def _get_sqlite_connection(self, name: str) -> sqlite3.Connection:
         """Get or create SQLite connection"""
         if name not in self.sqlite_connections:
-            db_path = self.db_root / f"{name}.db"
+            db_path = Path(self.db_path) / f"{name}" / f"{name}.db"
+            db_path.parent.mkdir(parents=True, exist_ok=True)
             self.sqlite_connections[name] = sqlite3.connect(str(db_path))
+            self.sqlite_connections[name].row_factory = sqlite3.Row
             self._init_sqlite_schema(self.sqlite_connections[name])
         return self.sqlite_connections[name]
         

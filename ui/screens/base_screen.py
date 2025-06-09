@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +19,12 @@ class BaseScreen(ABC):
         
     @abstractmethod
     def init(self) -> bool:
+        """Initialize the screen"""
         pass
         
     @abstractmethod
     def render(self, frame_data: Dict[str, Any]) -> None:
+        """Render the screen"""
         pass
         
     @abstractmethod
@@ -42,7 +44,7 @@ class BaseScreen(ABC):
         pass
         
     def cleanup(self) -> None:
-        """Cleanup resources - override in subclasses if needed"""
+        """Clean up resources"""
         self.initialized = False
         
     def set_parent(self, parent):

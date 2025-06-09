@@ -13,7 +13,10 @@ class NLPPipeline:
         self.nlp = spacy.load("nl_core_news_lg")
         self.tokenizer = DutchTokenizer()
         self.parser = DutchParser(self.nlp)
-        self.ner = DutchNER(self.nlp)
+        
+        # Initialize NER with proper config
+        ner_config = {"nlp": self.nlp}
+        self.ner = DutchNER(config=ner_config)
         
         # Load specialized models
         self.sentiment = SentimentAnalyzer()

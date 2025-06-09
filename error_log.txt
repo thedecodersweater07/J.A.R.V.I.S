@@ -1,9 +1,9 @@
 Error during JARVIS initialization or run: setup_logging() got an unexpected keyword argument 'log_dir'
 
 Traceback (most recent call last):
-  File "c:\nova_industrie\jarvis\main.py", line 647, in <module>
+  File "c:\nova_industrie\jarvis\main.py", line 704, in <module>
     jarvis = JARVIS()
              ^^^^^^^^
   File "c:\nova_industrie\jarvis\main.py", line 80, in __init__
-    setup_logging(log_dir="logs", level="DEBUG" if "--debug" in sys.argv else "INFO")
+    setup_logging(
 TypeError: setup_logging() got an unexpected keyword argument 'log_dir'

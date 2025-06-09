@@ -33,36 +33,29 @@ class LoginScreen(BaseScreen):
         pass  # Login handled through imgui interface
 
     def render(self, frame_data: Dict[str, Any]) -> None:
-        imgui.set_next_window_size(400, 200)
-        # Center window with GLFW
-        window = glfw.get_current_context() if hasattr(glfw, 'get_current_context') else None
-        if window:
-            monitor = glfw.get_primary_monitor()
-            if monitor:
-                vidmode = glfw.get_video_mode(monitor)
-                if vidmode:
-                    x = int((vidmode.size.width - 400) / 2)
-                    y = int((vidmode.size.height - 200) / 2)
-                    glfw.set_window_pos(window, x, y)
+        if not self.initialized:
+            return
 
-        
-        imgui.begin("Nova Industries Security", flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)
-        
-        try:
-            if self._check_lockout():
-                return
+        imgui_manager = frame_data.get("imgui_manager")
+        if not imgui_manager:
+            return
 
-            self._render_logo()
-            self._render_inputs()
-            self._render_login_button()
-            self._render_error()
-            
-        except Exception as e:
-            logger.error(f"Error rendering login screen: {e}")
-            self.error_message = "System error occurred"
-            
-        finally:
-            imgui.end()
+        with imgui_manager.window("Login", flags=imgui.WINDOW_NO_RESIZE):
+            try:
+                if self._check_lockout():
+                    return
+
+                self._render_logo()
+                self._render_inputs()
+                self._render_login_button()
+                self._render_error()
+                
+            except Exception as e:
+                logger.error(f"Error rendering login screen: {e}")
+                self.error_message = "System error occurred"
+                
+            finally:
+                imgui.end()
 
     def _setup_styling(self):
         """Initialize custom styling for login screen"""
