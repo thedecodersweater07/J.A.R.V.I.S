@@ -390,112 +390,169 @@
             }
         }
 
-        // Show message
+        // Show message to user
         function showMessage(message, type = 'error') {
-            const errorDiv = document.getElementById('errorMessage');
-            const successDiv = document.getElementById('successMessage');
+            const messageElement = type === 'error' ? document.getElementById('errorMessage') : document.getElementById('successMessage');
+            const otherMessageElement = type === 'error' ? document.getElementById('successMessage') : document.getElementById('errorMessage');
             
-            // Hide both first
-            errorDiv.style.display = 'none';
-            successDiv.style.display = 'none';
+            // Hide the other type of message
+            otherMessageElement.style.display = 'none';
+            otherMessageElement.style.opacity = '0';
             
+            // Set and show the message
+            messageElement.textContent = message;
+            messageElement.style.display = 'block';
+            
+            // Trigger reflow
+            void messageElement.offsetHeight;
+            
+            // Fade in
+            messageElement.style.opacity = '1';
+            
+            // Auto-hide after 5 seconds
+            clearTimeout(messageElement._timeout);
+            messageElement._timeout = setTimeout(() => {
+                messageElement.style.opacity = '0';
+                setTimeout(() => {
+                    messageElement.style.display = 'none';
+                }, 300);
+            }, 5000);
+            
+            // Also log to console for debugging
             if (type === 'error') {
-                errorDiv.textContent = message;
-                errorDiv.style.display = 'block';
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 5000);
+                console.error('Login error:', message);
             } else {
-                successDiv.textContent = message;
-                successDiv.style.display = 'block';
-                setTimeout(() => {
-                    successDiv.style.display = 'none';
-                }, 3000);
+                console.log('Login success:', message);
             }
         }
 
-        // Handle login
+        // Handle login form submission
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const username = document.getElementById('username').value;
+            const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
             const loginBtn = document.getElementById('loginBtn');
-            const loadingSpinner = document.getElementById('loadingSpinner');
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+            
+            // Hide any existing messages
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
             
             // Basic validation
             if (!username || !password) {
-                showMessage('Please enter both username and password', 'error');
+                showMessage('Please enter both username and password');
                 return;
             }
-
+            
             // Show loading state
             loginBtn.disabled = true;
+            loginBtn.innerHTML = 'Authenticating...';
             loginBtn.classList.add('loading');
-            loginBtn.textContent = 'Authenticating...';
-            loadingSpinner.style.display = 'block';
-
+            
             try {
-                // Simulate authentication delay
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Prepare form data for URL-encoded format
+                const formData = new URLSearchParams();
+                formData.append('username', username);
+                formData.append('password', password);
                 
-                // Demo authentication (accept specific credentials or any with "admin")
-                if ((username === 'jarvis' && password === 'stark2024') || 
-                    username.toLowerCase().includes('admin') ||
-                    password === 'demo123') {
+                // Make login request to the backend
+                const response = await fetch('/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: formData,
+                    credentials: 'include'  // Important for cookies
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Store the access token in localStorage
+                    if (data.access_token) {
+                        localStorage.setItem('access_token', data.access_token);
+                    }
                     
-                    showMessage('Authentication successful!', 'success');
+                    // Show success message
+                    showMessage('Login successful! Redirecting...', 'success');
                     
-                    // Hide form and show welcome screen
+                    // Redirect to dashboard after a short delay
                     setTimeout(() => {
-                        document.getElementById('loginForm').style.display = 'none';
-                        document.getElementById('welcomeScreen').style.display = 'block';
+                        window.location.href = '/dashboard';
                     }, 1000);
-                    
                 } else {
-                    showMessage('Invalid credentials. Try: jarvis/stark2024 or any username with "admin"', 'error');
+                    // Handle API error response
+                    const errorMsg = data.detail || 'Invalid username or password';
+                    throw new Error(Array.isArray(errorMsg) ? errorMsg[0].msg : errorMsg);
                 }
-                
-            } catch (error) {
-                showMessage('Authentication failed. Please try again.', 'error');
+            } catch (err) {
+                console.error('Login error:', err);
+                showMessage(err.message || 'An error occurred. Please try again.');
             } finally {
                 // Reset button state
                 loginBtn.disabled = false;
+                loginBtn.innerHTML = 'Login';
                 loginBtn.classList.remove('loading');
-                loginBtn.textContent = 'Login to JARVIS';
-                loadingSpinner.style.display = 'none';
             }
         });
 
-        // Go to dashboard (placeholder function)
+        // Go to dashboard
         function goToDashboard() {
-            showMessage('Redirecting to JARVIS dashboard...', 'success');
-            setTimeout(() => {
-                // In a real application, this would redirect to the dashboard
-                alert('Dashboard would load here! This is a demo interface.');
-            }, 1500);
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                showMessage('Not authenticated. Please log in again.', 'error');
+                return;
+            }
+            
+            // Redirect to dashboard
+            window.location.href = '/dashboard';
         }
 
-        // Add some interactive effects
-        document.querySelectorAll('input').forEach(input => {
-            input.addEventListener('focus', function() {
-                this.parentElement.style.transform = 'translateX(5px)';
-            });
-            
-            input.addEventListener('blur', function() {
-                this.parentElement.style.transform = 'translateX(0)';
-            });
-        });
+        // Check if user is already logged in
+        async function checkAuth() {
+            try {
+                // Check for token in cookies or localStorage
+                const token = localStorage.getItem('access_token');
+                if (!token) return;
+                
+                // Verify token with backend
+                const response = await fetch('/api/verify-token', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'include'  // Important for cookies
+                });
+                
+                if (response.ok) {
+                    // Token is valid, redirect to dashboard
+                    window.location.href = '/dashboard';
+                } else {
+                    // Token is invalid, remove it
+                    localStorage.removeItem('access_token');
+                    
+                    // If there's a refresh token flow, you could implement it here
+                    // For now, we'll just log the user out
+                    await fetch('/logout', {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                }
+            } catch (err) {
+                console.error('Auth check error:', err);
+                localStorage.removeItem('access_token');
+            }
+        }
 
         // Initialize on page load
         window.addEventListener('DOMContentLoaded', function() {
             createParticles();
             checkServerStatus();
+            checkAuth();
             
-            // Add some startup sound effect simulation
-            setTimeout(() => {
-                console.log('JARVIS system initialized');
-            }, 1000);
+            console.log('JARVIS login page initialized');
         });
 
         // Add keyboard shortcut (Ctrl+Enter to login)

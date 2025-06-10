@@ -9,11 +9,13 @@ from pathlib import Path
 project_root = Path(__file__).parent.absolute()
 sys.path.insert(0, str(project_root.parent))
 
-from fastapi import FastAPI, Depends, HTTPException, Security, status
+from fastapi import FastAPI, Depends, HTTPException, Security, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from server.websocket_handler import router as websocket_handler_router
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.websockets import WebSocket
 from typing import Dict, Any, Optional, List, Union
 from datetime import datetime, timedelta
 import jwt
@@ -22,7 +24,10 @@ import json
 import asyncio
 import threading
 import time
+import os
+from pathlib import Path
 from pydantic import BaseModel
+from dataclasses import dataclass, field
 
 # Define AI models
 class AIRequest(BaseModel):
@@ -47,6 +52,51 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger("jarvis-server")
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="JARVIS Server",
+    description="JARVIS AI Assistant Server",
+    version="1.0.0",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Security configuration
+@dataclass
+class SecurityConfig:
+    jwt_secret: str = "your-secret-key-should-be-in-env-vars"
+    token_expiry_hours: int = 12
+    password_min_length: int = 8
+    max_login_attempts: int = 3
+    lockout_duration_minutes: int = 15
+    allowed_roles: List[str] = field(default_factory=lambda: ["admin", "user", "guest"])
+    role_permissions: Dict[str, List[str]] = field(
+        default_factory=lambda: {
+            "admin": ["all"],
+            "user": ["read", "write", "execute"],
+            "guest": ["read"]
+        }
+    )
+
+# Initialize security config
+security_config = SecurityConfig()
+
+# OAuth2 scheme for token authentication
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# User store (temporary, replace with database)
+user_store = {}
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -79,28 +129,58 @@ try:
     from security.models.user import User
 except ImportError:
     logger.warning("User model not found, using default")
-    from dataclasses import dataclass
-    from datetime import datetime
-    from typing import Optional, Dict, List
-    
-    @dataclass
     class User:
-        id: str
-        username: str
-        password_hash: str
-        role: str = "user"
-        created_at: datetime = datetime.now()
-        last_login: Optional[datetime] = None
-        status: str = "active"
-        
-        @property
-        def is_active(self) -> bool:
+        def __init__(self, username: str, password_hash: str, role: str = "user"):
+            import uuid
+            self.id = str(uuid.uuid4())
+            self.username = username
+            self.password_hash = password_hash
+            self.role = role
+            self.created_at = datetime.now()
+            self.last_login = None
+            self.status = "active"
+            
+        def is_active(self):
             return self.status == "active"
 
-# Try to import optional components
+# Add default admin user if not exists
+if not user_store.get("admin"):
+    user_store["admin"] = User(
+        username="admin",
+        password_hash=bcrypt.hashpw("admin".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
+        role="admin"
+    )
+
+# Initialize optional components
 LLMCore = None
 ModelManager = None
 NLPProcessor = None
+
+# Authentication functions
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against a hash."""
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode('utf-8'),
+            hashed_password.encode('utf-8')
+        )
+    except Exception as e:
+        logger.error(f"Password verification failed: {e}")
+        return False
+
+def get_password_hash(password: str) -> str:
+    """Generate a password hash."""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """Create a JWT access token."""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(hours=12)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, security_config.jwt_secret, algorithm="HS256")
 DatabaseManager = None
 
 try:
@@ -142,10 +222,12 @@ def init_middleware(security_manager=None, api_keys=None):
     # Add CORS middleware first
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept"],
+        expose_headers=["Content-Disposition"],
+        max_age=600,
     )
     
     # Add security middleware
@@ -347,74 +429,25 @@ def get_password_hash(password: str) -> str:
 if not HAS_API_ROUTERS:
     # Add the default admin user
     if not user_store:
-        user_store["admin"] = {
-            "id": "1",
-            "username": "admin",
-            "password_hash": get_password_hash("admin"),
-            "role": "admin",
-            "is_active": True
-        }
+        user_store["admin"] = User(
+            username="admin",
+            password_hash=bcrypt.hashpw("admin".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
+            role="admin"
+        )
         logger.info("Added default admin user")
 
 # Helper functions for legacy routes
-def get_user(username: str) -> Optional[Dict[str, Any]]:
-    """Get user from store"""
-    if username in user_store:
-        return user_store[username]
-    return None
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password against hash"""
-    try:
-        return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
-    except Exception as e:
-        logger.error(f"Password verification error: {e}")
-        return False
-
-def get_password_hash(password: str) -> str:
-    """Generate password hash"""
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-
-# Function to create a new user
-def create_new_user(username: str, password: str, role: str = "user") -> Dict[str, Any]:
-    """Create a new user and add to user store"""
-    try:
-        user_id = f"user_{len(user_store)}"
-        password_hash = get_password_hash(password)
-        
-        user_store[username] = {
-            "id": user_id,
-            "username": username,
-            "password_hash": password_hash,
-            "role": role,
-            "is_active": True,
-            "created_at": datetime.now()
-        }
-        logger.info(f"Created new user: {username} with role: {role}")
-        return user_store[username]
-    except Exception as e:
-        logger.error(f"Failed to create user {username}: {e}")
-        return None
-
-# Helper functions
-def get_user(username: str) -> Optional[Dict[str, Any]]:
+def get_user(username: str):
     """Get user from store or database"""
-    if username in user_store:
-        return user_store[username]
-    
-    if db_manager:
-        # Try to get from database
-        try:
-            user = db_manager.get_user(username)
-            if user:
-                return {
-                    "id": user.id,
-                    "username": user.username,
-                    "password_hash": user.password_hash,
-                    "role": user.role
-                }
-        except Exception as e:
-            logger.error(f"Database error getting user: {e}")
+    if not username:
+        return None
+        
+    # Try to get from user store
+    user = user_store.get(username)
+    if user:
+        return user
+        
+    # Try to get from database if available
     
     return None
 
@@ -468,70 +501,275 @@ async def get_current_active_user(current_user: Dict[str, Any] = Depends(get_cur
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
-# Routes
-from fastapi.responses import FileResponse
-from pathlib import Path
+# Setup static files and templates
+app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "web")), name="static")
+templates = Jinja2Templates(directory=str(Path(__file__).parent / "web"))
 
-@app.get("/")
-async def root():
-    """Root endpoint - serves the backup screen"""
-    web_dir = Path(__file__).parent / "web"
-    return FileResponse(web_dir / "index.html")
+# Routes
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request, error: Optional[str] = None, message: Optional[str] = None):
+    """
+    Serve the login page with optional error and success messages
+    
+    Args:
+        request: The FastAPI request object
+        error: Optional error message to display
+        message: Optional success message to display
+        
+    Returns:
+        HTMLResponse: The login page template
+    """
+    # Check if user is already authenticated
+    token = request.cookies.get("access_token") or request.headers.get("authorization", "").replace("Bearer ", "")
+    if token:
+        try:
+            # Verify the token
+            payload = jwt.decode(
+                token,
+                security_config.jwt_secret if hasattr(security_config, 'jwt_secret') else "your-secret-key-should-be-in-env-vars",
+                algorithms=["HS256"]
+            )
+            if payload.get("sub"):
+                # User is authenticated, redirect to dashboard
+                from fastapi.responses import RedirectResponse
+                return RedirectResponse(url="/dashboard")
+        except (jwt.PyJWTError, Exception):
+            # Token is invalid, clear it and show login page
+            pass
+    
+    # Show login page with any error/message
+    return templates.TemplateResponse(
+        "login_page.html",
+        {
+            "request": request,
+            "error": error,
+            "message": message
+        }
+    )
 
 @app.post("/token")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    """Login endpoint"""
-    # Check if account is locked
-    username = form_data.username
-    current_time = datetime.utcnow()
+async def login(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    response_class=JSONResponse
+):
+    """
+    Login endpoint that authenticates users and returns JWT tokens
     
-    if username in failed_attempts:
-        attempts = [attempt for attempt in failed_attempts[username] 
-                   if current_time - attempt < timedelta(minutes=security_config.lockout_duration_minutes)]
-        failed_attempts[username] = attempts  # Clean up old attempts
+    Args:
+        request: The FastAPI request object
+        form_data: The OAuth2 form data containing username and password
         
-        if len(attempts) >= security_config.max_login_attempts:
-            logger.warning(f"Account locked: {username}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Account is locked due to too many failed attempts",
-                headers={"WWW-Authenticate": "Bearer"},
+    Returns:
+        JSONResponse: Contains the access token and user info
+    """
+    try:
+        # Get user from database
+        user = get_user(form_data.username)
+        
+        # Verify user exists and password is correct
+        if not user or not verify_password(form_data.password, user.get("password_hash", "")):
+            # Log failed login attempt
+            logger.warning(f"Failed login attempt for user: {form_data.username}")
+            
+            # Return to login page with error
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(
+                url=f"/?error=invalid_credentials",
+                status_code=status.HTTP_303_SEE_OTHER
             )
-    
-    # Get user and verify password
-    user = get_user(username)
-    if not user or not verify_password(form_data.password, user["password_hash"]):
-        # Record failed attempt
-        if username not in failed_attempts:
-            failed_attempts[username] = []
-        failed_attempts[username].append(current_time)
         
-        logger.warning(f"Failed login attempt: {username}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
+        # Update last login time
+        if hasattr(user, 'update_last_login'):
+            user.update_last_login()
+        elif hasattr(user, 'last_login'):
+            user["last_login"] = datetime.now()
+        
+        # Create access token
+        access_token_expires = timedelta(hours=security_config.token_expiry_hours if hasattr(security_config, 'token_expiry_hours') else 12)
+        access_token = create_access_token(
+            data={"sub": user["username"], "role": user.get("role", "user")},
+            expires_delta=access_token_expires
         )
+        
+        # Create response with token
+        response = JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "access_token": access_token,
+                "token_type": "bearer",
+                "expires_in": int(access_token_expires.total_seconds()),
+                "user": {
+                    "username": user["username"],
+                    "role": user.get("role", "user")
+                }
+            }
+        )
+        
+        # Set secure HTTP-only cookie with the token
+        response.set_cookie(
+            key="access_token",
+            value=f"Bearer {access_token}",
+            httponly=True,
+            max_age=3600 * 12,  # 12 hours
+            secure=os.getenv("ENVIRONMENT") == "production",
+            samesite="lax"
+        )
+        
+        # Set a separate non-HttpOnly cookie for client-side access if needed
+        response.set_cookie(
+            key="user_session",
+            value=user["username"],
+            max_age=3600 * 12,  # 12 hours
+            secure=os.getenv("ENVIRONMENT") == "production",
+            samesite="lax"
+        )
+        
+        # Redirect to dashboard
+        response.headers["Location"] = "/dashboard"
+        response.status_code = status.HTTP_303_SEE_OTHER
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        # Return to login page with error
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(
+            url=f"/?error=server_error",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+@app.get("/api/verify-token")
+async def verify_token(current_user: Dict[str, Any] = Depends(get_current_active_user)):
+    """
+    Verify if the provided token is valid
     
-    # Clear failed attempts on successful login
-    if username in failed_attempts:
-        failed_attempts[username] = []
+    Args:
+        current_user: The authenticated user from the JWT token
+        
+    Returns:
+        dict: Status and user information if token is valid
+    """
+    return {
+        "status": "valid", 
+        "user": {
+            "username": current_user.get("sub"),
+            "role": current_user.get("role", "user")
+        }
+    }
+
+@app.post("/logout")
+async def logout():
+    """
+    Logout endpoint that clears authentication cookies
     
-    # Create access token
-    access_token_expires = timedelta(hours=security_config.token_expiry_hours)
-    access_token = create_access_token(
-        data={"sub": user["username"], "role": user["role"]}, 
-        expires_delta=access_token_expires
+    Returns:
+        JSONResponse: Success message and redirect to login page
+    """
+    from fastapi.responses import JSONResponse, RedirectResponse
+    
+    # Create response with success message
+    response = JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"message": "Successfully logged out"}
     )
     
-    logger.info(f"User logged in: {username}")
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user_id": user["id"],
-        "username": user["username"],
-        "role": user["role"]
-    }
+    # Clear authentication cookies
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        secure=os.getenv("ENVIRONMENT") == "production",
+        samesite="lax"
+    )
+    response.delete_cookie(
+        key="user_session",
+        secure=os.getenv("ENVIRONMENT") == "production",
+        samesite="lax"
+    )
+    
+    # Redirect to login page
+    response.headers["Location"] = "/?message=logged_out"
+    response.status_code = status.HTTP_303_SEE_OTHER
+    
+    return response
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request, current_user: Dict[str, Any] = Depends(get_current_active_user)):
+    """
+    Serve the main dashboard
+    
+    This endpoint verifies the JWT token and serves the dashboard page.
+    If the token is invalid or expired, it will redirect to the login page.
+    """
+    try:
+        # Verify the token is still valid
+        token = request.cookies.get("access_token") or request.headers.get("authorization", "").replace("Bearer ", "")
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required"
+            )
+            
+        # Verify the token
+        try:
+            payload = jwt.decode(
+                token,
+                security_config.jwt_secret if hasattr(security_config, 'jwt_secret') else "your-secret-key-should-be-in-env-vars",
+                algorithms=["HS256"]
+            )
+            username = payload.get("sub")
+            if not username:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid authentication credentials"
+                )
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has expired"
+            )
+        except jwt.InvalidTokenError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token"
+            )
+            
+        # Token is valid, serve the dashboard
+        response = templates.TemplateResponse("index.html", {
+            "request": request,
+            "user": {
+                "username": current_user.get("sub", ""),
+                "role": current_user.get("role", "user")
+            }
+        })
+        
+        # Set secure cookie with token
+        response.set_cookie(
+            key="access_token",
+            value=f"Bearer {token}",
+            httponly=True,
+            max_age=3600 * 12,  # 12 hours
+            secure=os.getenv("ENVIRONMENT") == "production",
+            samesite="lax"
+        )
+        
+        return response
+        
+    except HTTPException as he:
+        # If there's an authentication error, redirect to login
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/?error=unauthorized")
+    except Exception as e:
+        logger.error(f"Dashboard error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
 
 @app.post("/users/", response_model=Dict[str, Any])
 async def create_user(user: UserCreate, current_user: Dict[str, Any] = Depends(get_current_active_user)):
