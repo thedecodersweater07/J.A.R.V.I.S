@@ -75,3 +75,33 @@ class AuthHandler:
         if forwarded:
             return forwarded.split(",")[0].strip()
         return request.client.host if request.client else "unknown"
+    
+    def create_auth_router(self):
+        """Create and return the authentication router"""
+        from fastapi import APIRouter
+        
+        router = APIRouter()
+        
+        @router.post("/login", response_model=Dict[str, Any])
+        async def login(form_data: OAuth2PasswordRequestForm = Depends(), request: Request = Depends()):
+            return await self.login(form_data, request)
+        
+        @router.post("/logout")
+        async def logout(token: str = Depends(oauth2_scheme)):
+            return await self.logout(token)
+        
+        return router
+    def get_auth_router(self):
+        """Get the authentication router"""
+        return self.create_auth_router()
+        """Get the authentication router"""
+        from fastapi import APIRouter
+        router = APIRouter()
+        @router.post("/login", response_model=Dict[str, Any])
+        async def login(form_data: OAuth2PasswordRequestForm = Depends(), request: Request = Depends()):
+            return await self.login(form_data, request)
+        @router.post("/logout")
+        async def logout(token: str = Depends(oauth2_scheme)):
+            return await self.logout(token)
+        return router
+

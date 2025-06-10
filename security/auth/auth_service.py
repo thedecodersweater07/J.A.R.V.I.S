@@ -11,7 +11,11 @@ from .auth_types import LoginResponse
 import os
 import sqlite3
 from pathlib import Path
-
+import uuid
+# Security module for JARVIS Server
+# Initialize logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Create logger for this module
 logger = logging.getLogger(__name__)
 
 class AuthService:
@@ -101,3 +105,75 @@ class AuthService:
     def _handle_failed_attempt(self, username: str, ip_address: str):
         self._log_attempt(username, False, ip_address)
         logger.warning(f"Failed login attempt for user {username} from IP {ip_address}")
+
+    def create_auth_router(self):
+        """Create and return the authentication router"""
+        from fastapi import APIRouter, Depends, HTTPException
+        from fastapi.security import OAuth2PasswordRequestForm
+
+        router = APIRouter()
+
+        @router.post("/login", response_model=LoginResponse)
+        async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+            response = self.authenticate(form_data.username, form_data.password, form_data.client_ip)
+            if not response.success:
+                raise HTTPException(status_code=401, detail=response.error)
+            return response
+
+        return router
+    def get_user_info(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get user information by user ID"""
+        conn = self.db._get_sqlite_connection("users")
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
+        
+        if user:
+            return {
+                "id": user[0],
+                "username": user[1],
+                "role": user[3],
+                "created_at": user[4]
+            }
+        return None
+    def change_password(self, user_id: str, new_password: str) -> bool:
+        """Change user password"""
+        hashed_password = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
+        conn = self.db._get_sqlite_connection("users")
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE users SET password = ? WHERE id = ?", (hashed_password, user_id))
+            conn.commit()
+            return True
+        except sqlite3.Error as e:
+            logger.error(f"Failed to change password for user {user_id}: {e}")
+            return False
+    def delete_user(self, user_id: str) -> bool:
+        """Delete user by ID"""
+        conn = self.db._get_sqlite_connection("users")
+        cursor = conn.cursor()
+        try:
+            cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+            return True
+        except sqlite3.Error as e:
+            logger.error(f"Failed to delete user {user_id}: {e}")
+            return False
+    def create_user(self, username: str, password: str, role: str = "user") -> Optional[Dict[str, Any]]:
+        """Create a new user"""
+        hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+        conn = self.db._get_sqlite_connection("users")
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO users (id, username, password, role) VALUES (?, ?, ?, ?)",
+                (str(uuid.uuid4()), username, hashed_password, role)
+            )
+            conn.commit()
+            return {"username": username, "role": role}
+        except sqlite3.IntegrityError:
+            logger.error(f"Username {username} already exists")
+            return None
+        except sqlite3.Error as e:
+            logger.error(f"Failed to create user {username}: {e}")
+            return None
