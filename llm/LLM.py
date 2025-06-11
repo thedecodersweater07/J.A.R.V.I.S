@@ -1,7 +1,7 @@
 #als van llm hoe het werkt en geconfigureerd is en hoe je het kan gebruiken
-from llm import LLM
-from llm.manager import LLMManager
-from llm.config import LLMConfig
+from jarvis.llm.llm import LLM
+from jarvis.llm.manager import LLMManager
+from jarvis.llm.config import LLMConfig
 
 class LLMService:
     """Service class to manage LLM operations"""

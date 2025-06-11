@@ -22,23 +22,39 @@ import pickle
 import json
 
 # Local imports (deze staan in dezelfde folder)
-from base import BaseModel
-from config import JarvisConfig, JARVIS_CONFIGS
+from .base import BaseModel
+from .config import JarvisConfig, JARVIS_CONFIGS
 
 # LLM imports 
-from llm.LLM import LLMServiceManager 
-from llm.processor import ResponseProcessor
-from llm.config import LLMConfig
-from llm.LLM import LLMService, LLMServiceFactory
+try:
+    from jarvis.llm.llm import LLMServiceManager, LLMService, LLMServiceFactory
+    from jarvis.llm.processor import ResponseProcessor
+    from jarvis.llm.config import LLMConfig
+except ImportError:
+    LLMServiceManager = object
+    LLMService = object
+    LLMServiceFactory = object
+    ResponseProcessor = object
+    LLMConfig = object
 
 # NLP imports
-from nlp.base import BaseNLPModel
-from nlp.dialogue import DialogueManager
-from nlp.generation import TextGenerationModel
-from nlp.understanding import TextUnderstandingModel
+try:
+    from jarvis.nlp.base import BaseNLPModel
+    from jarvis.nlp.dialogue import DialogueManager
+    from jarvis.nlp.generation import TextGenerationModel
+    from jarvis.nlp.understanding import TextUnderstandingModel
+except ImportError:
+    BaseNLPModel = object
+    DialogueManager = object
+    TextGenerationModel = object
+    TextUnderstandingModel = object
 
 # ML imports 
-from ml.training import trainer, trainers
+try:
+    from jarvis.ml.training import trainer, trainers
+except ImportError:
+    trainer = None
+    trainers = None
 
 # Logging configuratie
 logging.basicConfig(
@@ -90,33 +106,62 @@ class JarvisModel(BaseModel):
             model_name: Naam van het te laden model
             device: PyTorch device (cuda/cpu), auto-detect indien None
         """
-        super().__init__(model_name)
+        # Initialize the base class with a config dictionary
+        super().__init__({'model_name': model_name})
+        
+        # Store model name for later use
+        self.model_name = model_name
         
         # Device configuratie
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         logger.info(f"Gebruikend device: {self.device}")
         
         # Model configuratie
-        self.config: JarvisConfig = JARVIS_CONFIGS.get(
-            model_name, JARVIS_CONFIGS["jarvis-base"]
-        )
+        self.config = JARVIS_CONFIGS.get(model_name, JARVIS_CONFIGS["jarvis-base"])
         
-        # Initialiseer componenten
-        self._initialize_llm()
-        self._initialize_components()
-        
-        # Laad model
-        self.model = self._load_model(model_name)
-        self.model.to(self.device)
-        
-        # Prestatie tracking
-        self.metrics = ModelMetrics()
-        self._call_count = 0
-        
-        logger.info(f"JarvisModel succesvol geïnitialiseerd: {model_name}")
+        # Initialize LLM and other components
+        try:
+            self._initialize_llm()
+            self._initialize_components()
+            
+            # Laad model
+            self.model = self._load_model(model_name)
+            if self.model is not None:
+                self.model.to(self.device)
+                logger.info(f"Model geladen op apparaat: {self.device}")
+            else:
+                logger.warning("Geen model geladen, beperkte functionaliteit beschikbaar")
+            
+            # Prestatie tracking
+            self.metrics = ModelMetrics()
+            self._call_count = 0
+            
+            logger.info(f"JarvisModel succesvol geïnitialiseerd: {model_name}")
+            
+        except Exception as e:
+            logger.error(f"Fout tijdens initialisatie van JarvisModel: {e}")
+            # Ga door met beperkte functionaliteit in plaats van te crashen
+            self.model = None
 
     def _initialize_llm(self) -> None:
-        """Initialiseer de LLM configuratie en services"""
+        """
+        Initialize LLM configuration and services.
+        
+        Handles the initialization of language model services with proper error handling
+        and fallbacks when modules are not available.
+        """
+        # Initialize to None first
+        self.llm_service = None
+        self.llm_service_manager = None
+        
+        # Check if LLM modules are properly imported
+        if (LLMConfig is object or 
+            LLMServiceManager is object or 
+            LLMServiceFactory is object or
+            LLMService is object):
+            logger.warning("One or more LLM modules are not available")
+            return
+            
         try:
             self.llm_config = LLMConfig(
                 model_name=self.model_name,
@@ -132,24 +177,48 @@ class JarvisModel(BaseModel):
             self.llm_service_manager = LLMServiceManager()
             self.llm_service = LLMServiceFactory.create_service(self.llm_config)
             
-            logger.info("LLM configuratie succesvol geïnitialiseerd")
+            if self.llm_service is None:
+                raise RuntimeError("Failed to create LLM service instance")
+                
+            logger.info(f"LLM service initialized with model: {self.model_name}")
             
         except Exception as e:
-            logger.error(f"LLM initialisatie gefaald: {e}")
-            raise ModelLoadError(f"Kon LLM niet initialiseren: {e}") from e
+            logger.warning(f"LLM initialization failed, continuing without LLM: {str(e)}")
+            self.llm_service = None
+            self.llm_service_manager = None
 
     def _initialize_components(self) -> None:
         """Initialiseer aanvullende componenten"""
         try:
-            self.response_processor = ResponseProcessor(self.llm_service_manager)
-            self.executor = ThreadPoolExecutor(max_workers=4)
-            logger.info("Componenten succesvol geïnitialiseerd")
+            # Initialize components only if their modules are available
+            if ResponseProcessor is not object and hasattr(self, 'llm_service_manager') and self.llm_service_manager is not None:
+                try:
+                    self.response_processor = ResponseProcessor(self.llm_service_manager)
+                    logger.info("Response processor geïnitialiseerd")
+                except Exception as e:
+                    logger.warning(f"Kon response processor niet initialiseren: {e}")
+                    self.response_processor = None
+            else:
+                logger.warning("Response processor niet beschikbaar")
+                self.response_processor = None
+                
+            # Initialize thread pool executor
+            try:
+                self.executor = ThreadPoolExecutor(max_workers=4)
+                logger.info("Thread pool executor geïnitialiseerd")
+            except Exception as e:
+                logger.warning(f"Kon thread pool executor niet initialiseren: {e}")
+                self.executor = None
+                
+            logger.info("Componenten geïnitialiseerd met beperkte functionaliteit")
             
         except Exception as e:
             logger.error(f"Component initialisatie gefaald: {e}")
-            raise ModelLoadError(f"Kon componenten niet initialiseren: {e}") from e
+            # Don't raise an error, continue with limited functionality
+            self.response_processor = None
+            self.executor = None
 
-    def _load_model(self, model_name: str) -> nn.Module:
+    def _load_model(self, model_name: str) -> Optional[nn.Module]:
         """
         Laad het gespecificeerde JARVIS model.
         
@@ -157,35 +226,41 @@ class JarvisModel(BaseModel):
             model_name: Naam van het te laden model
             
         Returns:
-            PyTorch model instance
+            PyTorch model instance of None als het model niet geladen kan worden
             
-        Raises:
-            ModelLoadError: Als het model niet geladen kan worden
+        Note:
+            Geeft geen foutmelding als het model niet geladen kan worden, maar retourneert None.
+            Dit maakt het mogelijk om door te gaan met beperkte functionaliteit.
         """
         try:
-            # Implementeer hier de daadwerkelijke model laad logica
-            # Voor nu een placeholder architectuur
+            # Controleer of het configuratieobject de benodigde attributen heeft
+            output_dim = getattr(self.config, 'output_dim', 128)  # Default waarde als output_dim niet bestaat
+            
+            # Maak een eenvoudig neuraal netwerk als placeholder
             model = nn.Sequential(
                 nn.Linear(768, 512),
                 nn.ReLU(),
                 nn.Dropout(0.1),
                 nn.Linear(512, 256),
                 nn.ReLU(),
-                nn.Linear(256, self.config.output_dim)
+                nn.Linear(256, output_dim)  # Gebruik de opgehaalde output_dim
             )
             
             # Probeer voorgetrainde weights te laden indien beschikbaar
-            model_path = Path(f"models/{model_name}.pt")
-            if model_path.exists():
-                model.load_state_dict(torch.load(model_path, map_location=self.device))
-                logger.info(f"Voorgetrainde weights geladen van {model_path}")
+            try:
+                model_path = Path(f"models/{model_name}.pt")
+                if model_path.exists():
+                    model.load_state_dict(torch.load(model_path, map_location=self.device))
+                    logger.info(f"Voorgetrainde weights geladen van {model_path}")
+            except Exception as e:
+                logger.warning(f"Kon voorgetrainde weights niet laden: {e}")
             
-            logger.info(f"Model {model_name} succesvol geladen")
+            logger.info(f"Model {model_name} succesvol geïnitialiseerd")
             return model
             
         except Exception as e:
-            logger.error(f"Model laden gefaald voor {model_name}: {e}")
-            raise ModelLoadError(f"Kon model {model_name} niet laden") from e
+            logger.warning(f"Kon model {model_name} niet laden: {e}")
+            return None
 
     @contextmanager
     def _performance_tracking(self, operation: str):
@@ -202,61 +277,198 @@ class JarvisModel(BaseModel):
 
     def forward(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Voer een forward pass uit door het model.
+        Perform a forward pass through the model.
         
         Args:
-            inputs: Dictionary met input data
-            
+            inputs: Dictionary containing model inputs with at least one of:
+                   - 'input_ids': Tensor of token indices
+                   - 'text': Raw text to be processed
+                   - 'tensor': Direct tensor input
+                   
         Returns:
-            Dictionary met model outputs
+            Dictionary containing model outputs with:
+            - 'logits': Model predictions
+            - 'embeddings': Optional embeddings if available
+            - 'attention': Optional attention weights if available
             
         Raises:
-            ProcessingError: Als de forward pass faalt
+            ValueError: If inputs are invalid or missing required fields
+            ProcessingError: If forward pass fails
         """
+        if not isinstance(inputs, dict):
+            raise ValueError("Inputs must be a dictionary")
+            
+        if self.model is None:
+            raise ModelLoadError("No model is currently loaded")
+            
         try:
-            with self._performance_tracking("Forward pass"):
+            with self._performance_tracking("forward_pass"):
                 # Preprocess inputs
-                processed_inputs = self._preprocess_inputs(inputs)
+                model_inputs = self._preprocess_inputs(inputs)
                 
-                # Model inferentie
+                # Ensure inputs are on the correct device
+                model_inputs = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
+                              for k, v in model_inputs.items()}
+                
+                # Model inference
                 self.model.eval()
                 with torch.no_grad():
-                    outputs = self.model(processed_inputs)
+                    outputs = self.model(**model_inputs)
                 
-                # Postprocess outputs
+                # Post-process outputs
                 result = self._postprocess_outputs(outputs)
                 
-                logger.debug("Forward pass succesvol voltooid")
+                # Add metadata
+                result.update({
+                    'model': self.model_name,
+                    'device': str(self.device),
+                    'timestamp': torch.tensor(time.time()).item()
+                })
+                
+                logger.debug("Forward pass completed successfully")
                 return result
                 
         except Exception as e:
-            logger.error(f"Forward pass gefaald: {e}")
-            raise ProcessingError("Forward pass gefaald") from e
+            logger.exception("Forward pass failed")
+            raise ProcessingError(f"Forward pass failed: {str(e)}") from e
+            
+    def _preprocess_inputs(self, inputs: Dict[str, Any]) -> Dict[str, torch.Tensor]:
+        """
+        Preprocess input data for the model.
+            
+        Args:
+            inputs: Dictionary containing raw input data
+                
+        Returns:
+            Dictionary of processed tensors ready for model input
+                
+        Raises:
+            ValueError: If inputs cannot be processed
+        """
+        processed = {}
+            
+        try:
+            # Handle different input types
+            if 'input_ids' in inputs:
+                # Already tokenized input
+                processed['input_ids'] = torch.as_tensor(inputs['input_ids'], 
+                                                       device=self.device)
+                    
+            elif 'text' in inputs:
+                # Raw text input - tokenize if possible
+                if hasattr(self, 'tokenizer'):
+                    tokenized = self.tokenizer(
+                        inputs['text'], 
+                        return_tensors='pt',
+                        padding=True,
+                        truncation=True,
+                        max_length=512
+                    )
+                    processed.update({k: v.to(self.device) for k, v in tokenized.items()})
+                else:
+                    raise ValueError("Text tokenizer not available")
+                        
+            elif 'tensor' in inputs:
+                # Direct tensor input
+                processed['input_ids'] = torch.as_tensor(inputs['tensor'], 
+                                                       device=self.device)
+            else:
+                raise ValueError("No valid input format found. Expected 'input_ids', 'text', or 'tensor'")
+                    
+            # Add attention mask if not provided
+            if 'attention_mask' not in processed and 'input_ids' in processed:
+                processed['attention_mask'] = torch.ones_like(processed['input_ids'])
+                    
+            return processed
+                
+        except Exception as e:
+            logger.error(f"Input preprocessing failed: {str(e)}")
+            raise ValueError(f"Failed to preprocess inputs: {str(e)}") from e
 
-    def _preprocess_inputs(self, inputs: Dict[str, Any]) -> torch.Tensor:
-        """Preprocess input data voor het model"""
-        # Implementeer input preprocessing logica
-        # Voor nu een placeholder
-        if "text" in inputs:
-            # Tokenize en converteer naar tensor
-            # Placeholder implementatie
-            return torch.randn(1, 768).to(self.device)
-        return torch.randn(1, 768).to(self.device)
+    def _postprocess_outputs(self, outputs: Union[torch.Tensor, Dict[str, torch.Tensor]]) -> Dict[str, Any]:
+        """
+        Postprocess model outputs for easier consumption.
+            
+        Args:
+            outputs: Raw model outputs (tensor or dict)
+                
+        Returns:
+            Dictionary with processed outputs
+        """
+        result = {}
+            
+        try:
+            if isinstance(outputs, dict):
+                # Handle dictionary outputs (common in transformers)
+                result.update({
+                    'logits': outputs.get('logits', None),
+                    'embeddings': outputs.get('last_hidden_state', None),
+                    'attention': outputs.get('attentions', None)
+                })
+            elif isinstance(outputs, torch.Tensor):
+                # Handle tensor outputs
+                result['logits'] = outputs
+                    
+            # Convert tensors to CPU and numpy where applicable
+            for key, value in result.items():
+                if value is not None and isinstance(value, torch.Tensor):
+                    result[key] = value.detach().cpu()
+                        
+                    # Convert to numpy for non-scalar tensors
+                    if value.dim() > 0:
+                        result[key] = result[key].numpy()
+                
+            # Add softmax scores if logits are available
+            if 'logits' in result and result['logits'] is not None:
+                probs = torch.softmax(torch.tensor(result['logits']), dim=-1)
+                result['probabilities'] = probs.numpy()
+                result['confidence'] = float(probs.max())
+                    
+            return result
+                
+        except Exception as e:
+            logger.error(f"Output postprocessing failed: {str(e)}")
+            # Return raw outputs if processing fails
+            return {'raw_output': outputs}
 
-    def _postprocess_outputs(self, outputs: torch.Tensor) -> Dict[str, Any]:
-        """Postprocess model outputs"""
-        # Implementeer output postprocessing logica
-        return {
-            "predictions": outputs.cpu().numpy().tolist(),
-            "confidence": torch.softmax(outputs, dim=-1).max().item(),
-            "device": str(self.device)
-        }
+    def generate(self, prompt: str, max_length: int = 100) -> str:
+        """
+        Generate text from prompt.
+            
+        Args:
+            prompt: Input text prompt
+            max_length: Maximum length of generated text
+                
+        Returns:
+            Generated text
+                
+        Raises:
+            ProcessingError: If text generation fails
+        """
+        try:
+            # Try to use LLM service if available
+            if hasattr(self, 'llm_service') and self.llm_service is not None:
+                response = self.llm_service.generate(
+                    prompt=prompt,
+                    max_length=max_length,
+                    temperature=0.7,
+                    top_p=0.9,
+                    top_k=50
+                )
+                return response
+                    
+            # Fallback to a simple response if LLM is not available
+            return f"Generated response for: {prompt[:50]}... (LLM service not available)"
+                
+        except Exception as e:
+            logger.error(f"Text generation failed: {e}")
+            raise ProcessingError(f"Text generation failed: {e}") from e
 
     def get_model_summary(self) -> Dict[str, Any]:
         """Krijg een samenvatting van het model"""
         param_count = sum(p.numel() for p in self.model.parameters())
         trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-        
+            
         return {
             "model_name": self.model_name,
             "device": self.device,

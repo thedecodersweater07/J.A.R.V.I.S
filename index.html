@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS Test Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a73e8;
+            text-align: center;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background-color: #e8f0fe;
+            border-left: 4px solid #1a73e8;
+        }
+        .status.connected {
+            background-color: #e6f4ea;
+            border-left-color: #34a853;
+        }
+        .status.error {
+            background-color: #fce8e6;
+            border-left-color: #d93025;
+        }
+        .info {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        
+        .chat-container {
+            margin-top: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            max-width: 80%;
+            clear: both;
+        }
+        
+        .user-message {
+            float: right;
+            text-align: right;
+            margin-left: auto;
+        }
+        
+        .bot-message {
+            float: left;
+            text-align: left;
+            margin-right: auto;
+        }
+        
+        .message-sender {
+            font-weight: bold;
+            margin-bottom: 4px;
+            color: #1a73e8;
+        }
+        
+        .message-content {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 18px;
+            display: inline-block;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        
+        .user-message .message-content {
+            background: #1a73e8;
+            color: white;
+        }
+        
+        .chat-input {
+            display: flex;
+            padding: 15px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        #user-input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            margin-right: 10px;
+            font-size: 14px;
+            outline: none;
+        }
+        
+        #user-input:focus {
+            border-color: #1a73e8;
+        }
+        
+        #send-button {
+            padding: 0 20px;
+            background: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        
+        #send-button:hover {
+            background: #1557b0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JARVIS Test Interface</h1>
+        
+        <div id="status" class="status">
+            Connecting to JARVIS server...
+        </div>
+        
+        <div class="info">
+            <h3>Server Information</h3>
+            <div id="server-info">Loading...</div>
+        </div>
+        
+        <div class="chat-container">
+            <div id="chat-messages" class="chat-messages">
+                <div class="message bot-message">
+                    <div class="message-sender">JARVIS</div>
+                    <div class="message-content">Hello! I'm JARVIS. How can I assist you today?</div>
+                </div>
+            </div>
+            <div class="chat-input">
+                <input type="text" id="user-input" placeholder="Type your message..." />
+                <button id="send-button">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        const API_BASE_URL = window.location.origin;
+        
+        // DOM Elements
+        const statusElement = document.getElementById('status');
+        const serverInfoElement = document.getElementById('server-info');
+        const chatMessages = document.getElementById('chat-messages');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        
+        // Check server status on page load
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusElement.textContent = '✅ Connected to JARVIS server';
+                    statusElement.className = 'status connected';
+                    
+                    // Display server info
+                    serverInfoElement.innerHTML = `
+                        Status: ${data.status}<br>
+                        Service: ${data.service}<br>
+                        URL: ${window.location.host}
+                    `;
+                    
+                    // Enable chat
+                    userInput.disabled = false;
+                    sendButton.disabled = false;
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
+            } catch (error) {
+                statusElement.textContent = `❌ Error connecting to server: ${error.message}`;
+                statusElement.className = 'status error';
+                console.error('Connection error:', error);
+                
+                // Disable chat on error
+                userInput.disabled = true;
+                sendButton.disabled = true;
+            }
+        }
+        
+        // Add a message to the chat
+        function addMessage(sender, message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            messageDiv.innerHTML = `
+                <div class="message-sender">${sender === 'user' ? 'You' : 'JARVIS'}</div>
+                <div class="message-content">${message}</div>
+            `;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // Send a message to the server
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+            
+            // Add user message to chat
+            addMessage('user', message);
+            userInput.value = '';
+            
+            try {
+                // Show typing indicator
+                const typingIndicator = document.createElement('div');
+                typingIndicator.className = 'message bot-message';
+                typingIndicator.id = 'typing-indicator';
+                typingIndicator.innerHTML = `
+                    <div class="message-sender">JARVIS</div>
+                    <div class="message-content">Typing...</div>
+                `;
+                chatMessages.appendChild(typingIndicator);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                // Send message to server
+                const response = await fetch(`${API_BASE_URL}/api/chat/send`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message })
+                });
+                
+                // Remove typing indicator
+                document.getElementById('typing-indicator')?.remove();
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addMessage('bot', data.response);
+                } else {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(error.error || 'Failed to get response');
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+                addMessage('bot', `Sorry, I encountered an error: ${error.message}`);
+            }
+        }
+        
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', checkServerStatus);
+        
+        sendButton.addEventListener('click', sendMessage);
+        
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

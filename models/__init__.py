@@ -1,5 +1,6 @@
 from typing import Dict, Any
-from  jarvis import JarvisModel
+# Relative import to avoid package installation requirement
+from .jarvis import JarvisModel
 from .base import BaseModel
 
 # Model registry

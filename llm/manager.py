@@ -1,5 +1,5 @@
-from ..data.db.database import DatabaseManager
-from ..data.loader import DataLoader
+from jarvis.db.manager import DatabaseManager
+from jarvis.data.loader import DataLoader
 
 class LLMManager:
     def __init__(self):
