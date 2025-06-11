@@ -24,6 +24,34 @@ class CommandExecutor:
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.commands = {}
+        self.running_processes = {}  # Correct geplaatst
+        self.max_concurrent_processes = 5
+        self.logger.info("CommandExecutor initialized with max concurrent processes set to 5")
+
+    def register_command(self, command: str, handler: callable) -> None: # type: ignore
+        """Register a command with its handler function"""
+        if not callable(handler):
+            raise ValueError("Handler must be a callable function")
+        self.commands[command] = handler
+        self.logger.info(f"Command '{command}' registered successfully")
+
+    def unregister_command(self, command: str) -> None:
+        """Unregister a command"""
+        if command in self.commands:
+            del self.commands[command]
+            self.logger.info(f"Command '{command}' unregistered successfully")
+        else:
+            self.logger.warning(f"Command '{command}' not found for unregistration")
+
+    def parse_command(self, command_str: str) -> Dict[str, Any]:
+        """Parses a command string into a structured dict"""
+        parts = command_str.strip().split()
+        if not parts:
+            return {"command": "help"}
+
+        command = parts[0]
+        args = parts[1:]
+        return {"command": command, "args": args}
 
     def execute(self, command: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a parsed command"""
@@ -37,103 +65,73 @@ class CommandExecutor:
             self.logger.error(f"Command execution error: {e}")
             return {"status": "error", "message": str(e)}
 
-    def _start_process(self, process_name: str) -> Tuple[bool, str]:
-        """
-        Start een nieuw proces
-        
-        Args:
-            process_name: Naam van het uit te voeren proces
-            
-        Returns:
-            Tuple met succes-indicator en resultaatbericht
-        """
-        # Controleer of we niet te veel processen hebben
+    def _start_process(self, command: Dict[str, Any]) -> Dict[str, Any]:
+        """Start een nieuw proces via command args"""
         if len(self.running_processes) >= self.max_concurrent_processes:
-            return False, "Maximum aantal gelijktijdige processen bereikt"
-        
-        # Genereer een unieke ID voor dit proces
+            return {"status": "error", "message": "Maximum aantal gelijktijdige processen bereikt"}
+
+        args = command.get("args", [])
+        if not args:
+            return {"status": "error", "message": "Geen procesnaam opgegeven"}
+
+        process_name = args[0]
         process_id = str(uuid.uuid4())[:8]
-        
+
         try:
-            # Hier zou de daadwerkelijke processtart plaatsvinden
-            # Voor demonstratiedoeleinden simuleren we dit
-            logger.info(f"Starten proces: {process_name} met ID {process_id}")
-            
-            # Registreer het proces
             self.running_processes[process_id] = {
                 "name": process_name,
                 "start_time": time.time(),
                 "status": "running"
             }
-            
-            return True, f"Proces {process_name} gestart met ID: {process_id}"
-            
+            self.logger.info(f"Starten proces: {process_name} met ID {process_id}")
+            return {"status": "success", "message": f"Proces {process_name} gestart met ID: {process_id}"}
         except Exception as e:
-            logger.error(f"Fout bij starten van proces {process_name}: {e}")
-            return False, f"Kon proces niet starten: {str(e)}"
-    
-    def _stop_process(self, process_id: str) -> Tuple[bool, str]:
-        """
-        Stop een lopend proces
-        
-        Args:
-            process_id: ID van het te stoppen proces
-            
-        Returns:
-            Tuple met succes-indicator en resultaatbericht
-        """
+            self.logger.error(f"Fout bij starten van proces {process_name}: {e}")
+            return {"status": "error", "message": str(e)}
+
+    def _stop_process(self, command: Dict[str, Any]) -> Dict[str, Any]:
+        """Stop een lopend proces via ID"""
+        args = command.get("args", [])
+        if not args:
+            return {"status": "error", "message": "Geen proces-ID opgegeven"}
+
+        process_id = args[0]
         if process_id not in self.running_processes:
-            return False, f"Geen lopend proces met ID {process_id} gevonden"
-        
+            return {"status": "error", "message": f"Geen lopend proces met ID {process_id} gevonden"}
+
         try:
             process_info = self.running_processes[process_id]
-            logger.info(f"Stoppen proces: {process_info['name']} (ID: {process_id})")
-            
-            # Hier zou de daadwerkelijke processtop plaatsvinden
-            
-            # Werk de processtatus bij
             process_info["status"] = "stopped"
             process_info["end_time"] = time.time()
             process_info["runtime"] = process_info["end_time"] - process_info["start_time"]
-            
-            # Verwijder het proces uit de actieve lijst
             self.running_processes.pop(process_id)
-            
-            return True, f"Proces {process_info['name']} (ID: {process_id}) succesvol gestopt"
-            
+
+            self.logger.info(f"Gestopt proces: {process_info['name']} (ID: {process_id})")
+            return {"status": "success", "message": f"Proces {process_info['name']} gestopt"}
         except Exception as e:
-            logger.error(f"Fout bij stoppen van proces {process_id}: {e}")
-            return False, f"Kon proces niet stoppen: {str(e)}"
-    
-    def _get_status(self) -> Tuple[bool, str]:
-        """
-        Geef de status van alle lopende processen terug
-        
-        Returns:
-            Tuple met succes-indicator en resultaatbericht
-        """
+            self.logger.error(f"Fout bij stoppen van proces {process_id}: {e}")
+            return {"status": "error", "message": str(e)}
+
+    def _get_status(self, command: Dict[str, Any]) -> Dict[str, Any]:
+        """Toon status van lopende processen"""
         if not self.running_processes:
-            return True, "Geen actieve processen"
-        
-        status_message = "Actieve processen:\n"
+            return {"status": "success", "message": "Geen actieve processen"}
+
+        status_lines = []
         for pid, info in self.running_processes.items():
             runtime = time.time() - info["start_time"]
-            status_message += f"ID: {pid}, Naam: {info['name']}, Status: {info['status']}, Runtime: {runtime:.1f}s\n"
-        
-        return True, status_message
-    
-    def _show_help(self) -> Tuple[bool, str]:
-        """
-        Toon hulp voor beschikbare commando's
-        
-        Returns:
-            Tuple met succes-indicator en resultaatbericht
-        """
+            status_lines.append(
+                f"ID: {pid}, Naam: {info['name']}, Status: {info['status']}, Runtime: {runtime:.1f}s"
+            )
+        return {"status": "success", "message": "\n".join(status_lines)}
+
+    def _show_help(self, command: Dict[str, Any]) -> Dict[str, Any]:
+        """Toon beschikbare commando's"""
         help_text = """
-        Beschikbare commando's:
-        - start <process_name>: Start een nieuw proces
-        - stop <process_id>: Stop een lopend proces
-        - status: Bekijk de status van alle lopende processen
-        - help: Toon deze hulptekst
-        """
-        return True, help_text
+Beschikbare commando's:
+- start <procesnaam>: Start een nieuw proces
+- stop <proces_id>: Stop een lopend proces
+- status: Toon status van alle processen
+- help: Toon deze hulp
+"""
+        return {"status": "success", "message": help_text}
