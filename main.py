@@ -1,39 +1,55 @@
 import os
-import sys 
+import sys
 import json
 import signal
 import logging
 import threading
 import time
-import psutil  # Add psutil import
 
 # Suppress TensorFlow oneDNN warnings
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-from typing import Dict, Any, List, Optional
-from pathlib import Path
-from datetime import datetime
-import torch
-import yaml
 
-# Import core components
-from core.logging import setup_logging, get_logger
-from core.brain.cerebrum import Cerebrum
-from core.command.command_parser import CommandParser
-from core.command.executor import CommandExecutor
-from db.manager import DatabaseManager
-from llm.core.llm_core import LLMCore
-from ui.screen import Screen
-from core.constants import OPENGL_AVAILABLE
-from core.config import ConfigValidator
+# Basispakketten
+try:
+    import psutil
+    from pathlib import Path
+    from datetime import datetime
+    import torch
+    import yaml
+except ImportError as e:
+    print(f"[ERROR] Failed to import standard or ML libraries: {e}")
 
-# Add new imports
-from models.jarvis.model import JarvisModel
-from llm.knowledge import KnowledgeManager
-from llm.learning.learning_manager import LearningManager
-from llm.inference.inference_engine import InferenceEngine
-from ml.models import ModelManager
+# Typing
+try:
+    from typing import Dict, Any, List, Optional
+except ImportError as e:
+    print(f"[ERROR] Typing module import failed: {e}")
 
-# Import new AI architecture components
+# Core system
+try:
+    from core.logging import setup_logging, get_logger
+    from core.brain.cerebrum import Cerebrum
+    from core.command.command_parser import CommandParser
+    from core.command.executor import CommandExecutor
+    from db.manager import DatabaseManager
+    from llm.core.llm_core import LLMCore
+    from ui.screen import Screen
+    from core.constants import OPENGL_AVAILABLE
+    from core.config import ConfigValidator
+except ImportError as e:
+    print(f"[ERROR] Core component import failed: {e}")
+
+# AI & LLM modules
+try:
+    from models.jarvis import JarvisModel
+    from llm.knowledge import KnowledgeManager
+    from llm.learning.learning_manager import LearningManager
+    from llm.inference.inference_engine import InferenceEngine
+    from ml.models import ModelManager
+except ImportError as e:
+    print(f"[ERROR] LLM/ML import failed: {e}")
+
+# Advanced AI architecture (fallback to legacy if missing)
 try:
     from core.ai.coordinator import AICoordinator
     from core.ai.model_registry import ModelRegistry
@@ -41,23 +57,29 @@ try:
     from core.ai.events import EventBus
     from core.ai.resource_manager import ResourceManager
 except ImportError:
-    print("New AI architecture components not found, using legacy components")
-# Try to import optional components with error handling
+    print("[WARNING] New AI architecture not found. Falling back to legacy systems.")
+
+# Optional modules (fail gracefully)
 APIClient = None
 server_launcher = None
 
 try:
     from ui.api_client import APIClient
 except ImportError:
-    print("APIClient not found, API features will be disabled")
+    print("[INFO] APIClient not found. Disabling API features.")
 
 try:
     from server.launcher import start_server as server_launcher
 except ImportError as e:
-    print("Server launcher not found, server features will be disabled", e)
+    print("[INFO] Server launcher not found. Server features will be disabled.", e)
 
-# Set up logger
-logger = get_logger(__name__)
+# Logger setup
+try:
+    logger = get_logger(__name__)
+except Exception as e:
+    print(f"[CRITICAL] Logger setup failed: {e}")
+    logger = None
+
 
 class JARVIS:
     def __init__(self):

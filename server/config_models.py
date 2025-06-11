@@ -1,5 +1,5 @@
-from models.jarvis.config import ConfigManager
-from models.jarvis.models import ModelManager
+from models.jarvis import Jarvis
+from models.config import JarvisConfig
 from typing import Optional, Dict, List, Any
 
 
@@ -11,7 +11,7 @@ class ConfigModels:
     management and model management operations.
     """
     
-    def __init__(self, config_manager: ConfigManager, model_manager: ModelManager):
+    def __init__(self, config_manager: JarvisConfig, model_manager: Jarvis):
         """
         Initialize ConfigModels with managers.
         

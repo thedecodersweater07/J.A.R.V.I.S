@@ -26,7 +26,7 @@ class DataAuditor:
             self.inventory[ext] = list(self.data_root.rglob(f"*.{ext}"))
         return self.inventory
         
-    def validate_file(self, file_path: Path) -> Dict[str, Any]:
+    def validate_file(self, file_path: Path) -> Dict[str, any]:
         """Validate single data file"""
         result = {
             "valid": True,

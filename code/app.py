@@ -56,6 +56,18 @@ class ProblemType(Enum):
     DEPRECATED_SYNTAX = "deprecated_syntax"
     CODE_STYLE = "code_style"
 
+class LOG_LEVEL(Enum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+def allowed_file(filename: str) -> bool:
+    """Controleer of bestandsextensie is toegestaan"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+def is_valid_file_size(file_path: str) -> bool:
+    """Controleer of bestand niet te groot is"""
+    return os.path.getsize(file_path) <= MAX_FILE_SIZE
 @dataclass
 class CodeProblem:
     file_path: str

@@ -1,7 +1,7 @@
 from typing import Optional, Union, Any, Dict
 import sqlite3
 from pathlib import Path
-from .models.database import Database
+from models.database import Database
 
 class DatabaseManager:
     def __init__(self, config: Optional[Dict[str, Any]] = None):

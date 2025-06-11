@@ -1,5 +1,5 @@
 from typing import Dict, Any
-from .jarvis.model import JarvisModel
+from  jarvis import JarvisModel
 from .base import BaseModel
 
 # Model registry

@@ -1,9 +1,10 @@
-Error during JARVIS initialization or run: setup_logging() got an unexpected keyword argument 'log_dir'
+Error during JARVIS initialization or run: name 'ConfigValidator' is not defined
 
 Traceback (most recent call last):
-  File "c:\nova_industrie\jarvis\main.py", line 704, in <module>
+  File "/workspaces/J.A.R.V.I.S/main.py", line 760, in <module>
     jarvis = JARVIS()
              ^^^^^^^^
-  File "c:\nova_industrie\jarvis\main.py", line 80, in __init__
-    setup_logging(
-TypeError: setup_logging() got an unexpected keyword argument 'log_dir'
+  File "/workspaces/J.A.R.V.I.S/main.py", line 113, in __init__
+    self.config_validator = ConfigValidator()
+                            ^^^^^^^^^^^^^^^
+NameError: name 'ConfigValidator' is not defined

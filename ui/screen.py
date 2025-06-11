@@ -1,12 +1,7 @@
-import os
-import sys
 import logging
-from typing import Optional, Dict, Any
-from contextlib import contextmanager
-from pathlib import Path
+from typing import Dict, Any
 import time
 
-from ui.screens.base_screen import BaseScreen
 
 try:
     import imgui
@@ -17,8 +12,6 @@ except ImportError:
     logger = logging.getLogger(__name__)
     logger.warning("ImGui not available. Some UI features will be disabled")
 
-from .rendering.renderer_factory import RendererFactory, RenderMode
-from .rendering.imGUI_manager import ImGuiManager
 
 # Initialize logger at module level
 logger = logging.getLogger(__name__)

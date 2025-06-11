@@ -8,7 +8,18 @@ from typing import Dict, Any, List, Optional
 
 # Import core components
 from core.logging import get_logger
-from models.jarvis.model import JarvisModel  # Import from the models directory
+from .models.jarvis import JarvisModel  # Import from the models directory
+
+
+try:
+    # Ensure the models directory is in the Python path
+    current_dir = Path(__file__).resolve().parent
+    models_dir = current_dir / "models/jarvis"
+    if models_dir not in sys.path:
+        sys.path.append(str(models_dir))
+except Exception as e:
+    logging.error(f"Failed to add models directory to path: {e}")
+    sys.exit(1)
 
 class MLComponentsManager:
     """Manager class for ML components initialization and management"""

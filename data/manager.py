@@ -10,7 +10,7 @@ from pathlib import Path
 from data.core.manager import DataManager
 from data.core.storage import StorageManager
 from data.core.validation import ValidationManager
-from data.core.caching import CacheManager
+from data.core.cache import CacheManager
 from data.core.processing import ProcessingManager
 
 class DataManager:
