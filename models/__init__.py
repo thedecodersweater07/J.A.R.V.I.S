@@ -1,6 +1,6 @@
 from typing import Dict, Any
 # Relative import to avoid package installation requirement
-from .jarvis import JarvisModel
+from .jarvis import JarvisModel, JarvisLanguageModel
 from .base import BaseModel
 
 # Model registry
@@ -16,3 +16,5 @@ def create_model(model_name: str) -> BaseModel:
     if model_name not in MODELS:
         raise ValueError(f"Unknown model: {model_name}")
     return MODELS[model_name]()
+
+__all__ = ['JarvisModel', 'JarvisLanguageModel', 'BaseModel', 'create_model']

@@ -1,10 +1,30 @@
 // Importeer de Python bridge
-import pythonBridge from './python-bridge.js';
+import { PythonBridge } from './python-bridge.js';
 
 // Globale variabelen
 let isProcessing = false;
 let conversationHistory = [];
 let messageCount = 0;
+let pythonBridge = new PythonBridge();
+
+// WebSocket connection
+let ws = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_DELAY = 2000;
+const WS_PORT = 18087;
+
+// DOM Elements
+const chatMessages = document.getElementById('chatMessages');
+const chatForm = document.getElementById('chatForm');
+const messageInput = document.getElementById('messageInput');
+const statusIndicator = document.getElementById('statusIndicator');
+const connectionStatus = document.getElementById('connectionStatus');
+const messageCountElement = document.getElementById('messageCount');
+const latencyDisplay = document.getElementById('latency');
+
+let messageCounter = 0;
+let lastPingTime = null;
 
 // Configureer de Python bridge
 function setupPythonBridge() {
@@ -13,25 +33,10 @@ function setupPythonBridge() {
         console.log('Verbonden met Python server');
         updateConnectionStatus('connected');
         
-        // Verstuur een testbericht om de verbinding te verifiëren
-        pythonBridge.sendMessage({
-            type: 'handshake',
-            client: 'J.A.R.V.I.S. Web Client',
-            version: '1.0.0',
-            timestamp: new Date().toISOString()
-        })
-        .then(response => {
-            console.log('Handshake voltooid:', response);
-            
-            // Toon welkomstbericht als dit de eerste keer is
-            if (conversationHistory.length === 0) {
-                addMessage('assistant', 'Hallo! Ik ben J.A.R.V.I.S., je persoonlijke assistent. Hoe kan ik je vandaag helpen?');
-            }
-        })
-        .catch(error => {
-            console.error('Handshake mislukt:', error);
-            showError('Kon geen verbinding maken met de server. Probeer het later opnieuw.');
-        });
+        // Toon welkomstbericht als dit de eerste keer is
+        if (conversationHistory.length === 0) {
+            addMessage('assistant', 'Hallo! Ik ben J.A.R.V.I.S., je persoonlijke assistent. Hoe kan ik je vandaag helpen?');
+        }
     };
     
     pythonBridge.onDisconnect = (event) => {
@@ -42,12 +47,12 @@ function setupPythonBridge() {
     
     pythonBridge.onReconnectAttempt = (attempt, maxAttempts, delay) => {
         console.log(`Poging ${attempt}/${maxAttempts} om opnieuw te verbinden over ${delay}ms...`);
-        updateConnectionStatus('reconnecting', attempt, maxAttempts);
+        updateConnectionStatus('connecting', attempt, maxAttempts);
     };
     
     pythonBridge.onMaxReconnectAttempts = () => {
         console.error('Maximaal aantal herpogingen bereikt');
-        updateConnectionStatus('failed');
+        updateConnectionStatus('error');
         showError('Kon geen verbinding maken met de server. Ververs de pagina om het opnieuw te proberen.');
     };
     
@@ -331,52 +336,27 @@ function updateUI() {
 }
 
 // Functie om de verbindingsstatus in de UI bij te werken
-function updateConnectionStatus(status, attempt = 0, maxAttempts = 0) {
-    const statusElement = document.getElementById('statusIndicator');
-    if (!statusElement) return;
+function updateConnectionStatus(status) {
+    const statusIndicator = document.getElementById('statusIndicator');
+    const connectionStatus = document.getElementById('connectionStatus');
     
-    // Verwijder bestaande statusklassen
-    statusElement.className = 'status-indicator';
+    if (!statusIndicator || !connectionStatus) return;
     
     switch (status) {
         case 'connected':
-            statusElement.innerHTML = `
-                <div class="pulse-dot connected"></div>
-                <span>Verbonden</span>
-            `;
-            statusElement.classList.add('status-connected');
+            statusIndicator.className = 'status-indicator connected';
+            connectionStatus.textContent = 'Connected';
+            connectionStatus.className = 'status connected';
             break;
-            
-        case 'reconnecting':
-            statusElement.innerHTML = `
-                <div class="pulse-dot reconnecting"></div>
-                <span>Verbinding maken... (${attempt}/${maxAttempts})</span>
-            `;
-            statusElement.classList.add('status-reconnecting');
-            break;
-            
         case 'disconnected':
-            statusElement.innerHTML = `
-                <div class="pulse-dot disconnected"></div>
-                <span>Verbinding verbroken</span>
-            `;
-            statusElement.classList.add('status-disconnected');
+            statusIndicator.className = 'status-indicator disconnected';
+            connectionStatus.textContent = 'Disconnected';
+            connectionStatus.className = 'status disconnected';
             break;
-            
-        case 'failed':
-            statusElement.innerHTML = `
-                <div class="pulse-dot failed"></div>
-                <span>Verbinding mislukt</span>
-            `;
-            statusElement.classList.add('status-failed');
-            break;
-            
         default:
-            statusElement.innerHTML = `
-                <div class="pulse-dot unknown"></div>
-                <span>Status onbekend</span>
-            `;
-            statusElement.classList.add('status-unknown');
+            statusIndicator.className = 'status-indicator disconnected';
+            connectionStatus.textContent = 'Disconnected';
+            connectionStatus.className = 'status disconnected';
     }
 }
 
@@ -438,59 +418,141 @@ function updateStats() {
 
 // Functie om event listeners toe te voegen
 function setupEventListeners() {
+    // Zoek de chat formulier en input elementen
+    const chatForm = document.getElementById('chatForm');
     const messageInput = document.getElementById('messageInput');
     const sendButton = document.getElementById('sendButton');
-    const clearButton = document.getElementById('clearButton');
     
-    if (!messageInput || !sendButton || !clearButton) return;
+    if (!chatForm || !messageInput || !sendButton) {
+        console.error('Chat elementen niet gevonden!');
+        return;
+    }
     
-    // Verstuur bericht op Enter (maar niet Shift+Enter)
-    messageInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendButton.click();
-        }
-    });
-    
-    // Update de UI wanneer de gebruiker typt
-    messageInput.addEventListener('input', () => {
-        updateUI();
-    });
-    
-    // Verstuur knop
-    sendButton.addEventListener('click', () => {
+    // Voeg submit handler toe aan het formulier
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
         const message = messageInput.value.trim();
         if (message) {
-            sendToAI(message);
+            await sendToAI(message);
             messageInput.value = '';
-            updateUI();
+            messageInput.focus();
         }
     });
     
-    // Wis chat knop
-    clearButton.addEventListener('click', clearChat);
+    // Voeg click handler toe aan de verzend knop
+    sendButton.addEventListener('click', async () => {
+        const message = messageInput.value.trim();
+        if (message) {
+            await sendToAI(message);
+            messageInput.value = '';
+            messageInput.focus();
+        }
+    });
+    
+    // Voeg enter key handler toe aan het input veld
+    messageInput.addEventListener('keypress', async (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (message) {
+                await sendToAI(message);
+                messageInput.value = '';
+                messageInput.focus();
+            }
+        }
+    });
+    
+    // Voeg clear chat handler toe
+    const clearButton = document.getElementById('clearChat');
+    if (clearButton) {
+        clearButton.addEventListener('click', clearChat);
+    }
 }
 
-// Initialiseer de applicatie wanneer de DOM geladen is
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialiseer de Python bridge
-    setupPythonBridge();
+function updateStatus(status, message) {
+    const dot = statusIndicator.querySelector('.pulse-dot');
+    const text = statusIndicator.querySelector('.status-text');
     
-    // Voeg event listeners toe
+    dot.className = 'pulse-dot ' + status;
+    text.textContent = message;
+    connectionStatus.textContent = message;
+}
+
+function connectWebSocket() {
+    if (ws) {
+        ws.close();
+        ws = null;
+    }
+
+    ws = new WebSocket(`ws://${window.location.hostname}:${WS_PORT}`);
+
+    ws.onopen = () => {
+        console.log('WebSocket Connected');
+        updateConnectionStatus('connected');
+        reconnectAttempts = 0;
+        startPingInterval();
+    };
+
+    ws.onclose = () => {
+        console.log('WebSocket Disconnected');
+        updateConnectionStatus('disconnected');
+        ws = null;
+        clearInterval(pingInterval);
+        
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            reconnectAttempts++;
+            setTimeout(connectWebSocket, RECONNECT_DELAY);
+        }
+    };
+
+    ws.onerror = (error) => {
+        console.error('WebSocket Error:', error);
+        updateConnectionStatus('disconnected');
+    };
+
+    ws.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'pong' && lastPingTime) {
+                const latency = Date.now() - lastPingTime;
+                updateLatency(latency);
+                lastPingTime = null;
+            }
+            else if (data.type === 'status') {
+                updateConnectionStatus(data.status.toLowerCase());
+            }
+            
+        } catch (error) {
+            console.error('Error processing message:', error);
+        }
+    };
+}
+
+function startPingInterval() {
+    window.pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+            lastPingTime = Date.now();
+            ws.send(JSON.stringify({ type: 'ping' }));
+        }
+    }, 5000);
+}
+
+// Initialiseer de applicatie
+document.addEventListener('DOMContentLoaded', () => {
+    setupPythonBridge();
     setupEventListeners();
     
-    // Update de UI
-    updateUI();
-    
-    // Initialiseer de statistieken
-    updateStats();
-    
-    // Controleer periodiek de verbinding
-    setInterval(checkConnection, 30000);
-    
-    // Focus op het invoerveld
+    // Focus op het input veld
     const messageInput = document.getElementById('messageInput');
     if (messageInput) {
         messageInput.focus();
     }
+    
+    // Initialize connection
+    updateConnectionStatus('disconnected');
+    connectWebSocket();
 });
+
+// Export for use in React component
+window.WS_PORT = WS_PORT;

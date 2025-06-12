@@ -3,132 +3,372 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jarvis AI Chat - Nederlands</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <title>J.A.R.V.I.S. AI Interface</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=JetBrains+Mono:wght@100;200;300;400;500;600;700;800&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+    <style>
+        /* Extra styles for enhanced chat bubbles */
+        .message {
+            position: relative;
+            margin: 20px;
+            max-width: 80%;
+            transition: all 0.3s ease;
+        }
+
+        .message.user {
+            margin-left: auto;
+            background: linear-gradient(135deg, var(--electric-blue), var(--plasma-purple));
+            border-radius: 20px 20px 5px 20px;
+            padding: 15px 20px;
+            color: white;
+            box-shadow: 0 5px 15px rgba(0, 102, 255, 0.2);
+        }
+
+        .message.assistant {
+            margin-right: auto;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px 20px 20px 5px;
+            padding: 15px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .message-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .message.assistant .message-content::before {
+            content: '🤖';
+            position: absolute;
+            left: -40px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 24px;
+        }
+
+        .message.user .message-content::after {
+            content: '👤';
+            position: absolute;
+            right: -40px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 24px;
+        }
+
+        /* Enhanced input area */
+        .input-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 10px;
+            margin: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        #messageInput {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 16px;
+            padding: 15px;
+            width: calc(100% - 120px);
+            font-family: 'Inter', sans-serif;
+        }
+
+        #messageInput:focus {
+            outline: none;
+        }
+
+        .send-btn {
+            background: linear-gradient(45deg, var(--neon-cyan), var(--electric-blue));
+            border: none;
+            border-radius: 15px;
+            padding: 15px 30px;
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .send-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: 0.5s;
+        }
+
+        .send-btn:hover::before {
+            left: 100%;
+        }
+
+        .send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 247, 255, 0.3);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Typing indicator */
+        .typing-indicator {
+            display: none;
+            padding: 15px;
+            margin: 10px;
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            width: fit-content;
+        }
+
+        .typing-indicator.visible {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--neon-cyan);
+            animation: typing 1s infinite;
+            opacity: 0.7;
+        }
+
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Enhanced chat container */
+        .chat-container {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            margin: 20px;
+            height: calc(100vh - 300px);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--neon-cyan) transparent;
+        }
+
+        .chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-container::-webkit-scrollbar-thumb {
+            background: var(--neon-cyan);
+            border-radius: 3px;
+        }
+    </style>
 </head>
 <body>
-    <div class="background-grid"></div>
-    
+    <!-- Background Effects -->
+    <div class="neural-grid"></div>
+    <div class="quantum-field">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
+
     <div class="container">
-        <div class="header">
-            <div class="logo">🤖</div>
-            <h1>Jarvis AI Chat</h1>
-            <p class="subtitle">Geavanceerde AI Model Interface</p>
-            <div id="statusIndicator" class="status-indicator">
-                <div class="pulse-dot"></div>
-                Verbinden...
-            </div>
-        </div>
-        
-        <div class="main-content">
+        <div class="neural-interface">
+            <!-- Header Section -->
+            <header class="header">
+                <div class="logo">AI</div>
+                <h1>J.A.R.V.I.S. AI Interface</h1>
+                <p class="subtitle">Geavanceerde AI Model Interface</p>
+                <div class="status-indicator">
+                    <div class="pulse-dot disconnected"></div>
+                    <span class="status-text">Disconnected</span>
+                </div>
+            </header>
+
+            <!-- Main Chat Section -->
             <div class="chat-section">
-                <div id="chatContainer" class="chat-container">
-                    <div class="ai-message message">
-                        <strong>🤖 Jarvis:</strong> Hallo! Ik ben klaar om te chatten. Typ een bericht hieronder om de AI te testen.
-                    </div>
-                </div>
+                <div class="chat-container" id="chatMessages"></div>
                 
-                <div class="input-section">
+                <div class="typing-indicator" id="typingIndicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+
+                <form class="input-section" id="messageForm">
                     <div class="input-container">
-                        <input type="text" id="userInput" placeholder="Typ uw bericht..." maxlength="500">
-                        <button onclick="sendMessage()" id="sendBtn" class="btn send-btn">Verstuur</button>
+                        <input
+                            type="text"
+                            id="messageInput"
+                            placeholder="Type je bericht..."
+                            autocomplete="off"
+                            disabled
+                        />
+                        <button type="submit" class="send-btn" disabled>
+                            <span class="btn-text">Verstuur</span>
+                            <span class="btn-icon">➤</span>
+                        </button>
                     </div>
-                    
-                    <div class="controls">
-                        <button id="clearChat" class="btn-clear">Wis Gesprek</button>
-                        <button onclick="updateStats()" class="btn stats-btn">📊 Refresh Stats</button>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="sidebar">
-                <div class="stats" id="stats">
-                    <h2>📊 Systeem Status</h2>
-                    <div class="stats-grid" id="statsContent">
-                        <div class="stat-item">
-                            <div class="stat-label">Status</div>
-                            <div class="stat-value">Loading...</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="performance-indicator">
-                    <h4>⚡ Performance</h4>
-                    <div class="model-info">
-                        <div class="model-type">
-                            <span class="label">Model Type</span>
-                            <span class="value">Jarvis AI</span>
-                        </div>
-                        <div class="model-status">
-                            <span class="label">Status</span>
-                            <span class="value status-text">Actief</span>
-                        </div>
-                        <div class="conversation-count">
-                            <span class="label">Gesprekken</span>
-                            <span class="value">0</span>
-                        </div>
-                        <div class="processing-status">
-                            <span class="label">Verwerking</span>
-                            <span class="value">
-                                <span class="processing-dot">🟢</span>
-                                <span class="processing-text">Nee</span>
-                            </span>
-                        </div>
-                        <div class="uptime">
-                            <span class="label">Actief sinds</span>
-                            <span class="value uptime-value">0s</span>
-                        </div>
-                    </div>
-                    <div class="metric-bar">
-                        <div class="metric-label">
-                            <span>Response Time</span>
-                            <span>~1.2s</span>
-                        </div>
-                        <div class="metric-progress">
-                            <div class="metric-fill" style="width: 85%"></div>
-                        </div>
-                    </div>
-                    <div class="metric-bar">
-                        <div class="metric-label">
-                            <span>CPU Usage</span>
-                            <span>34%</span>
-                        </div>
-                        <div class="metric-progress">
-                            <div class="metric-fill" style="width: 34%"></div>
-                        </div>
-                    </div>
-                    <div class="metric-bar">
-                        <div class="metric-label">
-                            <span>Geheugen</span>
-                            <span>2.1GB</span>
-                        </div>
-                        <div class="metric-progress">
-                            <div class="metric-fill" style="width: 67%"></div>
-                        </div>
-                    </div>
-                </div>
+                </form>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/reconnecting-websocket@4.4.0/dist/reconnecting-websocket.min.js"></script>
-    <script src="script.js"></script>
     <script>
-        // Voeg event listeners toe aan de knoppen
-        document.getElementById('userInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                sendMessage();
+        // DOM Elements
+        const statusDot = document.querySelector('.pulse-dot');
+        const statusText = document.querySelector('.status-text');
+        const messageInput = document.getElementById('messageInput');
+        const messageForm = document.getElementById('messageForm');
+        const chatMessages = document.getElementById('chatMessages');
+        const sendButton = document.querySelector('.send-btn');
+        const typingIndicator = document.getElementById('typingIndicator');
+
+        // WebSocket Connection
+        let ws = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        const reconnectDelay = 3000;
+
+        function connect() {
+            ws = new WebSocket(`ws://${window.location.hostname}:18087`);
+
+            ws.onopen = () => {
+                console.log('Connected to server');
+                statusDot.className = 'pulse-dot connected';
+                statusText.textContent = 'Connected';
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                reconnectAttempts = 0;
+            };
+
+            ws.onclose = () => {
+                console.log('Disconnected from server');
+                statusDot.className = 'pulse-dot disconnected';
+                statusText.textContent = 'Disconnected';
+                messageInput.disabled = true;
+                sendButton.disabled = true;
+                typingIndicator.classList.remove('visible');
+
+                // Attempt to reconnect
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    setTimeout(connect, reconnectDelay);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                statusDot.className = 'pulse-dot error';
+                statusText.textContent = 'Error';
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'message') {
+                        // Show typing indicator
+                        typingIndicator.classList.add('visible');
+                        
+                        // Add message after a short delay
+                        setTimeout(() => {
+                            typingIndicator.classList.remove('visible');
+                            addMessage('assistant', data.content);
+                        }, 1000);
+                    }
+                } catch (error) {
+                    console.error('Error processing message:', error);
+                }
+            };
+        }
+
+        function addMessage(type, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.textContent = type === 'assistant' ? `${content}` : `You said: ${content}`;
+            
+            messageDiv.appendChild(messageContent);
+            chatMessages.appendChild(messageDiv);
+            
+            // Scroll to bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            // Add fade-in animation
+            messageDiv.style.opacity = '0';
+            messageDiv.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                messageDiv.style.opacity = '1';
+                messageDiv.style.transform = 'translateY(0)';
+            }, 10);
+        }
+
+        messageForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (!message || !ws) return;
+
+            // Send message
+            ws.send(JSON.stringify({
+                type: 'message',
+                content: message
+            }));
+
+            // Add message to UI
+            addMessage('user', message);
+            
+            // Clear input
+            messageInput.value = '';
+        });
+
+        // Add typing animation
+        messageInput.addEventListener('input', () => {
+            if (!messageInput.value.trim()) {
+                sendButton.classList.remove('active');
+            } else {
+                sendButton.classList.add('active');
             }
         });
 
-        document.getElementById('clearChat').addEventListener('click', function() {
-            if (confirm('Weet je zeker dat je het gesprek wilt wissen?')) {
-                document.getElementById('chatContainer').innerHTML = `
-                    <div class="ai-message message">
-                        <strong>🤖 Jarvis:</strong> Het gesprek is gewist. Hoe kan ik je vandaag helpen?
-                    </div>`;
-            }
+        // Initial connection
+        connect();
+
+        // Add some cool effects
+        document.addEventListener('mousemove', (e) => {
+            const particles = document.querySelectorAll('.particle');
+            particles.forEach((particle, index) => {
+                const speed = index * 0.5;
+                const x = (e.clientX * speed) / 100;
+                const y = (e.clientY * speed) / 100;
+                particle.style.transform = `translate(${x}px, ${y}px)`;
+            });
         });
     </script>
 </body>
