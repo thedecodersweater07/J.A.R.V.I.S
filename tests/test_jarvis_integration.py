@@ -206,7 +206,7 @@ class JarvisServer:
                         user_message = data.get('message', '')
                         
                         # Get response from JARVIS
-                        response = await self.jarvis.get_response(user_message)
+                        response = self.jarvis.generate_response(user_message)
                         
                         # Send response back to client
                         await websocket.send(json.dumps({
