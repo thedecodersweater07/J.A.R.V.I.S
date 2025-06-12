@@ -43,6 +43,20 @@ try:
 except ImportError as e:
     print(f"[ERROR] Kan JarvisModel niet importeren: {e}")
 
+# Initialize Jarvis model
+jarvis_model = None
+try:
+    jarvis_model = JarvisModel()
+    logger.info("Jarvis model initialized successfully")
+except Exception as e:
+    logger.warning(f"Could not initialize Jarvis model: {e}")
+
+def get_jarvis_model():
+    """Get the Jarvis model instance"""
+    if jarvis_model is None:
+        raise Exception("Jarvis model not initialized")
+    return jarvis_model
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -447,14 +461,28 @@ async def health_check():
     }
 
 @app.get("/api/stats")
-async def get_stats(current_user: Dict[str, Any] = Depends(get_admin_user)):
-    """Get server statistics (admin only)"""
-    return {
-        "total_users": len(user_store),
-        "active_users": len([u for u in user_store.values() if u.get("status") == "active"]),
-        "ai_components": len(ai_registry.components),
-        "server_uptime": datetime.utcnow().isoformat()
-    }
+async def get_stats():
+    """Get server statistics"""
+    try:
+        jarvis = get_jarvis_model()
+        return {
+            "model_type": "Jarvis",
+            "status": "active",
+            "is_processing": False,
+            "uptime": int((datetime.utcnow() - app.start_time).total_seconds()) if hasattr(app, 'start_time') else 0,
+            "components": {
+                "llm": hasattr(jarvis, 'llm_service'),
+                "nlp": hasattr(jarvis, 'nlp_processor'),
+                "ml": hasattr(jarvis, 'model')
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting stats: {e}")
+        return {
+            "model_type": "Jarvis",
+            "status": "error",
+            "error": str(e)
+        }
 
 # Background tasks
 async def log_ai_request(request_id: str, username: str, request_type: str, processing_time: float):

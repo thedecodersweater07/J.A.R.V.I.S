@@ -37,6 +37,43 @@ router = APIRouter(
 )
 
 # Routes
+@router.post("/chat", response_model=AIResponse)
+async def process_chat_message(
+    request: AIRequest,
+    current_user: Dict[str, Any] = Depends(get_current_active_user)
+):
+    """Process chat message and generate response"""
+    request_id = str(uuid.uuid4())
+    start_time = time.time()
+    logger.info(f"Processing chat message {request_id} from user {current_user['username']}")
+    
+    try:
+        # Get Jarvis model from app state
+        from ..app import get_jarvis_model
+        jarvis = get_jarvis_model()
+        
+        # Process message
+        response = jarvis.generate(
+            prompt=request.query,
+            max_length=100,
+            temperature=0.7,
+            top_p=0.9,
+            top_k=50
+        )
+        
+        return AIResponse(
+            response=response,
+            request_id=request_id,
+            processing_time=time.time() - start_time,
+            timestamp=datetime.now().isoformat()
+        )
+    except Exception as e:
+        logger.error(f"Error processing chat message: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
 @router.post("/query", response_model=AIResponse)
 async def process_ai_query(
     request: AIRequest,
