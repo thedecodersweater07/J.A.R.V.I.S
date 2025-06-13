@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DJ Instagram Optimization Guide</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head>
 <body>
     <div class="grid-background"></div>
@@ -26,76 +28,111 @@
                     Beste performance met consistent hoge views
                 </div>
 
-                <table class="performance-table">
-                    <thead>
-                        <tr>
-                            <th>Dag</th>
-                            <th>Rating</th>
-                            <th>Beste Tijd</th>
-                            <th>Trend</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Maandag</td>
-                            <td>📈 Stijgend</td>
-                            <td>17:00-20:00</td>
-                            <td>+149 views groei</td>
-                        </tr>
-                        <tr style="background: rgba(0, 255, 136, 0.1);">
-                            <td><strong>Woensdag</strong></td>
-                            <td><strong>🔥 BESTE</strong></td>
-                            <td><strong>16:00</strong></td>
-                            <td><strong>191 views piek</strong></td>
-                        </tr>
-                        <tr>
-                            <td>Dinsdag</td>
-                            <td>⭐ Goed</td>
-                            <td>17:00</td>
-                            <td>136 views consistent</td>
-                        </tr>
-                        <tr>
-                            <td>Donderdag</td>
-                            <td>🆗 Oké</td>
-                            <td>17:00</td>
-                            <td>Gemiddeld</td>
-                        </tr>
-                        <tr>
-                            <td>Vrijdag</td>
-                            <td>❌ Slecht</td>
-                            <td>-</td>
-                            <td>Vermijden</td>
-                        </tr>
-                        <tr>
-                            <td>Weekend</td>
-                            <td>❌ Slecht</td>
-                            <td>-</td>
-                            <td>Mensen gaan uit</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="table-container">
+                    <table class="performance-table">
+                        <thead>
+                            <tr>
+                                <th>Dag</th>
+                                <th>Rating</th>
+                                <th>Beste Tijd</th>
+                                <th>Trend</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="trending-up">
+                                <td>Maandag</td>
+                                <td><span class="rating-badge trending">📈 Stijgend</span></td>
+                                <td>17:00-20:00</td>
+                                <td>+149 views groei</td>
+                            </tr>
+                            <tr class="best-day">
+                                <td><strong>Woensdag</strong></td>
+                                <td><span class="rating-badge best">🔥 BESTE</span></td>
+                                <td><strong>16:00</strong></td>
+                                <td><strong>191 views piek</strong></td>
+                            </tr>
+                            <tr class="good-day">
+                                <td>Dinsdag</td>
+                                <td><span class="rating-badge good">⭐ Goed</span></td>
+                                <td>17:00</td>
+                                <td>136 views consistent</td>
+                            </tr>
+                            <tr>
+                                <td>Donderdag</td>
+                                <td><span class="rating-badge okay">🆗 Oké</span></td>
+                                <td>17:00</td>
+                                <td>Gemiddeld</td>
+                            </tr>
+                            <tr class="avoid-day">
+                                <td>Vrijdag</td>
+                                <td><span class="rating-badge bad">❌ Slecht</span></td>
+                                <td>-</td>
+                                <td>Vermijden</td>
+                            </tr>
+                            <tr class="avoid-day">
+                                <td>Weekend</td>
+                                <td><span class="rating-badge bad">❌ Slecht</span></td>
+                                <td>-</td>
+                                <td>Mensen gaan uit</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- Content Strategy -->
             <div class="card">
                 <h2>🎵 Content Strategie</h2>
                 
-                <h3>🎯 Focus Content</h3>
-                <div class="highlight">
-                    <strong>60% Goede Transities</strong> - Skills showcase<br>
-                    <strong>40% Fails & Mistakes</strong> - Relateerbaar en grappig
+                <div class="strategy-section">
+                    <h3>🎯 Focus Content</h3>
+                    <div class="content-mix">
+                        <div class="mix-item">
+                            <div class="mix-percentage">60%</div>
+                            <div class="mix-label">Goede Transities</div>
+                            <div class="mix-description">Skills showcase</div>
+                        </div>
+                        <div class="mix-item">
+                            <div class="mix-percentage">40%</div>
+                            <div class="mix-label">Fails & Mistakes</div>
+                            <div class="mix-description">Relateerbaar en grappig</div>
+                        </div>
+                    </div>
                 </div>
 
-                <h3>🎛️ Genres</h3>
-                <p>House • Techno • DNB • Hardstyle • Uptempo • Hardcore</p>
+                <div class="strategy-section">
+                    <h3>🎛️ Genres</h3>
+                    <div class="genre-tags">
+                        <span class="genre-tag">House</span>
+                        <span class="genre-tag">Techno</span>
+                        <span class="genre-tag">DNB</span>
+                        <span class="genre-tag">Hardstyle</span>
+                        <span class="genre-tag">Uptempo</span>
+                        <span class="genre-tag">Hardcore</span>
+                    </div>
+                </div>
 
-                <h3>📱 Technische Setup</h3>
-                <ul style="list-style: none; padding-left: 1rem;">
-                    <li>▶ Format: 1920x1080 → 9:16</li>
-                    <li>▶ DDJ-200: Gecentreerd setup</li>
-                    <li>▶ Clip Lengte: 30-60 seconden</li>
-                    <li>▶ Focus: Hands-on mixing</li>
-                </ul>
+                <div class="strategy-section">
+                    <h3>📱 Technische Setup</h3>
+                    <div class="tech-specs">
+                        <div class="spec-item">
+                            <span class="spec-icon">📱</span>
+                            <span class="spec-text">Format: 1920x1080 → 9:16</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-icon">🎛️</span>
+                            <span class="spec-text">DDJ-200: Gecentreerd setup</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-icon">⏱️</span>
+                            <span class="spec-text">Clip Lengte: 30-60 seconden</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-icon">🎯</span>
+                            <span class="spec-text">Focus: Hands-on mixing</span>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="highlight warning">
                     <strong>⚡ Pro Tip:</strong> Begin clip net voor transitie/drop voor maximale impact
@@ -108,44 +145,88 @@
                 
                 <div class="hashtag-grid">
                     <div class="hashtag-category">
-                        <h4>🎛️ Basis DJ</h4>
+                        <div class="category-header">
+                            <span class="category-icon">🎛️</span>
+                            <h4>Basis DJ</h4>
+                        </div>
                         <div class="hashtag-list">
-                            #djlife #djmix #mixing #pioneerdj #ddj200 #djfail #transition
+                            <span class="hashtag">#djlife</span>
+                            <span class="hashtag">#djmix</span>
+                            <span class="hashtag">#mixing</span>
+                            <span class="hashtag">#pioneerdj</span>
+                            <span class="hashtag">#ddj200</span>
+                            <span class="hashtag">#djfail</span>
+                            <span class="hashtag">#transition</span>
                         </div>
                     </div>
                     
                     <div class="hashtag-category">
-                        <h4>🎶 House & Techno</h4>
+                        <div class="category-header">
+                            <span class="category-icon">🎶</span>
+                            <h4>House & Techno</h4>
+                        </div>
                         <div class="hashtag-list">
-                            #housemusic #techno #deephouse #progressivehouse #technomusic
+                            <span class="hashtag">#housemusic</span>
+                            <span class="hashtag">#techno</span>
+                            <span class="hashtag">#deephouse</span>
+                            <span class="hashtag">#progressivehouse</span>
+                            <span class="hashtag">#technomusic</span>
                         </div>
                     </div>
                     
                     <div class="hashtag-category">
-                        <h4>🥵 Drum & Bass</h4>
+                        <div class="category-header">
+                            <span class="category-icon">🥵</span>
+                            <h4>Drum & Bass</h4>
+                        </div>
                         <div class="hashtag-list">
-                            #drumandbass #dnb #dnbmix #bassmusic #jungledrum
+                            <span class="hashtag">#drumandbass</span>
+                            <span class="hashtag">#dnb</span>
+                            <span class="hashtag">#dnbmix</span>
+                            <span class="hashtag">#bassmusic</span>
+                            <span class="hashtag">#jungledrum</span>
                         </div>
                     </div>
                     
                     <div class="hashtag-category">
-                        <h4>💥 Hardstyle+</h4>
+                        <div class="category-header">
+                            <span class="category-icon">💥</span>
+                            <h4>Hardstyle+</h4>
+                        </div>
                         <div class="hashtag-list">
-                            #hardstyle #hardcore #uptempo #hardcoremusic #harddance
+                            <span class="hashtag">#hardstyle</span>
+                            <span class="hashtag">#hardcore</span>
+                            <span class="hashtag">#uptempo</span>
+                            <span class="hashtag">#hardcoremusic</span>
+                            <span class="hashtag">#harddance</span>
                         </div>
                     </div>
                     
                     <div class="hashtag-category">
-                        <h4>😅 Fails</h4>
+                        <div class="category-header">
+                            <span class="category-icon">😅</span>
+                            <h4>Fails</h4>
+                        </div>
                         <div class="hashtag-list">
-                            #djfails #mixingfail #learningdj #djstruggles #djhumor
+                            <span class="hashtag">#djfails</span>
+                            <span class="hashtag">#mixingfail</span>
+                            <span class="hashtag">#learningdj</span>
+                            <span class="hashtag">#djstruggles</span>
+                            <span class="hashtag">#djhumor</span>
                         </div>
                     </div>
                     
                     <div class="hashtag-category">
-                        <h4>✨ Skills</h4>
+                        <div class="category-header">
+                            <span class="category-icon">✨</span>
+                            <h4>Skills</h4>
+                        </div>
                         <div class="hashtag-list">
-                            #smoothtransition #beatmatching #djskills #perfectmix #seratoflow
+                            <span class="hashtag">#smoothtransition</span>
+                            <span class="hashtag">#beatmatching</span>
+                            <span class="hashtag">#djskills</span>
+                            <span class="hashtag">#perfectmix</span>
+                            <span class="hashtag">#seratoflow</span>
                         </div>
                     </div>
                 </div>
@@ -155,20 +236,54 @@
             <div class="card">
                 <h2>🤖 Algorithm Insights</h2>
                 
-                <h3>📈 Groei Patroon</h3>
-                <div class="highlight">
-                    <strong>Week 1:</strong> Warming-up (gemiddeld 20-30 views)<br>
-                    <strong>Week 2:</strong> Learning fase (40-60 views)<br>
-                    <strong>Week 3:</strong> Breakthrough (100+ views)
+                <div class="insights-section">
+                    <h3>📈 Groei Patroon</h3>
+                    <div class="growth-timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-week">Week 1</div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Warming-up</div>
+                                <div class="timeline-stats">gemiddeld 20-30 views</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-week">Week 2</div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Learning fase</div>
+                                <div class="timeline-stats">40-60 views</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item breakthrough">
+                            <div class="timeline-week">Week 3</div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Breakthrough</div>
+                                <div class="timeline-stats">100+ views</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <h3>⚡ Boost Factoren</h3>
-                <ul style="list-style: none; padding-left: 1rem;">
-                    <li>▶ Consistente posting op beste tijden</li>
-                    <li>▶ Algoritme leert je doelgroep kennen</li>
-                    <li>▶ Groeiende follower engagement</li>
-                    <li>▶ Cross-pollination door shares/tags</li>
-                </ul>
+                <div class="insights-section">
+                    <h3>⚡ Boost Factoren</h3>
+                    <div class="boost-factors">
+                        <div class="boost-item">
+                            <span class="boost-icon">📅</span>
+                            <span class="boost-text">Consistente posting op beste tijden</span>
+                        </div>
+                        <div class="boost-item">
+                            <span class="boost-icon">🎯</span>
+                            <span class="boost-text">Algoritme leert je doelgroep kennen</span>
+                        </div>
+                        <div class="boost-item">
+                            <span class="boost-icon">💫</span>
+                            <span class="boost-text">Groeiende follower engagement</span>
+                        </div>
+                        <div class="boost-item">
+                            <span class="boost-icon">🔄</span>
+                            <span class="boost-text">Cross-pollination door shares/tags</span>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="highlight success">
                     <strong>🎯 Key Insight:</strong> Woensdag 16:00 = mensen willen energie voor rest van week
@@ -179,13 +294,38 @@
             <div class="card action-plan">
                 <h2>🚀 Action Plan</h2>
                 
-                <ol class="action-steps">
-                    <li><strong>Focus op Woensdag 16:00</strong> als hoofdpost moment</li>
-                    <li><strong>Backup: Dinsdag 17:00</strong> voor extra content</li>
-                    <li><strong>Content Mix:</strong> 60% goede transities, 40% fails</li>
-                    <li><strong>Hashtag Rotatie:</strong> Wissel tussen genre en content tags</li>
-                    <li><strong>Consistentie:</strong> Minimaal 3x per week op beste tijden</li>
-                </ol>
+                <div class="action-steps">
+                    <div class="step-item">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <strong>Focus op Woensdag 16:00</strong> als hoofdpost moment
+                        </div>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <strong>Backup: Dinsdag 17:00</strong> voor extra content
+                        </div>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <strong>Content Mix:</strong> 60% goede transities, 40% fails
+                        </div>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <strong>Hashtag Rotatie:</strong> Wissel tussen genre en content tags
+                        </div>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <strong>Consistentie:</strong> Minimaal 3x per week op beste tijden
+                        </div>
+                    </div>
+                </div>
 
                 <div class="highlight warning">
                     <strong>⚠️ Vermijd:</strong> Vrijdag en weekend posting - mensen gaan zelf uit
@@ -193,10 +333,8 @@
             </div>
         </div>
 
-        <div style="text-align: center; margin-top: 2rem; padding: 2rem; background: rgba(0, 255, 136, 0.05); border-radius: 15px; border: 1px solid #00ff88;">
-            <p style="color: #66ffaa; font-size: 0.9rem;">
-                📊 Data gebaseerd op 3 weken analyse • 🎧 Optimaliseer en dominate Instagram!
-            </p>
+        <div class="footer-stats">
+            <p>📊 Data gebaseerd op 3 weken analyse • 🎧 Optimaliseer en domineer Instagram!</p>
         </div>
     </div>
 
