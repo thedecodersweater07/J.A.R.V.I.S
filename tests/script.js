@@ -7,13 +7,6 @@ let conversationHistory = [];
 let messageCount = 0;
 let pythonBridge = new PythonBridge();
 
-// WebSocket connection
-let ws = null;
-let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
-const RECONNECT_DELAY = 2000;
-const WS_PORT = 18087;
-
 // DOM Elements
 const chatMessages = document.getElementById('chatMessages');
 const chatForm = document.getElementById('chatForm');
@@ -23,14 +16,25 @@ const connectionStatus = document.getElementById('connectionStatus');
 const messageCountElement = document.getElementById('messageCount');
 const latencyDisplay = document.getElementById('latency');
 
+// Debug mode
+const DEBUG = true;
+
+function debugLog(...args) {
+    if (DEBUG) {
+        console.log('[DEBUG]', ...args);
+    }
+}
+
 let messageCounter = 0;
 let lastPingTime = null;
 
 // Configureer de Python bridge
 function setupPythonBridge() {
+    debugLog('Setting up Python bridge...');
+    
     // Stel event handlers in
     pythonBridge.onConnect = () => {
-        console.log('Verbonden met Python server');
+        debugLog('Connected to Python server');
         updateConnectionStatus('connected');
         
         // Toon welkomstbericht als dit de eerste keer is
@@ -40,42 +44,29 @@ function setupPythonBridge() {
     };
     
     pythonBridge.onDisconnect = (event) => {
-        console.log('Verbinding met Python server verbroken', event);
+        debugLog('Disconnected from Python server', event);
         updateConnectionStatus('disconnected');
         showError('Verbinding met de server verbroken. Er wordt geprobeerd opnieuw verbinding te maken...');
     };
     
-    pythonBridge.onReconnectAttempt = (attempt, maxAttempts, delay) => {
-        console.log(`Poging ${attempt}/${maxAttempts} om opnieuw te verbinden over ${delay}ms...`);
-        updateConnectionStatus('connecting', attempt, maxAttempts);
-    };
-    
-    pythonBridge.onMaxReconnectAttempts = () => {
-        console.error('Maximaal aantal herpogingen bereikt');
-        updateConnectionStatus('error');
-        showError('Kon geen verbinding maken met de server. Ververs de pagina om het opnieuw te proberen.');
-    };
-    
     pythonBridge.onError = (error) => {
-        console.error('Python bridge fout:', error);
+        console.error('Python bridge error:', error);
         showError(`Verbindingsfout: ${error.message}`);
     };
     
     // Start de verbinding
-    console.log('Initialiseer Python bridge...');
+    debugLog('Initializing Python bridge...');
     pythonBridge.connect();
-}
-
-// Controleer de verbindingsstatus
-function checkConnection() {
-    if (!pythonBridge.isConnected()) {
-        pythonBridge.reconnect();
-    }
 }
 
 // Functie om een bericht naar de AI te sturen
 async function sendToAI(message) {
-    if (!message || !message.trim() || isProcessing) return;
+    if (!message || !message.trim() || isProcessing) {
+        debugLog('Invalid message or already processing');
+        return;
+    }
+    
+    debugLog('Sending message to AI:', message);
     
     // Markeer dat we bezig zijn met verwerken
     isProcessing = true;
@@ -101,177 +92,77 @@ async function sendToAI(message) {
     const typingIndicator = addMessage('assistant', 'Denk na...', true);
     
     try {
-        // Bereid het verzoek voor met contextuele informatie
+        debugLog('Preparing request');
+        // Bereid het verzoek voor
         const request = {
             type: 'chat',
-            timestamp: new Date().toISOString(),
-            context: {
-                user_agent: navigator.userAgent,
-                language: navigator.language,
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                previous_messages: conversationHistory
-                    .slice(-4) // Neem de laatste 4 berichten als context
-                    .map(msg => ({
-                        role: msg.role,
-                        content: msg.content,
-                        timestamp: new Date().toISOString()
-                    }))
-            },
             message: message
         };
         
-        console.log('Verstuur verzoek:', request);
-        
-        // Verstuur het bericht naar de Python bridge
-        const response = await pythonBridge.sendMessage(request);
-        
-        console.log('Ontvangen antwoord:', response);
+        debugLog('Sending request:', request);
+        // Verstuur het bericht via de Python bridge
+        const response = await new Promise((resolve, reject) => {
+            pythonBridge.sendMessage(request, (error, result) => {
+                if (error) {
+                    debugLog('Error from Python bridge:', error);
+                    reject(error);
+                } else {
+                    debugLog('Response from Python bridge:', result);
+                    resolve(result);
+                }
+            });
+        });
         
         // Verwijder de 'typing' indicator
         if (typingIndicator) typingIndicator.remove();
         
-        // Verwerk het antwoord
-        if (response && (response.result || response.text)) {
-            const responseText = response.result || response.text;
-            
-            // Voeg AI antwoord toe aan de chat
-            addMessage('assistant', responseText);
+        debugLog('Processing response:', response);
+        // Voeg het antwoord toe aan de chat
+        if (response && response.message) {
+            addMessage('assistant', response.message);
             
             // Voeg toe aan gespreksgeschiedenis
             conversationHistory.push({ 
                 role: 'assistant', 
-                content: responseText,
+                content: response.message,
                 timestamp: new Date().toISOString()
             });
-            
-            // Voeg eventuele extra acties toe (bijv. knoppen, afbeeldingen, etc.)
-            if (response.actions && Array.isArray(response.actions)) {
-                handleResponseActions(response.actions);
-            }
         } else {
-            throw new Error('Ongeldig antwoord ontvangen van de server');
+            throw new Error('Invalid response format from server');
         }
     } catch (error) {
-        console.error('Fout bij versturen bericht:', error);
+        console.error('Error sending message:', error);
+        debugLog('Error details:', error);
         
         // Verwijder de 'typing' indicator
         if (typingIndicator) typingIndicator.remove();
         
-        // Toon een passende foutmelding
-        let errorMessage = 'Er is een fout opgetreden bij het verwerken van je bericht. ';
-        
-        if (error.message.includes('timeout') || error.message.includes('time-out')) {
-            errorMessage += 'De server reageert niet op tijd. Probeer het later opnieuw.';
-        } else if (error.message.includes('connection') || error.message.includes('verbinding')) {
-            errorMessage += 'Er is een probleem met de verbinding. Controleer je internetverbinding.';
-        } else {
-            errorMessage += 'Probeer het later opnieuw.';
-        }
-        
-        addMessage('error', errorMessage);
-        
-        // Probeer opnieuw verbinding te maken
-        if (pythonBridge.reconnect) {
-            pythonBridge.reconnect();
-        }
+        // Toon foutmelding
+        addMessage('error', 'Er is een fout opgetreden bij het verwerken van je bericht. Probeer het opnieuw.');
     } finally {
-        // Zorg ervoor dat de invoer weer actief is
         isProcessing = false;
-        
-        // Update de UI
         updateUI();
     }
 }
 
-// Functie om extra acties uit het antwoord te verwerken
-function handleResponseActions(actions) {
-    if (!Array.isArray(actions)) return;
-    
-    actions.forEach(action => {
-        if (action.type === 'show_image' && action.url) {
-            // Toon een afbeelding in de chat
-            const img = document.createElement('img');
-            img.src = action.url;
-            img.alt = action.alt || 'Afbeelding';
-            img.style.maxWidth = '100%';
-            img.style.borderRadius = '8px';
-            img.style.marginTop = '8px';
-            
-            const messageElement = document.querySelector('.message:last-child .message-content');
-            if (messageElement) {
-                messageElement.appendChild(document.createElement('br'));
-                messageElement.appendChild(img);
-            }
-        }
-        // Voeg hier meer actietypen toe indien nodig
-    });
-}
-
 // Functie om een bericht aan de chat toe te voegen
-function addMessage(sender, text, isTyping = false) {
-    const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) return null;
+function addMessage(type, text, isTyping = false) {
+    debugLog('Adding message:', { type, text, isTyping });
     
-    const messageElement = document.createElement('div');
-    messageElement.className = `message ${sender}${isTyping ? ' typing' : ''}`;
-    
-    // Voeg avatar toe
-    const avatar = document.createElement('div');
-    avatar.className = 'message-avatar';
-    
-    if (sender === 'assistant') {
-        avatar.innerHTML = '🤖'; // Of gebruik een afbeelding: <img src="path/to/avatar.png" alt="J.A.R.V.I.S.">
-    } else if (sender === 'user') {
-        avatar.innerHTML = '👤'; // Of gebruik een gebruikersafbeelding
-    } else {
-        avatar.innerHTML = '⚠️'; // Voor foutmeldingen
-    }
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type}`;
     
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
+    messageContent.textContent = text;
     
-    if (isTyping) {
-        // Voeg een leuke typing indicator toe met CSS-animaties
-        const typingIndicator = document.createElement('div');
-        typingIndicator.className = 'typing-indicator';
-        typingIndicator.innerHTML = `
-            <span></span>
-            <span></span>
-            <span></span>
-        `;
-        messageContent.appendChild(typingIndicator);
-    } else {
-        // Voeg de berichttekst toe
-        messageContent.textContent = text;
-    }
-    
-    // Voeg timestamp toe
-    const timestamp = document.createElement('div');
-    timestamp.className = 'message-timestamp';
-    timestamp.textContent = formatTime(new Date());
-    
-    // Voeg alle elementen samen
-    messageElement.appendChild(avatar);
-    messageElement.appendChild(messageContent);
-    messageElement.appendChild(timestamp);
-    
-    // Voeg het bericht toe aan de chat
-    chatMessages.appendChild(messageElement);
+    messageDiv.appendChild(messageContent);
+    chatMessages.appendChild(messageDiv);
     
     // Scroll naar beneden
     chatMessages.scrollTop = chatMessages.scrollHeight;
     
-    // Voeg een subtiele animatie toe voor nieuwe berichten
-    messageElement.style.opacity = '0';
-    messageElement.style.transform = 'translateY(10px)';
-    messageElement.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-    
-    setTimeout(() => {
-        messageElement.style.opacity = '1';
-        messageElement.style.transform = 'translateY(0)';
-    }, 10);
-    
-    return messageElement;
+    return isTyping ? messageDiv : null;
 }
 
 // Functie om de chat te wissen
@@ -300,6 +191,7 @@ function clearChat() {
 
 // Functie om de UI te updaten op basis van de huidige staat
 function updateUI() {
+    debugLog('Updating UI');
     const messageInput = document.getElementById('messageInput');
     const sendButton = document.getElementById('sendButton');
     const clearButton = document.getElementById('clearButton');
@@ -337,32 +229,14 @@ function updateUI() {
 
 // Functie om de verbindingsstatus in de UI bij te werken
 function updateConnectionStatus(status) {
-    const statusIndicator = document.getElementById('statusIndicator');
-    const connectionStatus = document.getElementById('connectionStatus');
-    
-    if (!statusIndicator || !connectionStatus) return;
-    
-    switch (status) {
-        case 'connected':
-            statusIndicator.className = 'status-indicator connected';
-            connectionStatus.textContent = 'Connected';
-            connectionStatus.className = 'status connected';
-            break;
-        case 'disconnected':
-            statusIndicator.className = 'status-indicator disconnected';
-            connectionStatus.textContent = 'Disconnected';
-            connectionStatus.className = 'status disconnected';
-            break;
-        default:
-            statusIndicator.className = 'status-indicator disconnected';
-            connectionStatus.textContent = 'Disconnected';
-            connectionStatus.className = 'status disconnected';
-    }
+    debugLog('Updating connection status:', status);
+    statusIndicator.className = `pulse-dot ${status}`;
+    connectionStatus.textContent = status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 // Functie om een foutmelding te tonen
 function showError(message) {
-    console.error('Fout:', message);
+    debugLog('Showing error:', message);
     addMessage('error', message);
 }
 
@@ -380,6 +254,7 @@ function formatTime(date) {
 
 // Functie om de statistieken bij te werken
 function updateStats() {
+    debugLog('Updating stats');
     const statsElement = document.getElementById('stats');
     if (!statsElement) return;
     
@@ -418,6 +293,8 @@ function updateStats() {
 
 // Functie om event listeners toe te voegen
 function setupEventListeners() {
+    debugLog('Setting up event listeners');
+    
     // Zoek de chat formulier en input elementen
     const chatForm = document.getElementById('chatForm');
     const messageInput = document.getElementById('messageInput');
@@ -429,13 +306,14 @@ function setupEventListeners() {
     }
     
     // Voeg submit handler toe aan het formulier
-    chatForm.addEventListener('submit', async (e) => {
+    chatForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const message = messageInput.value.trim();
+        debugLog('Form submitted with message:', message);
+        
         if (message) {
-            await sendToAI(message);
+            sendToAI(message);
             messageInput.value = '';
-            messageInput.focus();
         }
     });
     
@@ -450,15 +328,10 @@ function setupEventListeners() {
     });
     
     // Voeg enter key handler toe aan het input veld
-    messageInput.addEventListener('keypress', async (e) => {
+    messageInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            const message = messageInput.value.trim();
-            if (message) {
-                await sendToAI(message);
-                messageInput.value = '';
-                messageInput.focus();
-            }
+            chatForm.dispatchEvent(new Event('submit'));
         }
     });
     
@@ -478,68 +351,9 @@ function updateStatus(status, message) {
     connectionStatus.textContent = message;
 }
 
-function connectWebSocket() {
-    if (ws) {
-        ws.close();
-        ws = null;
-    }
-
-    ws = new WebSocket(`ws://${window.location.hostname}:${WS_PORT}`);
-
-    ws.onopen = () => {
-        console.log('WebSocket Connected');
-        updateConnectionStatus('connected');
-        reconnectAttempts = 0;
-        startPingInterval();
-    };
-
-    ws.onclose = () => {
-        console.log('WebSocket Disconnected');
-        updateConnectionStatus('disconnected');
-        ws = null;
-        clearInterval(pingInterval);
-        
-        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-            reconnectAttempts++;
-            setTimeout(connectWebSocket, RECONNECT_DELAY);
-        }
-    };
-
-    ws.onerror = (error) => {
-        console.error('WebSocket Error:', error);
-        updateConnectionStatus('disconnected');
-    };
-
-    ws.onmessage = (event) => {
-        try {
-            const data = JSON.parse(event.data);
-            
-            if (data.type === 'pong' && lastPingTime) {
-                const latency = Date.now() - lastPingTime;
-                updateLatency(latency);
-                lastPingTime = null;
-            }
-            else if (data.type === 'status') {
-                updateConnectionStatus(data.status.toLowerCase());
-            }
-            
-        } catch (error) {
-            console.error('Error processing message:', error);
-        }
-    };
-}
-
-function startPingInterval() {
-    window.pingInterval = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-            lastPingTime = Date.now();
-            ws.send(JSON.stringify({ type: 'ping' }));
-        }
-    }, 5000);
-}
-
 // Initialiseer de applicatie
 document.addEventListener('DOMContentLoaded', () => {
+    debugLog('DOM loaded, initializing...');
     setupPythonBridge();
     setupEventListeners();
     
@@ -551,7 +365,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Initialize connection
     updateConnectionStatus('disconnected');
-    connectWebSocket();
 });
 
 // Export for use in React component

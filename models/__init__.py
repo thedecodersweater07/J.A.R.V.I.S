@@ -1,6 +1,12 @@
+"""
+JARVIS Models Package
+====================
+Core models for JARVIS AI system.
+"""
+
 from typing import Dict, Any
 # Relative import to avoid package installation requirement
-from .jarvis import JarvisModel, JarvisLanguageModel
+from .jarvis import JarvisModel, JarvisLanguageModel, JarvisModelManager
 from .base import BaseModel
 
 # Model registry
@@ -17,4 +23,4 @@ def create_model(model_name: str) -> BaseModel:
         raise ValueError(f"Unknown model: {model_name}")
     return MODELS[model_name]()
 
-__all__ = ['JarvisModel', 'JarvisLanguageModel', 'BaseModel', 'create_model']
+__all__ = ['JarvisModel', 'JarvisLanguageModel', 'JarvisModelManager', 'BaseModel', 'create_model']

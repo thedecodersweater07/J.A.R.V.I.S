@@ -1,309 +1,360 @@
-"""Integration test server for JARVIS"""
-
-import asyncio
-import json
+"""
+JARVIS Integration Server - Simplified
+======================================
+A lightweight WebSocket and HTTP server for JARVIS AI model integration.
+"""
+import os
+import time
+import socket
 import logging
-import websockets
-from websockets.legacy.server import WebSocketServerProtocol, serve as websocket_serve
+import asyncio
+import threading
+import json
 import signal
 import sys
-import socket
+import traceback
+from datetime import datetime
+from typing import Dict, Any, Set, Optional, Protocol, Union, Awaitable
+from pathlib import Path
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from pathlib import Path
-from typing import Any, Awaitable, Optional, cast
-import threading
-import os
 
-# Add the project root to the Python path
-import sys
-from pathlib import Path
-project_root = str(Path(__file__).parent.parent.absolute())
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-# Import JARVIS model
-from models.jarvis import JarvisLanguageModel
+# Import WebSocket related modules
+try:
+    import websockets
+    # We'll use the main websockets module directly for better compatibility
+    from websockets.typing import Data
+except ImportError as e:
+    print("Error: websockets module not found.")
+    print("Please install it with: pip install 'websockets>=10.0'")
+    sys.exit(1)
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('jarvis_server.log')
+    ]
 )
+
 logger = logging.getLogger(__name__)
 
-def find_free_port(start_port: int, max_attempts: int = 10) -> int:
-    """Find a free port starting from start_port"""
-    for port in range(start_port, start_port + max_attempts):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.bind(('127.0.0.1', port))
-                return port
-        except OSError:
-            logger.warning(f"Port {port} is already in use")
-            continue
-    raise RuntimeError(f"Could not find a free port in range {start_port}-{start_port + max_attempts}")
+class SimpleAIModel:
+    """A simple AI model that can be used when the main model is not available"""
+    def __init__(self):
+        self.responses = {
+            "hallo": "Hoi! Hoe kan ik je helpen?",
+            "hey": "Hey! Wat kan ik voor je doen?",
+            "hi": "Hi daar! Waar kan ik je mee helpen?",
+            "help": "Ik ben een eenvoudige AI assistent. Ik kan basic vragen beantwoorden en gesprekken voeren.",
+            "wie ben je": "Ik ben J.A.R.V.I.S., je AI assistent. Momenteel draai ik in fallback modus.",
+            "wat kun je": "In fallback modus kan ik eenvoudige gesprekken voeren en basis vragen beantwoorden.",
+            "hoe gaat het": "Met mij gaat het goed! Ik draai in fallback modus maar ben nog steeds beschikbaar om te helpen.",
+            "dag": "Tot ziens! Het was fijn om je te helpen.",
+            "doei": "Doei! Kom gerust terug als je meer vragen hebt.",
+        }
+        self.default_response = "Ik begrijp je bericht. Helaas draai ik momenteel in fallback modus met beperkte functionaliteit."
 
-def check_port_in_use(port: int) -> bool:
-    """Check if a port is in use"""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        try:
-            sock.bind(('127.0.0.1', port))
-            return False
-        except OSError:
-            return True
+    def generate_response(self, message: str) -> str:
+        """Generate a response based on the input message"""
+        message = message.lower().strip()
+        
+        # Check for exact matches
+        if message in self.responses:
+            return self.responses[message]
+            
+        # Check for partial matches
+        for key in self.responses:
+            if key in message:
+                return self.responses[key]
+                
+        return self.default_response
+
+class CustomHandler(SimpleHTTPRequestHandler):
+    """Custom HTTP request handler that serves static files"""
+    def __init__(self, *args, **kwargs):
+        self.directory = str(Path(__file__).parent)
+        super().__init__(*args, **kwargs)
+
+    def log_message(self, format, *args):
+        """Override to use our logger"""
+        logger.debug(f"HTTP: {format % args}")
 
 class JarvisServer:
-    def __init__(self, host: str = '127.0.0.1', http_port: Optional[int] = None, ws_port: Optional[int] = None):
+    def __init__(self, host: str = '127.0.0.1', http_port: int = 8080, ws_port: int = 8765) -> None:
         self.host = host
-        # Find free ports if none specified
-        self.http_port = http_port or find_free_port(18080)
-        self.ws_port = ws_port or find_free_port(self.http_port + 1)
-        
-        self.clients: set[WebSocketServerProtocol] = set()
-        self.is_running = False
-        self.is_connected = False
-        self.http_server: Optional[HTTPServer] = None
-        self.http_thread: Optional[threading.Thread] = None
-        self.ws_server = None
-        
-        # Initialize JARVIS model
-        self.jarvis = JarvisLanguageModel()
-        
-        # Update the WebSocket port in the JavaScript file
-        self.update_ws_port_in_js()
-        
-    def update_ws_port_in_js(self) -> None:
-        """Update the WebSocket port in the JavaScript file"""
-        try:
-            js_file = Path(__file__).parent / 'script.js'
-            if not js_file.exists():
-                logger.warning(f"Could not find {js_file}")
-                return
-            
-            # Read with UTF-8 encoding
-            content = js_file.read_text(encoding='utf-8')
-            
-            # Find the WS_PORT line and update it
-            lines = content.splitlines()
-            for i, line in enumerate(lines):
-                if 'const WS_PORT' in line:
-                    lines[i] = f"const WS_PORT = {self.ws_port};"
-                    break
-            
-            # Write back with UTF-8 encoding
-            js_file.write_text('\n'.join(lines), encoding='utf-8')
-            logger.info(f"Updated WebSocket port in script.js to {self.ws_port}")
-        except Exception as e:
-            logger.error(f"Failed to update WebSocket port in script.js: {e}")
-
-    def start_http_server(self) -> None:
-        """Start the HTTP server in a separate thread"""
-        try:
-            # Change to the directory containing the test files
-            os.chdir(Path(__file__).parent)
-            
-            handler = SimpleHTTPRequestHandler
-            self.http_server = HTTPServer((self.host, self.http_port), handler)
-            logger.info(f"HTTP server started at http://{self.host}:{self.http_port}")
-            self.http_server.serve_forever()
-        except Exception as e:
-            logger.error(f"HTTP server error: {e}")
-            self.is_running = False
+        self.http_port = http_port
+        self.ws_port = ws_port
+        self.clients: Set[Any] = set()  # Using Any for WebSocketServerProtocol compatibility
+        self.model = SimpleAIModel()
+        self.stats = {
+            'start_time': datetime.now(),
+            'connections': 0,
+            'messages': 0
+        }
+        self._server = None
+        self._http_server = None
     
-    async def connect(self) -> None:
-        """Connect to the server and start all services"""
-        if self.is_connected:
-            logger.warning("Server is already connected")
-            return
-
+    async def start(self) -> None:
+        """Start the WebSocket and HTTP servers"""
+        # Start WebSocket server in the background
+        ws_task = asyncio.create_task(self.start_websocket_server())
+        
+        # Start HTTP server in the background
+        http_task = asyncio.create_task(self.run_http_server())
+        
+        # Wait for both servers to be ready
+        await asyncio.gather(ws_task, http_task, return_exceptions=True)
+        
+        # Keep the server running
+        while True:
+            await asyncio.sleep(1)
+    
+    def run_http_server_sync(self) -> None:
+        """Run the HTTP server in a synchronous way"""
+        class AsyncHTTPRequestHandler(SimpleHTTPRequestHandler):
+            def do_GET(self):
+                try:
+                    return SimpleHTTPRequestHandler.do_GET(self)
+                except Exception as e:
+                    logger.error(f"Error handling GET request: {e}")
+                    self.send_error(500, str(e))
+            
+            def log_message(self, format, *args):
+                logger.info(f"HTTP {self.address_string()} - {format % args}")
+        
+        self._http_server = HTTPServer((self.host, self.http_port), AsyncHTTPRequestHandler)
+        logger.info(f"HTTP server started on http://{self.host}:{self.http_port}")
+        self._http_server.serve_forever()
+    
+    async def run_http_server(self) -> None:
+        """Run the HTTP server in a separate thread"""
+        # Run the HTTP server in a separate thread
+        def start_http_server():
+            try:
+                self.run_http_server_sync()
+            except Exception as e:
+                logger.error(f"HTTP server error: {e}")
+        
+        http_thread = threading.Thread(target=start_http_server, daemon=True)
+        http_thread.start()
+        
+        # Give the server a moment to start
+        await asyncio.sleep(0.1)
+    
+    async def stop(self) -> None:
+        """Stop the servers"""
+        if self._server:
+            self._server.close()
+            await self._server.wait_closed()
+        if self._http_server:
+            self._http_server.shutdown()
+        logger.info("Servers stopped")
+    
+    async def handle_websocket(self, websocket, path: str = '') -> None:
+        """Handle WebSocket connections
+        
+        Args:
+            websocket: The WebSocket connection
+            path: Optional path (for compatibility with older websockets versions)
+        """
+        self.clients.add(websocket)
+        self.stats['connections'] += 1
+        client_ip = 'unknown'
+        
         try:
-            # Start HTTP server in a separate thread
-            self.http_thread = threading.Thread(target=self.start_http_server)
-            self.http_thread.daemon = True
-            self.http_thread.start()
-            
-            # Start WebSocket server
-            self.ws_server = await websocket_serve(
-                self.handle_websocket,
-                self.host,
-                self.ws_port,
-                ping_interval=20,
-                ping_timeout=20
-            )
-            
-            self.is_running = True
-            self.is_connected = True
-            
-            logger.info("Successfully connected to all services")
-            logger.info(f"HTTP server running at http://{self.host}:{self.http_port}")
-            logger.info(f"WebSocket server running at ws://{self.host}:{self.ws_port}")
-            
-            # Print server info
-            self.print_server_info()
-            
-        except Exception as e:
-            logger.error(f"Failed to connect: {str(e)}")
-            await self.disconnect()
-            raise
-
-    async def disconnect(self) -> None:
-        """Disconnect from all services and cleanup"""
-        if not self.is_connected:
-            logger.warning("Server is not connected")
-            return
-            
-        logger.info("Disconnecting from all services...")
-        
-        # Close all client connections
-        if self.clients:
-            logger.info(f"Closing {len(self.clients)} client connections...")
-            await asyncio.gather(*[ws.close() for ws in self.clients])
-        self.clients.clear()
-        
-        # Stop WebSocket server
-        if self.ws_server:
-            logger.info("Stopping WebSocket server...")
-            self.ws_server.close()
-            await self.ws_server.wait_closed()
-            self.ws_server = None
-        
-        # Stop HTTP server
-        if self.http_server:
-            logger.info("Stopping HTTP server...")
-            self.http_server.shutdown()
-            self.http_server.server_close()
-            self.http_server = None
-        
-        # Stop HTTP thread
-        if self.http_thread and self.http_thread.is_alive():
-            logger.info("Waiting for HTTP thread to stop...")
-            self.http_thread.join(timeout=5)
-            self.http_thread = None
-
-        self.is_running = False
-        self.is_connected = False
-        logger.info("Successfully disconnected from all services")
-
-    async def handle_websocket(self, websocket: WebSocketServerProtocol) -> None:
-        """Handle WebSocket connections"""
-        try:
-            # Register client
-            client_id = id(websocket)
-            self.clients.add(websocket)
-            logger.info(f"Client {client_id} connected. Total clients: {len(self.clients)}")
-            
-            # Send initial status
-            await websocket.send(json.dumps({
-                'type': 'status',
-                'status': 'Connected',
-                'client_id': client_id
-            }))
+            if hasattr(websocket, 'remote_address') and websocket.remote_address:
+                client_ip = websocket.remote_address[0] if isinstance(websocket.remote_address, (list, tuple)) else str(websocket.remote_address)
+                
+            logger.info(f"New WebSocket connection from {client_ip}. Total clients: {len(self.clients)}")
             
             async for message in websocket:
+                self.stats['messages'] += 1
+                logger.debug(f"Received message from {client_ip}: {message}")
+                
                 try:
                     data = json.loads(message)
-                    if data.get('type') == 'message':
-                        user_message = data.get('message', '')
-                        
-                        # Get response from JARVIS
-                        response = self.jarvis.generate_response(user_message)
-                        
-                        # Send response back to client
-                        await websocket.send(json.dumps({
-                            'type': 'response',
-                            'message': response,
-                            'client_id': client_id
-                        }))
-                    
+                    response = await self._process_message(data)
+                    await websocket.send(json.dumps(response))
                 except json.JSONDecodeError:
-                    logger.error(f"Invalid JSON from client {client_id}")
-                except Exception as e:
-                    logger.error(f"Error processing message from client {client_id}: {e}")
+                    logger.error(f"Invalid JSON received from {client_ip}")
                     await websocket.send(json.dumps({
-                        'type': 'error',
-                        'message': str(e),
-                        'client_id': client_id
+                        'status': 'error',
+                        'message': 'Invalid JSON format'
                     }))
-                    
+                except Exception as e:
+                    logger.error(f"Error processing message from {client_ip}: {e}")
+                    logger.error(traceback.format_exc())
+                    await websocket.send(json.dumps({
+                        'status': 'error',
+                        'message': f'Error processing message: {str(e)}'
+                    }))
         except websockets.exceptions.ConnectionClosed:
-            logger.info(f"Client {client_id} connection closed")
+            logger.info(f"WebSocket connection closed by {client_ip}")
         except Exception as e:
-            logger.error(f"WebSocket error for client {client_id}: {e}")
+            logger.error(f"WebSocket error with {client_ip}: {e}")
+            logger.error(traceback.format_exc())
         finally:
-            # Unregister client
-            self.clients.remove(websocket)
-            logger.info(f"Client {client_id} disconnected. Total clients: {len(self.clients)}")
-
-    async def start(self) -> None:
-        """Start the server"""
-        await self.connect()
-        try:
-            while self.is_running:
-                await asyncio.sleep(1)
-        except asyncio.CancelledError:
-            logger.info("Received shutdown signal")
-        finally:
-            await self.stop()
-
-    async def stop(self) -> None:
-        """Stop the server"""
-        self.is_running = False
-        await self.disconnect()
-
-    def print_server_info(self) -> None:
-        """Print server information in a nice box"""
-        info = [
-            "J.A.R.V.I.S. AI Server",
-            f"• HTTP:      http://{self.host}:{self.http_port}",
-            f"• WebSocket: ws://{self.host}:{self.ws_port}",
-            f"• Status:    {'Connected' if self.is_connected else 'Disconnected'}"
-        ]
-        
-        # Calculate box width
-        width = max(len(line) for line in info) + 4
-        
-        # Print top border
-        print("╔" + "═" * width + "╗")
-        
-        # Print title
-        print("║" + info[0].center(width) + "║")
-        
-        # Print separator
-        print("╠" + "═" * width + "╣")
-        
-        # Print info lines
-        for line in info[1:]:
-            print("║" + line.ljust(width) + "║")
-        
-        # Print separator
-        print("╠" + "═" * width + "╣")
-        
-        # Print instructions
-        print("║" + "Gebruik Ctrl+C om te stoppen".center(width) + "║")
-        
-        # Print bottom border
-        print("╚" + "═" * width + "╝")
-
-def handle_shutdown(signum: int, frame: Any) -> None:
-    """Handle shutdown signals"""
-    logger.info("Received shutdown signal")
-    sys.exit(0)
-
-if __name__ == "__main__":
-    # Register signal handlers
-    signal.signal(signal.SIGINT, handle_shutdown)
-    signal.signal(signal.SIGTERM, handle_shutdown)
+            try:
+                self.clients.remove(websocket)
+                logger.info(f"Client {client_ip} disconnected. Remaining clients: {len(self.clients)}")
+            except (KeyError, ValueError):
+                pass
     
-    # Create and start server
+    async def _process_message(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process incoming message"""
+        try:
+            message_type = data.get('type', 'chat')
+            logger.debug(f"Processing message of type: {message_type}")
+            
+            if message_type == 'chat':
+                user_message = data.get('message', '')
+                logger.debug(f"Processing chat message: {user_message}")
+                
+                response = self.model.generate_response(user_message)
+                logger.debug(f"Generated model response: {response}")
+                
+                return {
+                    'type': 'response',
+                    'message': response,
+                    'timestamp': datetime.now().isoformat()
+                }
+            
+            elif message_type == 'status':
+                return {
+                    'type': 'status',
+                    'server': 'running',
+                    'model': 'fallback_active',
+                    'clients': len(self.clients),
+                    'uptime': str(datetime.now() - self.stats['start_time']),
+                    'stats': self.stats
+                }
+            
+            else:
+                logger.warning(f"Unknown message type received: {message_type}")
+                return {
+                    'type': 'error',
+                    'message': f'Unknown message type: {message_type}'
+                }
+        except Exception as e:
+            logger.error(f"Error in _process_message: {e}\n{traceback.format_exc()}")
+            return {
+                'type': 'error',
+                'message': 'Error processing message',
+                'details': str(e)
+            }
+    
+    def start_http_server(self):
+        """Start HTTP server for serving static files"""
+        try:
+            httpd = HTTPServer((self.host, self.http_port), CustomHandler)
+            logger.info(f"HTTP server starting on http://{self.host}:{self.http_port}")
+            httpd.serve_forever()
+        except Exception as e:
+            logger.error(f"HTTP server error: {e}")
+    
+    def is_port_available(self, port: int) -> bool:
+        """Check if a port is available on the given host."""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                s.bind((self.host, port))
+                # Get the port number that was actually bound
+                _, bound_port = s.getsockname()
+                # Close the socket immediately
+                s.close()
+                # On Windows, we need to wait a moment for the port to be released
+                if os.name == 'nt':
+                    time.sleep(0.1)
+                return True
+            except OSError as e:
+                logger.debug(f"Port {port} is not available: {e}")
+                return False
+            except Exception as e:
+                logger.error(f"Error checking port {port}: {e}")
+                return False
+    
+    async def start_websocket_server(self, max_attempts: int = 10) -> bool:
+        """Start WebSocket server with automatic port selection"""
+        original_port = self.ws_port
+        server = None
+        
+        for attempt in range(max_attempts):
+            try:
+                if not self.is_port_available(self.ws_port):
+                    logger.warning(f"Port {self.ws_port} is in use, trying next port...")
+                    self.ws_port += 1
+                    continue
+                
+                # Create server with minimal options for maximum compatibility
+                server = await websockets.serve(
+                    self.handle_websocket,
+                    self.host,
+                    self.ws_port,
+                    # Skip reuse_port as it's not supported on Windows
+                    ping_interval=30,
+                    ping_timeout=30,
+                    close_timeout=1,  # Faster cleanup
+                    # Disable compression for better performance
+                    compression=None,
+                    # Use smaller buffer sizes for better behavior on Windows
+                    read_limit=2**16,
+                    write_limit=2**16
+                )
+                
+                if self.ws_port != original_port:
+                    logger.warning(f"Port {original_port} was in use, using port {self.ws_port} instead")
+                
+                logger.info(f"WebSocket server started on ws://{self.host}:{self.ws_port}")
+                logger.info(f"Server ready! Open http://{self.host}:{self.http_port} in your browser")
+                
+                # Keep the server running until it's closed
+                await server.wait_closed()
+                return True
+                
+            except OSError as e:
+                if server is not None:
+                    server.close()
+                    await server.wait_closed()
+                
+                if "Address already in use" in str(e) or "address is already in use" in str(e).lower():
+                    self.ws_port += 1
+                    if attempt < max_attempts - 1:
+                        await asyncio.sleep(0.1)  # Small delay before retry
+                        continue
+                
+                logger.error(f"Failed to start WebSocket server after {attempt + 1} attempts: {e}")
+                logger.debug(traceback.format_exc())
+                return False
+            except Exception as e:
+                if server is not None:
+                    server.close()
+                    await server.wait_closed()
+                logger.error(f"Unexpected error starting WebSocket server: {e}")
+                logger.debug(traceback.format_exc())
+                return False
+        
+        logger.error(f"Could not find an available port in range {original_port}-{self.ws_port}")
+        return False
+
+def main():
+    """Main entry point"""
     server = JarvisServer()
     
+    # Start HTTP server in a separate thread
+    http_thread = threading.Thread(target=server.start_http_server, daemon=True)
+    http_thread.start()
+    
+    # Start WebSocket server in the main thread
     try:
-        asyncio.run(server.start())
+        asyncio.get_event_loop().run_until_complete(server.start_websocket_server())
     except KeyboardInterrupt:
-        logger.info("Received keyboard interrupt")
+        logger.info("Shutting down server...")
     except Exception as e:
         logger.error(f"Server error: {e}")
     finally:
-        # Ensure proper cleanup
-        if server.is_connected:
-            asyncio.run(server.disconnect())
+        logger.info("Server stopped")
+
+if __name__ == "__main__":
+    main()

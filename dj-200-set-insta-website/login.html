@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DJ Guide - Login</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="grid-background"></div>
+    <div class="glow-overlay"></div>
+    
+    <div class="login-container">
+        <div class="login-card">
+            <h2>🎧 DJ LOGIN</h2>
+            
+            <form id="loginForm" action="/login" method="post" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="remember" name="remember">
+                        Remember me
+                    </label>
+                </div>
+                
+                <button type="submit" class="btn">LOGIN 🚀</button>
+            </form>
+            
+            <div class="auth-links">
+                <p>Geen account? <a href="register.html">Maak er een aan</a></p>
+                <p><a href="forgot.html">Wachtwoord vergeten?</a></p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

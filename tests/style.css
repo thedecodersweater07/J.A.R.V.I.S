@@ -2,9 +2,9 @@
 
 :root {
     /* Primary Colors */
-    --neon-cyan: #00f5ff;
+    --neon-cyan: #00f7ff;
     --electric-blue: #0066ff;
-    --plasma-purple: #b300ff;
+    --plasma-purple: #9933ff;
     --quantum-pink: #ff0080;
     --neural-green: #00ff88;
     --photon-yellow: #ffcc00;
@@ -37,6 +37,12 @@
     /* Grid Properties */
     --grid-size: 40px;
     --grid-opacity: 0.15;
+
+    --background-color: #0a0a1f;
+    --text-color: #e0e0ff;
+    --success-green: #00ff9d;
+    --error-red: #ff3366;
+    --warning-yellow: #ffcc00;
 }
 
 * {
@@ -47,8 +53,8 @@
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: var(--void-black);
-    color: var(--text-primary);
+    background: var(--background-color);
+    color: var(--text-color);
     min-height: 100vh;
     overflow-x: hidden;
     position: relative;
@@ -133,12 +139,12 @@ body {
 
 .particle {
     position: absolute;
-    width: 2px;
-    height: 2px;
+    width: 4px;
+    height: 4px;
     background: var(--neon-cyan);
     border-radius: 50%;
-    box-shadow: 0 0 6px currentColor;
-    animation: quantum-drift 15s linear infinite;
+    filter: blur(2px);
+    animation: float 20s infinite linear;
 }
 
 .particle:nth-child(1) { left: 10%; animation-delay: 0s; background: var(--electric-blue); }
@@ -150,20 +156,12 @@ body {
 .particle:nth-child(7) { left: 70%; animation-delay: -12s; background: var(--photon-yellow); }
 .particle:nth-child(8) { left: 80%; animation-delay: -14s; background: var(--plasma-purple); }
 
-@keyframes quantum-drift {
+@keyframes float {
     0% {
-        transform: translateY(100vh) translateX(0px) rotate(0deg);
-        opacity: 0;
-    }
-    10% {
-        opacity: 1;
-    }
-    90% {
-        opacity: 1;
+        transform: translate(0, 0);
     }
     100% {
-        transform: translateY(-10vh) translateX(100px) rotate(360deg);
-        opacity: 0;
+        transform: translate(100vw, 100vh);
     }
 }
 
@@ -319,8 +317,8 @@ h1 {
 }
 
 .pulse-dot {
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
     position: relative;
 }
@@ -335,15 +333,15 @@ h1 {
 }
 
 .pulse-dot.connected {
-    background: #4CAF50;
-}
-
-.pulse-dot.connecting {
-    background: #FFC107;
+    background-color: var(--success-green);
 }
 
 .pulse-dot.disconnected {
-    background: #F44336;
+    background-color: var(--error-red);
+}
+
+.pulse-dot.connecting {
+    background-color: var(--warning-yellow);
 }
 
 .pulse-dot.error {
@@ -359,7 +357,7 @@ h1 {
 @keyframes pulse {
     0% {
         transform: scale(1);
-        opacity: 0.7;
+        opacity: 0.8;
     }
     50% {
         transform: scale(1.5);
@@ -367,7 +365,7 @@ h1 {
     }
     100% {
         transform: scale(1);
-        opacity: 0.7;
+        opacity: 0.8;
     }
 }
 
@@ -391,7 +389,7 @@ h1 {
     flex: 1;
     overflow-y: auto;
     padding: 20px;
-    background: rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 10px;
     margin-bottom: 20px;
     min-height: 400px;
@@ -438,6 +436,13 @@ h1 {
 
 .message.assistant .message-content {
     background: rgba(0, 136, 255, 0.1);
+}
+
+.message.error {
+    background: rgba(255, 51, 102, 0.2);
+    color: var(--error-red);
+    margin: 10px auto;
+    text-align: center;
 }
 
 /* Input section styles */
@@ -724,17 +729,22 @@ h1 {
 
 /* Typing indicator */
 .typing-indicator {
+    display: none;
+    padding: 10px;
+    margin: 10px 0;
+}
+
+.typing-indicator.visible {
     display: flex;
     gap: 5px;
-    padding: 10px;
 }
 
 .typing-indicator span {
     width: 8px;
     height: 8px;
+    background: var(--neon-cyan);
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.5);
-    animation: typing 1s infinite;
+    animation: bounce 1s infinite;
 }
 
 .typing-indicator span:nth-child(2) {
@@ -745,11 +755,11 @@ h1 {
     animation-delay: 0.4s;
 }
 
-@keyframes typing {
+@keyframes bounce {
     0%, 100% {
         transform: translateY(0);
     }
     50% {
-        transform: translateY(-5px);
+        transform: translateY(-10px);
     }
 }
