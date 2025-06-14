@@ -19,3 +19,4 @@ De jarvis model is te vinden in de folder model en dan jarvis daar moet als in v
 Om het jarvis model te gebruiken, moet je de jarvis.py file uitvoeren. Deze file bevat de code om het model te laden en te gebruiken voor het genereren van tekst en het beantwoorden van vragen. De jarvis.py file maakt gebruik van de jarvis_model folder om het model te laden en te gebruiken.
 # jarvis model trainen
 Het trainen van het jarvis model is een complex proces dat veel tijd en middelen vereist. Het model is getraind op een grote dataset van tekst en is geoptimaliseerd voor het genereren van tekst en het beantwoorden van vragen. Het trainen van het model kan worden gedaan met behulp van de code in de jarvis.py file, maar dit vereist wel kennis van machine learning en deep learning.
+

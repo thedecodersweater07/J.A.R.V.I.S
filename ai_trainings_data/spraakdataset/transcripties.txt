@@ -1,5 +1,0 @@
-audio_0.wav: Dit is transcriptie 0
-audio_1.wav: Dit is transcriptie 1
-audio_2.wav: Dit is transcriptie 2
-audio_3.wav: Dit is transcriptie 3
-audio_4.wav: Dit is transcriptie 4
