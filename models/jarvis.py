@@ -187,8 +187,8 @@ except ModuleNotFoundError:
 if 'nn' not in globals():
     import torch.nn as nn  # type: ignore
 
-from typing import Dict, Any, Optional, List, Union, Callable
-from dataclasses import dataclass
+from typing import Dict, Any, Optional, List, Union, Callable, Type, Tuple
+from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 from pathlib import Path
 import logging
@@ -197,6 +197,79 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import pickle
 import json
+import sys
+import os
+from importlib import import_module
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Try to import ML/NLP/LLM modules with fallbacks
+try:
+    import torch
+    import numpy as np
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    logger.warning("PyTorch not available. Some ML/NLP features will be disabled.")
+    
+    # Create dummy torch and numpy modules for type checking
+    import types
+    sys.modules['torch'] = types.ModuleType('torch')
+    sys.modules['numpy'] = types.ModuleType('numpy')
+    import torch  # type: ignore
+    import numpy as np  # type: ignore
+
+# Try to import LLM components
+try:
+    from llm.LLM import LLMService, LLMServiceManager, LLMConfig
+except ImportError as e:
+    logger.warning(f"Could not import LLM components: {e}")
+    
+    # Define dummy LLM classes for type checking
+    class LLMConfig:
+        def __init__(self, **kwargs):
+            self.config = kwargs
+
+    class LLMService:
+        def __init__(self, config):
+            self.config = config
+        def process_input(self, text, context=None):
+            return {"response": "LLM service not available", "success": False}
+
+    class LLMServiceManager:
+        def __init__(self):
+            self.services = {}
+        def add_service(self, name, config):
+            self.services[name] = LLMService(config)
+        def get_service(self, name):
+            return self.services.get(name, LLMService(LLMConfig()))
+
+# Try to import NLP components
+try:
+    from nlp.processor import NLPProcessor
+except ImportError as e:
+    logger.warning(f"Could not import NLP components: {e}")
+    
+    # Define dummy NLPProcessor for type checking
+    class NLPProcessor:
+        def __init__(self, model_name="default"):
+            self.model_name = model_name
+        def process(self, text):
+            return {"text": text, "tokens": text.split(), "success": True}
+
+# Try to import ML components
+try:
+    from ml.model import MLModel
+except ImportError as e:
+    logger.warning(f"Could not import ML components: {e}")
+    
+    # Define dummy MLModel for type checking
+    class MLModel:
+        def __init__(self, model_name="default"):
+            self.model_name = model_name
+        def predict(self, data):
+            return {"prediction": None, "confidence": 0.0, "success": False}
 
 # Initialize logging early so it's available for import handling
 logging.basicConfig(

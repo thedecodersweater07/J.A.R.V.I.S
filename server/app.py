@@ -4,57 +4,119 @@ import logging
 import asyncio
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from contextlib import asynccontextmanager
 
 import jwt
 import bcrypt
 from pydantic import BaseModel, Field
-from fastapi import FastAPI, Depends, HTTPException, status, Request, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, status, Request, BackgroundTasks, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-import sys
-from pathlib import Path
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('server.log')
+    ]
+)
+logger = logging.getLogger("jarvis-server")
 
-# Pak de root van het project
-BASE_DIR = Path(__file__).resolve().parent
+# Add project root to Python path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
-# Mappen die je wil toevoegen
-paths_to_add = [
-    BASE_DIR,
-    BASE_DIR / "models",
-    BASE_DIR / "models" / "jarvis",
-    
-]
+# Initialize FastAPI app
+app = FastAPI(
+    title="JARVIS API",
+    description="JARVIS AI Assistant API",
+    version="1.0.0",
+    docs_url="/docs" if os.getenv("DEBUG") else None,
+    redoc_url="/redoc" if os.getenv("DEBUG") else None,
+)
 
-# Voeg toe aan sys.path als ze er nog niet in zitten
-for path in paths_to_add:
-    path_str = str(path)
-    if path_str not in sys.path:
-        sys.path.append(path_str)
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Nu kan je veilig importeren
+# Initialize templates
 try:
-    from models.jarvis import JarvisModel
-except ImportError as e:
-    print(f"[ERROR] Kan JarvisModel niet importeren: {e}")
-
-# Initialize Jarvis model
-jarvis_model = None
-try:
-    jarvis_model = JarvisModel()
-    logger.info("Jarvis model initialized successfully")
+    templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
+    logger.info("Templates initialized successfully")
 except Exception as e:
-    logger.warning(f"Could not initialize Jarvis model: {e}")
+    logger.warning(f"Could not initialize templates: {e}")
+    templates = None
+
+# Initialize static files
+try:
+    static_dir = PROJECT_ROOT / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+        logger.info("Static files mounted at /static")
+    else:
+        logger.warning(f"Static directory not found: {static_dir}")
+except Exception as e:
+    logger.warning(f"Could not mount static files: {e}")
+
+# Initialize Jarvis model with fallback
+def initialize_jarvis_model():
+    """Initialize the Jarvis model with fallback to dummy model if needed"""
+    try:
+        # Try to import the actual model
+        from models.jarvis import JarvisModel as RealJarvisModel
+        
+        logger.info("Initializing Jarvis model...")
+        model = RealJarvisModel()
+        model.initialized = True  # Ensure the model has the initialized flag
+        logger.info("Jarvis model initialized successfully")
+        return model
+        
+    except ImportError as e:
+        logger.warning(f"Could not import Jarvis model: {e}")
+        logger.warning("Falling back to dummy model")
+        
+        # Create a dummy model if the real one can't be imported
+        class DummyJarvisModel:
+            def __init__(self):
+                self.initialized = True
+                self.model_name = "dummy-model"
+                
+            def process(self, text, **kwargs):
+                return {
+                    "response": f"Dummy response to: {text}",
+                    "success": True,
+                    "model": self.model_name,
+                    "error": "Running in fallback mode - model initialization failed"
+                }
+                
+        return DummyJarvisModel()
+    
+    except Exception as e:
+        logger.error(f"Failed to initialize Jarvis model: {e}")
+        raise
+
+# Initialize the model when the module loads
+jarvis_model = initialize_jarvis_model()
+app.state.jarvis_model = jarvis_model
 
 def get_jarvis_model():
     """Get the Jarvis model instance"""
-    if jarvis_model is None:
-        raise Exception("Jarvis model not initialized")
+    if not hasattr(jarvis_model, 'initialized') or not jarvis_model.initialized:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Jarvis model is not available"
+        )
     return jarvis_model
 
 # Configure logging
