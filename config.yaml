@@ -1,0 +1,58 @@
+# JARVIS Server Configuration
+
+# Server settings
+server:
+  host: 0.0.0.0
+  port: 8001
+  debug: true
+  reload: true
+
+# Database settings
+database:
+  url: ${DATABASE_URL}
+  echo: true
+  pool_pre_ping: true
+  pool_recycle: 300
+
+# JWT Authentication
+jwt:
+  secret_key: ${JWT_SECRET_KEY}
+  algorithm: ${JWT_ALGORITHM}
+  access_token_expire_minutes: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES}
+
+# Logging
+logging:
+  level: INFO
+  format: "[%(asctime)s] [%(levelname)s] %(message)s"
+  datefmt: "%Y-%m-%d %H:%M:%S"
+
+# CORS settings
+cors:
+  allow_origins:
+    - "*"
+  allow_credentials: true
+  allow_methods:
+    - "*"
+  allow_headers:
+    - "*"
+
+# Static files
+static:
+  directory: server/web
+  index: index.html
+
+# WebSocket settings
+websocket:
+  enabled: true
+  ping_interval: 20
+  ping_timeout: 20
+  max_message_size: 10485760  # 10MB
+
+# API settings
+api:
+  title: JARVIS API
+  description: JARVIS API Server
+  version: 1.0.0
+  docs_url: /api/docs
+  redoc_url: /api/redoc
+  openapi_url: /api/openapi.json
