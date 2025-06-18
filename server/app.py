@@ -1,21 +1,27 @@
+# Standard library imports
 import os
 import sys
 import logging
 import asyncio
+import json
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List, Union
 from contextlib import asynccontextmanager
 
+# Third-party imports
 import jwt
 import bcrypt
-from pydantic import BaseModel, Field
-from fastapi import FastAPI, Depends, HTTPException, status, Request, BackgroundTasks, Response
+from fastapi import (
+    FastAPI, Depends, HTTPException, status, Request, 
+    BackgroundTasks, Response, WebSocket, WebSocketDisconnect
+)
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, Field
 
 # Configure logging
 logging.basicConfig(
@@ -32,42 +38,81 @@ logger = logging.getLogger("jarvis-server")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# Set up paths
+BASE_DIR = Path(__file__).parent
+WEB_DIR = BASE_DIR / "web"
+
 # Initialize FastAPI app
 app = FastAPI(
-    title="JARVIS API",
-    description="JARVIS AI Assistant API",
+    title="JARVIS Web Interface",
+    description="JARVIS AI Assistant Web Interface",
     version="1.0.0",
-    docs_url="/docs" if os.getenv("DEBUG") else None,
-    redoc_url="/redoc" if os.getenv("DEBUG") else None,
+    docs_url=None,  # Disable docs in production
+    redoc_url=None,  # Disable redoc in production
 )
 
-# CORS middleware
+# Serve static files
+app.mount("/static", StaticFiles(directory=str(WEB_DIR), html=True), name="static")
+
+# Serve index.html for the root path
+@app.get("/", response_class=HTMLResponse)
+async def serve_home():
+    index_path = WEB_DIR / "index.html"
+    if not index_path.exists():
+        return HTMLResponse(content="<h1>Web interface not found. Please check if the web files are in the correct location.</h1>", status_code=404)
+    return FileResponse(index_path)
+
+# Handle SPA routing - serve index.html for all other routes
+@app.get("/{path:path}", response_class=HTMLResponse)
+async def serve_spa(path: str):
+    # Check if the requested path exists as a file
+    file_path = WEB_DIR / path
+    if file_path.exists() and file_path.is_file():
+        return FileResponse(file_path)
+    # Fallback to index.html for SPA routing
+    return FileResponse(WEB_DIR / "index.html")
+
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Initialize templates
 try:
-    templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
-    logger.info("Templates initialized successfully")
-except Exception as e:
-    logger.warning(f"Could not initialize templates: {e}")
-    templates = None
-
-# Initialize static files
-try:
-    static_dir = PROJECT_ROOT / "static"
-    if static_dir.exists():
-        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-        logger.info("Static files mounted at /static")
+    if WEB_DIR.exists():
+        templates = Jinja2Templates(directory=str(WEB_DIR))
+        logger.info(f"Templates initialized from {WEB_DIR}")
     else:
-        logger.warning(f"Static directory not found: {static_dir}")
+        logger.warning(f"Web directory not found: {WEB_DIR}")
+        # Create web directory if it doesn't exist
+        WEB_DIR.mkdir(parents=True, exist_ok=True)
+        # Create a basic index.html if it doesn't exist
+        (WEB_DIR / "index.html").write_text(
+            """<!DOCTYPE html>
+            <html>
+            <head>
+                <title>JARVIS Web Interface</title>
+                <style>
+                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                    h1 { color: #2c3e50; }
+                </style>
+            </head>
+            <body>
+                <h1>JARVIS Web Interface</h1>
+                <p>Welcome to JARVIS AI Assistant</p>
+                <p>Place your web interface files in the 'server/web' directory.</p>
+            </body>
+            </html>""")
+        logger.info(f"Created default web interface at {WEB_DIR}/index.html")
+        templates = Jinja2Templates(directory=str(WEB_DIR))
 except Exception as e:
-    logger.warning(f"Could not mount static files: {e}")
+    logger.error(f"Failed to initialize web interface: {e}")
+    raise
 
 # Initialize Jarvis model with fallback
 def initialize_jarvis_model():
@@ -142,7 +187,7 @@ class SecurityConfig:
 # Pydantic Models
 class AIRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=1000)
-    request_type: str = Field(..., regex="^(text|nlp|ml|analysis)$")
+    request_type: str = Field(..., pattern="^(text|nlp|ml|analysis)$")
     context: Optional[Dict[str, Any]] = None
 
 class AIResponse(BaseModel):
@@ -155,7 +200,7 @@ class AIResponse(BaseModel):
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=8)
-    role: str = Field(default="user", regex="^(admin|user|guest)$")
+    role: str = Field(default="user", pattern="^(admin|user|guest)$")
 
 class UserResponse(BaseModel):
     id: str
@@ -290,36 +335,42 @@ class UserManager:
     def create_user(username: str, password: str, role: str = "user") -> Dict[str, Any]:
         """Create a new user"""
         if username in user_store:
-            raise HTTPException(status_code=400, detail="Username already exists")
-        
-        user_id = f"user_{len(user_store) + 1:04d}"
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already registered"
+            )
+            
+        hashed_password = AuthManager.hash_password(password)
+        user_id = str(len(user_store) + 1)
         user_data = {
             "id": user_id,
             "username": username,
-            "password_hash": AuthManager.hash_password(password),
+            "hashed_password": hashed_password,
             "role": role,
             "created_at": datetime.utcnow(),
             "last_login": None,
-            "status": "active"
+            "is_active": True
         }
         user_store[username] = user_data
-        logger.info(f"User created: {username} with role: {role}")
         return user_data
     
     @staticmethod
-    def get_user(username: str) -> Optional[Dict[str, Any]]:
+    def get_user(username: Optional[str]) -> Optional[Dict[str, Any]]:
         """Get user by username"""
+        if not username:
+            return None
         return user_store.get(username)
     
     @staticmethod
     def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
         """Authenticate user credentials"""
         user = UserManager.get_user(username)
-        if not user or not AuthManager.verify_password(password, user["password_hash"]):
+        if not user or not user.get("is_active", True):
             return None
-        
-        # Update last login
-        user["last_login"] = datetime.utcnow()
+            
+        if not AuthManager.verify_password(password, user["hashed_password"]):
+            return None
+            
         return user
 
 # Initialize default users
@@ -339,7 +390,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any
     username = payload.get("sub")
     user = UserManager.get_user(username)
     
-    if user is None or user.get("status") != "active":
+    if user is None or not user.get("is_active", True):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive"
@@ -390,9 +441,103 @@ app.add_middleware(
 
 # Static files setup
 web_dir = Path(__file__).parent / "web"
-if web_dir.exists():
-    app.mount("/static", StaticFiles(directory=str(web_dir)), name="static")
-    templates = Jinja2Templates(directory=str(web_dir))
+
+# Create web directory if it doesn't exist
+web_dir.mkdir(parents=True, exist_ok=True)
+
+# Mount static files from web directory
+app.mount("/static", StaticFiles(directory=str(web_dir)), name="static")
+
+templates = Jinja2Templates(directory=str(web_dir))
+
+# Serve static files directly from web directory
+@app.get("/{file_path:path}")
+async def serve_static(file_path: str):
+    # Skip WebSocket upgrade requests
+    if file_path == 'ws' or file_path.startswith('ws/'):
+        raise HTTPException(status_code=404, detail="Not Found")
+        
+    # Handle root path
+    if not file_path or file_path == "/":
+        file_path = "index.html"
+    
+    static_file = web_dir / file_path
+    
+    # Try to serve the requested file
+    if static_file.exists() and static_file.is_file():
+        return FileResponse(static_file)
+    
+    # For API routes, return 404
+    if file_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Not Found")
+    
+    # Fall back to index.html for SPA routing
+    return FileResponse(web_dir / "index.html")
+
+# Serve index.html for root path
+@app.get("/")
+async def read_root():
+    return await serve_static("")
+
+# WebSocket endpoint
+from fastapi import WebSocket, WebSocketDisconnect
+from typing import Dict
+import json
+import logging
+
+# Store active WebSocket connections
+active_connections: Dict[str, WebSocket] = {}
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    
+    # Generate a unique client ID
+    client_id = f"client_{id(websocket)}"
+    active_connections[client_id] = websocket
+    
+    try:
+        # Send welcome message
+        welcome_msg = {
+            'type': 'connection_established',
+            'message': 'Connected to JARVIS WebSocket',
+            'client_id': client_id
+        }
+        await websocket.send_text(json.dumps(welcome_msg))
+        
+        while True:
+            # Wait for any message from the client
+            data = await websocket.receive_text()
+            
+            # Process the message
+            try:
+                message = json.loads(data)
+                logger.info(f"Received message from {client_id}: {message}")
+                
+                # Echo back the received message
+                response = {
+                    'type': 'message_received',
+                    'content': message,
+                    'timestamp': datetime.utcnow().isoformat()
+                }
+                await websocket.send_text(json.dumps(response))
+                
+            except json.JSONDecodeError:
+                error_msg = {
+                    'type': 'error',
+                    'message': 'Invalid JSON format',
+                    'received': data
+                }
+                await websocket.send_text(json.dumps(error_msg))
+                
+    except WebSocketDisconnect:
+        logger.info(f"Client {client_id} disconnected")
+    except Exception as e:
+        logger.error(f"WebSocket error for {client_id}: {str(e)}")
+    finally:
+        # Clean up the connection
+        if client_id in active_connections:
+            del active_connections[client_id]
 
 # API Routes
 @app.post("/api/token", response_model=Token)
@@ -531,7 +676,7 @@ async def get_stats():
             "model_type": "Jarvis",
             "status": "active",
             "is_processing": False,
-            "uptime": int((datetime.utcnow() - app.start_time).total_seconds()) if hasattr(app, 'start_time') else 0,
+            "uptime": int((datetime.utcnow() - getattr(app.state, 'start_time', datetime.utcnow())).total_seconds()),
             "components": {
                 "llm": hasattr(jarvis, 'llm_service'),
                 "nlp": hasattr(jarvis, 'nlp_processor'),

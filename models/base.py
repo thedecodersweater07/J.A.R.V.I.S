@@ -1,7 +1,56 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
-import torch
-import torch.nn as nn
+from typing import Dict, Any, Optional, Union
+import logging
+
+# Set up logging
+logger = logging.getLogger(__name__)
+
+try:
+    import torch
+    import torch.nn as nn
+    TORCH_AVAILABLE = True
+except ImportError:
+    logger.warning("PyTorch not available. Running in limited functionality mode.")
+    TORCH_AVAILABLE = False
+    
+    # Create dummy classes for type checking
+    class DummyModule:
+        def __init__(self, *args, **kwargs):
+            pass
+        def __call__(self, *args, **kwargs):
+            return self
+        def to(self, *args, **kwargs):
+            return self
+        def train(self, mode=True):
+            return self
+        def eval(self):
+            return self
+        def parameters(self, recurse=True):
+            return []
+            
+    class DummyTensor:
+        def to(self, *args, **kwargs):
+            return self
+            
+    # Create dummy modules
+    class DummyDevice:
+        def __init__(self, device_str):
+            self.device_str = device_str
+            
+        def __str__(self):
+            return self.device_str
+            
+        def __repr__(self):
+            return f"device('{self.device_str}')"
+    
+    torch = type('torch', (), {
+        'Tensor': DummyTensor,
+        'device': DummyDevice,
+        'cuda': type('cuda', (), {'is_available': lambda: False}),
+        '__version__': '1.0.0'
+    })()
+    torch.device = DummyDevice
+    nn = type('nn', (), {'Module': DummyModule})()
 
 class BaseModel(nn.Module, ABC):
     """Base class for all JARVIS models"""

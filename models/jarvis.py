@@ -366,9 +366,16 @@ class JarvisModel(BaseModel):
         # Store model name for later use
         self.model_name = model_name
         
-        # Device configuratie
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        logger.info(f"Gebruikend device: {self.device}")
+        # Device configuration
+        try:
+            if device:
+                self.device = torch.device(device)
+            else:
+                self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            logger.info(f"Using device: {self.device}")
+        except Exception as e:
+            logger.warning(f"Failed to initialize device: {e}. Falling back to CPU.")
+            self.device = torch.device("cpu")
         
         # Model configuratie
         self.config = JARVIS_CONFIGS.get(model_name, JARVIS_CONFIGS["jarvis-base"])
