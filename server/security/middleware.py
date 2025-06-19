@@ -42,9 +42,19 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             self.rate_limit = config.get("rate_limit", self.rate_limit)
             self.rate_window = config.get("rate_limit_window", self.rate_window)
         else:
+<<<<<<< Updated upstream
             logger.warning("No security manager provided, using default configuration")
         
         logger.info(f"Security middleware initialized (rate limit: {self.rate_limit} req/{self.rate_window}s)")
+=======
+            # Access config directly from security_manager
+            config = getattr(self.security_manager, 'config', {})
+            self.rate_limit = config.get("rate_limit", 100)
+            self.rate_window = config.get("rate_limit_window", 60)  # Note: using rate_limit_window to match SecurityManager
+            self.blocked_ips = set()
+            
+        logger.info("Security middleware initialized")
+>>>>>>> Stashed changes
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process incoming requests with security checks"""
