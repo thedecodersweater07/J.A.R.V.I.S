@@ -1,14 +1,11 @@
-from dataclasses import dataclass
+import yaml
+import os
+from dataclasses import dataclass, asdict
 from typing import Dict, Any
 
 @dataclass
 class LLMConfig:
-    """Configuration for the (dummy) LLM service.
-
-    Includes a superset of parameters required by *models.jarvis* so that
-    instantiation never fails even if some fields are unused by the dummy
-    backend.
-    """
+    """Configuration for the LLM service."""
     model_name: str = "jarvis-base"
     max_length: int = 512
     temperature: float = 0.7
@@ -17,24 +14,35 @@ class LLMConfig:
     repetition_penalty: float = 1.0
     num_return_sequences: int = 1
     device: str = "cpu"
-    # Legacy / optional parameters for compatibility with older code paths
     max_tokens: int = 150
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
 
 class ConfigManager:
-    def __init__(self):
-        self.default_config = LLMConfig(
-            model_name="jarvis-base",
-            temperature=0.7,
-            max_length=512,
-            top_p=0.9,
-            top_k=50,
-            repetition_penalty=1.0,
-            num_return_sequences=1,
-            device="cpu"
-        )
-    
+    def __init__(self, config_path: str = 'config.yaml'):
+        self.config_path = config_path
+        self.default_config = LLMConfig()
+        self.config = self.load_config()
+
     def load_config(self) -> LLMConfig:
-        # Load from config file or use default
+        """Loads configuration from a YAML file, falling back to defaults."""
+        config_data = self._read_yaml()
+        if config_data and 'llm' in config_data:
+            # Update default config with values from file
+            llm_config_data = {k: v for k, v in config_data['llm'].items() if hasattr(self.default_config, k)}
+            return LLMConfig(**llm_config_data)
         return self.default_config
+
+    def _read_yaml(self) -> Dict[str, Any]:
+        """Reads the YAML configuration file."""
+        if os.path.exists(self.config_path):
+            with open(self.config_path, 'r') as f:
+                try:
+                    return yaml.safe_load(f)
+                except yaml.YAMLError as e:
+                    print(f"Error loading YAML config: {e}")
+        return {}
+
+    def get_config(self) -> LLMConfig:
+        """Returns the current configuration."""
+        return self.config

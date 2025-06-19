@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 # Configure logging
 logging.basicConfig(
@@ -114,55 +115,138 @@ except Exception as e:
     logger.error(f"Failed to initialize web interface: {e}")
     raise
 
-# Initialize Jarvis model with fallback
 def initialize_jarvis_model():
-    """Initialize the Jarvis model with fallback to dummy model if needed"""
+    """
+    Initialize the Jarvis model with proper error handling.
+    
+    Returns:
+        An instance of JarvisModel
+    """
     try:
-        # Try to import the actual model
-        from models.jarvis import JarvisModel as RealJarvisModel
+        # Add project root to Python path if not already there
+        import sys
+        from pathlib import Path
+        project_root = Path(__file__).parent.parent
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
         
-        logger.info("Initializing Jarvis model...")
-        model = RealJarvisModel()
-        model.initialized = True  # Ensure the model has the initialized flag
+        # Import the model and base classes
+        from models.jarvis import JarvisModel, LLMBase, NLPProtocol, NLPBase
+        
+        # Create a simple LLM implementation
+        class SimpleLLM(LLMBase):
+            def generate(self, prompt: str, **kwargs: Any) -> Dict[str, Any]:
+                return {"response": "Simple LLM response", "success": True}
+                
+            def complete(self, text: str, **kwargs: Any) -> Dict[str, Any]:
+                return {"response": text + " [completed]", "success": True}
+                
+            def predict(self, text: str, **kwargs: Any) -> Dict[str, Any]:
+                return {"prediction": "This is a prediction", "confidence": 0.9, "success": True}
+                
+            def summarize(self, text: str, **kwargs: Any) -> Dict[str, Any]:
+                words = text.split()
+                summary = ' '.join(words[:30]) + ('...' if len(words) > 30 else '')
+                return {
+                    "summary": summary,
+                    "success": True,
+                    "model": "simple-llm"
+                }
+        
+        # Create a simple NLP analyzer
+        class SimpleNLPAnalyzer(NLPBase):
+            def analyze(self, text: str) -> Dict[str, Any]:
+                return {
+                    "entities": [{"text": text, "type": "UNKNOWN"}],
+                    "sentiment": {"polarity": 0.0, "label": "neutral"},
+                    "success": True
+                }
+                
+            def analyze_sentiment(self, text: str) -> Dict[str, Any]:
+                return {"sentiment": "neutral", "score": 0.0, "success": True}
+                
+            def extract_entities(self, text: str) -> List[Dict[str, Any]]:
+                return [{"text": text, "type": "UNKNOWN", "start": 0, "end": len(text)}]
+                
+            def __call__(self, text: str) -> Dict[str, Any]:
+                return self.analyze(text)
+        
+        # Initialize the model with the simple components
+        llm = SimpleLLM()
+        nlp_analyzer = SimpleNLPAnalyzer()
+        
+        # Try to import and use real implementations if available
+        try:
+            from llm.core.llm_core import LLMCore
+            llm = LLMCore()
+            logger.info("Initialized real LLM")
+        except ImportError as e:
+            logger.warning(f"Could not import LLM: {e}")
+            logger.info("Using simple LLM implementation")
+        except Exception as e:
+            logger.error(f"Error initializing LLM: {e}", exc_info=True)
+            logger.info("Falling back to simple LLM implementation due to error")
+        
+        # Initialize the model
+        model = JarvisModel(
+            llm=llm,
+            nlp_analyzer=nlp_analyzer,
+            config={"version": "1.0.0"}
+        )
+        
         logger.info("Jarvis model initialized successfully")
         return model
         
     except ImportError as e:
         logger.warning(f"Could not import Jarvis model: {e}")
-        logger.warning("Falling back to dummy model")
         
-        # Create a dummy model if the real one can't be imported
+        # Create a dummy model as fallback
         class DummyJarvisModel:
             def __init__(self):
-                self.initialized = True
                 self.model_name = "dummy-model"
                 
-            def process(self, text, **kwargs):
+            def process_input(self, text: str, user_id: str = "default", **kwargs) -> Dict[str, Any]:
                 return {
-                    "response": f"Dummy response to: {text}",
-                    "success": True,
-                    "model": self.model_name,
-                    "error": "Running in fallback mode - model initialization failed"
+                    "response": "Dummy model response - JARVIS is not properly initialized",
+                    "success": False,
+                    "error": "Dummy model - JARVIS not properly initialized"
                 }
-                
+        
+        logger.warning("Falling back to dummy model")
         return DummyJarvisModel()
-    
+        
     except Exception as e:
-        logger.error(f"Failed to initialize Jarvis model: {e}")
-        raise
+        logger.critical(f"Critical error initializing Jarvis model: {e}", exc_info=True)
+        raise RuntimeError(f"Failed to initialize Jarvis model: {e}")
+        logger.warning(f"Could not import Jarvis model: {e}")
+        logger.warning("Falling back to dummy model")
+        
+# Database dependency
+def get_db():
+    """Dependency for getting database session"""
+    from db import init_db
+    
+    # Initialize the database and get a session
+    db = init_db()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # Initialize the model when the module loads
 jarvis_model = initialize_jarvis_model()
 app.state.jarvis_model = jarvis_model
 
-def get_jarvis_model():
-    """Get the Jarvis model instance"""
-    if not hasattr(jarvis_model, 'initialized') or not jarvis_model.initialized:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Jarvis model is not available"
-        )
-    return jarvis_model
+def get_jarvis_model() -> Any:
+    """
+    Get the Jarvis model instance.
+    
+    Returns:
+        An instance of JarvisModel or a fallback dummy model.
+    """
+    if not hasattr(app.state, 'jarvis_model'):
+        app.state.jarvis_model = initialize_jarvis_model()
+    return app.state.jarvis_model
 
 # Configure logging
 logging.basicConfig(
@@ -483,37 +567,36 @@ async def read_root():
 from fastapi import WebSocket, WebSocketDisconnect
 from typing import Dict
 import json
+import uuid
 import logging
 
-# Store active WebSocket connections
-active_connections: Dict[str, WebSocket] = {}
+# Import ConnectionManager from websocket module
+from .websocket import manager as connection_manager
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    
-    # Generate a unique client ID
-    client_id = f"client_{id(websocket)}"
-    active_connections[client_id] = websocket
+@app.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    # Accept the WebSocket connection
+    await connection_manager.connect(websocket, client_id)
     
     try:
-        # Send welcome message
-        welcome_msg = {
-            'type': 'connection_established',
-            'message': 'Connected to JARVIS WebSocket',
-            'client_id': client_id
-        }
-        await websocket.send_text(json.dumps(welcome_msg))
-        
         while True:
             # Wait for any message from the client
             data = await websocket.receive_text()
             
-            # Process the message
             try:
+                # Parse the message as JSON
                 message = json.loads(data)
                 logger.info(f"Received message from {client_id}: {message}")
                 
+                # Process the message using the connection manager
+                if isinstance(message, dict) and "text" in message:
+                    await connection_manager.process_message(message["text"], client_id)
+                else:
+                    await connection_manager.send_message(
+                        "Invalid message format. Expected {\"text\": \"your message\"}",
+                        client_id
+                    )
+                    
                 # Echo back the received message
                 response = {
                     'type': 'message_received',
@@ -523,21 +606,20 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_text(json.dumps(response))
                 
             except json.JSONDecodeError:
-                error_msg = {
-                    'type': 'error',
-                    'message': 'Invalid JSON format',
-                    'received': data
-                }
-                await websocket.send_text(json.dumps(error_msg))
+                error_msg = 'Invalid JSON format. Please send a valid JSON message.'
+                await connection_manager.send_message(error_msg, client_id)
+                logger.error(f'JSON decode error from {client_id}')
                 
     except WebSocketDisconnect:
-        logger.info(f"Client {client_id} disconnected")
+        logger.info(f'Client {client_id} disconnected')
+        connection_manager.disconnect(client_id)
     except Exception as e:
-        logger.error(f"WebSocket error for {client_id}: {str(e)}")
-    finally:
-        # Clean up the connection
-        if client_id in active_connections:
-            del active_connections[client_id]
+        logger.error(f'WebSocket error for {client_id}: {str(e)}', exc_info=True)
+        try:
+            await websocket.close()
+        except:
+            pass  # WebSocket is already closed
+        connection_manager.disconnect(client_id)
 
 # API Routes
 @app.post("/api/token", response_model=Token)
@@ -604,54 +686,98 @@ async def list_users(current_user: Dict[str, Any] = Depends(get_admin_user)):
 async def process_ai_request(
     request: AIRequest,
     background_tasks: BackgroundTasks,
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Process AI query with authentication"""
-    import time
-    start_time = time.time()
-    request_id = f"req_{int(start_time * 1000000)}"
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Process AI query with authentication and proper error handling.
     
-    # Add user context
-    context = request.context or {}
-    context.update({
-        "user_id": current_user["id"],
-        "username": current_user["username"],
-        "role": current_user["role"],
-        "timestamp": datetime.utcnow().isoformat()
-    })
+    Args:
+        request: The AI request containing query and context
+        background_tasks: FastAPI background tasks
+        current_user: Authenticated user information
+        db: Database session dependency
+        
+    Returns:
+        Dict containing the AI response and metadata
+        
+    Raises:
+        HTTPException: If there's an error processing the request
+    """
+    start_time = datetime.utcnow()
+    request_id = f"req_{int(start_time.timestamp())}_{current_user['username']}"
     
     try:
-        # Process AI request
-        response_data = await ai_registry.process_request(
-            request.request_type,
-            request.query,
-            context
+        # Get the model instance
+        model = get_jarvis_model()
+        
+        # Ensure the model has access to the database session
+        if hasattr(model, 'db') and model.db is None:
+            model.db = db
+        
+        # Process the request
+        response = model.process_input(
+            text=request.query,
+            user_id=str(current_user.get('id', 'anonymous')),
+            **({} if request.context is None else request.context)
         )
         
-        processing_time = time.time() - start_time
+        # Ensure response is serializable
+        response_data = response.get("response", "I'm sorry, I couldn't process that request.")
+        if not isinstance(response_data, (str, int, float, bool, type(None))):
+            response_data = str(response_data)
         
-        # Log request in background
+        # Log the request in background
+        processing_time = (datetime.utcnow() - start_time).total_seconds()
         background_tasks.add_task(
             log_ai_request,
-            request_id,
-            current_user["username"],
-            request.request_type,
-            processing_time
+            request_id=request_id,
+            username=current_user['username'],
+            request_type=request.request_type,
+            processing_time=processing_time
         )
         
-        return AIResponse(
-            response=response_data,
-            request_id=request_id,
-            processing_time=processing_time,
-            timestamp=datetime.utcnow(),
-            success=True
-        )
+        return {
+            "request_id": request_id,
+            "response": response_data,
+            "processing_time": processing_time,
+            "model": response.get("model", "unknown"),
+            "timestamp": datetime.utcnow().isoformat(),
+            "success": True
+        }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
         
     except Exception as e:
-        logger.error(f"AI processing error for user {current_user['username']}: {e}")
+        error_msg = f"Error processing request: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        
+        # Log the error in the background
+        error_time = (datetime.utcnow() - start_time).total_seconds()
+        background_tasks.add_task(
+            log_ai_request,
+            request_id=request_id,
+            username=current_user['username'],
+            request_type=request.request_type,
+            processing_time=error_time
+        )
+        
+        # Return a structured error response
+        error_detail = {
+            "error": "Internal server error",
+            "details": error_msg,
+            "request_id": request_id,
+            "success": False
+        }
+        
+        # Log the full error for debugging
+        logger.error(f"Error processing request {request_id}: {error_msg}", exc_info=True)
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"AI processing failed: {str(e)}"
+            detail=error_detail
         )
 
 @app.get("/api/health")
@@ -696,13 +822,25 @@ async def log_ai_request(request_id: str, username: str, request_type: str, proc
     """Log AI request for analytics"""
     logger.info(f"AI Request - ID: {request_id}, User: {username}, Type: {request_type}, Time: {processing_time:.3f}s")
 
+# Cleanup function to close database connections
+@app.on_event("shutdown")
+def shutdown_event():
+    """Cleanup database connections on shutdown"""
+    if hasattr(app.state, 'db'):
+        try:
+            app.state.db.close()
+            logger.info("Database connection closed")
+        except Exception as e:
+            logger.error(f"Error closing database connection: {e}")
+
 # Main entry point
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "main:app",
-        host="127.0.0.1",
+        "app:app",
+        host="0.0.0.0",
         port=8000,
         reload=True,
-        log_level="info"
+        ssl_keyfile=None,
+        ssl_certfile=None
     )

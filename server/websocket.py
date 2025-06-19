@@ -1,32 +1,60 @@
 import json
+import sys
 import asyncio
 import logging
+import importlib
 from fastapi import WebSocket, WebSocketDisconnect
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union, TYPE_CHECKING
 
 logger = logging.getLogger("websocket")
 
 class JarvisModelStub:
     """Stub for JARVIS model when dependencies are not available"""
-    def process_message(self, message: str) -> str:
-        return "JARVIS: I'm currently running in limited mode. Some features may not be available."
+    def process_input(self, text: str, user_id: str = "default", **kwargs) -> dict:
+        return {
+            "response": "JARVIS: I'm currently running in limited mode. Some features may not be available.",
+            "confidence": 1.0,
+            "metadata": {}
+        }
+
+# Type hint for the model to avoid circular imports
+if TYPE_CHECKING:
+    from models.jarvis import JarvisModel
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
-        self.jarvis_model = self._initialize_model()
+        self._jarvis_model: Union[JarvisModel, JarvisModelStub, None] = None
     
-    def _initialize_model(self):
+    @property
+    def jarvis_model(self) -> Union['JarvisModel', JarvisModelStub]:
+        """Lazy load the JARVIS model when first accessed"""
+        if self._jarvis_model is None:
+            self._jarvis_model = self._initialize_model()
+        return self._jarvis_model
+    
+    def _initialize_model(self) -> Union['JarvisModel', JarvisModelStub]:
         """Safely initialize the JARVIS model"""
         try:
-            from models.jarvis import create_jarvis_model
-            logger.info("Initializing JARVIS model...")
-            return create_jarvis_model(model_type="language")
+            # Clear any existing imports to avoid module caching issues
+            if 'models.jarvis' in sys.modules:
+                importlib.invalidate_caches()
+                sys.modules.pop('models.jarvis', None)
+            
+            # Import the module and function dynamically
+            jarvis_module = importlib.import_module('models.jarvis')
+            if hasattr(jarvis_module, 'create_jarvis_model'):
+                logger.info("Initializing JARVIS model...")
+                return jarvis_module.create_jarvis_model(model_type="language")
+            else:
+                logger.warning("create_jarvis_model function not found in models.jarvis")
+                return JarvisModelStub()
+                
         except ImportError as e:
             logger.warning(f"Could not import JARVIS model: {e}")
             return JarvisModelStub()
         except Exception as e:
-            logger.error(f"Error initializing JARVIS model: {e}")
+            logger.error(f"Error initializing JARVIS model: {e}", exc_info=True)
             return JarvisModelStub()
 
     async def connect(self, websocket: WebSocket, client_id: str):
@@ -54,10 +82,12 @@ class ConnectionManager:
     async def process_message(self, message: str, client_id: str):
         try:
             # Process the message using the JARVIS model
-            response = self.jarvis_model.process_message(message)
-            await self.send_message(response, client_id)
+            result = self.jarvis_model.process_input(text=message, user_id=client_id)
+            response = result.get("response", "I'm sorry, I couldn't process that request.")
+            await self.send_message(str(response), client_id)
         except Exception as e:
             error_msg = f"Error processing message: {str(e)}"
+            logger.error(error_msg, exc_info=True)
             await self.send_message(error_msg, client_id)
 
 manager = ConnectionManager()
