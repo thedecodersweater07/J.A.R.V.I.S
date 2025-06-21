@@ -8,55 +8,79 @@ including vocabulary training, grammar checking, and pronunciation analysis.
 import sys
 import warnings
 from pathlib import Path
-from typing import Any, Dict, Optional, Type, TYPE_CHECKING
+from typing import Any, Type, Union, Dict, List, Optional, Sequence, TYPE_CHECKING
 
-# Add the parent directory to the Python path to allow absolute imports
-project_root = Path(__file__).parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
+# Export the main classes
+__all__ = [
+    'LanguageCoach',
+    'LessonProgress',
+    'VocabularyTrainer',
+    'WordEntryDict',
+    'WordInput',
+    'GrammarChecker',
+    'PronunciationAnalyzer',
+    'DummyGrammarChecker',
+    'DummyPronunciationAnalyzer',
+    'coach'
+]
 
-# Define a dummy LanguageCoach for when imports fail
-class DummyLanguageCoach:
-    """Dummy LanguageCoach for when imports fail."""
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.initialized = False
-    
-    def __getattr__(self, name: str) -> Any:
-        if not self.initialized:
-            raise ImportError("LanguageCoach failed to initialize. Check your imports and dependencies.")
-        return super().__getattribute__(name)
-
-# Initialize a global instance of the language coach
-LanguageCoach: Type[DummyLanguageCoach]
-LessonProgress: Any
-
-# Try to import the real implementations
+# Import the main components
 try:
-    from lang_learner.language_coach import LanguageCoach as RealLanguageCoach, LessonProgress as RealLessonProgress  # type: ignore
-    LanguageCoach = RealLanguageCoach  # type: ignore
-    LessonProgress = RealLessonProgress  # type: ignore
+    from .language_coach import LanguageCoach, LessonProgress
+    from .vocabulary_interface import VocabularyTrainer, WordEntryDict, WordInput
     
-    # Create a default instance for convenience
+    # Try to import real implementations, fall back to dummies
+    try:
+        from .grammar import GrammarChecker
+    except ImportError:
+        from .dummy_grammar import DummyGrammarChecker as GrammarChecker
+        warnings.warn("Using DummyGrammarChecker - real grammar module not available")
+    
+    try:
+        from .pronunciation import PronunciationAnalyzer
+    except ImportError:
+        from .dummy_pronunciation import DummyPronunciationAnalyzer as PronunciationAnalyzer
+        warnings.warn("Using DummyPronunciationAnalyzer - real pronunciation module not available")
+    
+    # Import dummy versions for direct access
+    from .dummy_grammar import DummyGrammarChecker
+    from .dummy_pronunciation import DummyPronunciationAnalyzer
+    
+    # Initialize the global coach instance
     coach = LanguageCoach()
-    __all__ = ['LanguageCoach', 'LessonProgress', 'coach']
     
-except (ImportError, ModuleNotFoundError) as e:
-    warnings.warn(
-        f"Failed to import LanguageCoach: {e}. Using dummy implementation. "
-        "Some functionality may be limited.",
-        RuntimeWarning,
-        stacklevel=2
-    )
-    LanguageCoach = DummyLanguageCoach  # type: ignore
-    LessonProgress = dict  # type: ignore
-    coach = DummyLanguageCoach()
-    __all__ = ['LanguageCoach', 'LessonProgress', 'coach']
+except ImportError as e:
+    warnings.warn(f"Failed to import main language learning components: {e}")
+    
+    # Create dummy implementations if imports fail
+    class DummyLanguageCoach:
+        """Dummy LanguageCoach for when imports fail."""
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            self.initialized = False
+            
+        def __getattr__(self, name: str):
+            raise RuntimeError("Language learning components failed to initialize. Check your dependencies.")
+    
+    # Set up dummy classes for type checking
+    class DummyGrammarChecker: pass
+    class DummyPronunciationAnalyzer: pass
+    class VocabularyTrainer: pass
+    class GrammarChecker: pass
+    class PronunciationAnalyzer: pass
+    class WordEntryDict(dict): pass
+    
+    # Define type aliases
+    WordInput = Union[str, Dict[str, Any]]
+    
+    # Set the default exports
+    LanguageCoach = DummyLanguageCoach
+    LessonProgress = object
+    
+    # Initialize the global coach instance
+    coach = LanguageCoach()
 
 # Clean up the namespace
-try:
-    del sys, warnings, Path, Any, Dict, Optional, Type, TYPE_CHECKING, DummyLanguageCoach
-except NameError:
-    pass
+del sys, warnings, Path, Any, Type, Union, Dict, List, Optional, Sequence, TYPE_CHECKING
 
 try:
     del RealLanguageCoach, RealLessonProgress

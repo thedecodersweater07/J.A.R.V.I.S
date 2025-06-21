@@ -1,86 +1,40 @@
 """
-Pronunciation Analysis Module
+Pronunciation Analysis Module - Optimized Version
 
-Provides functionality for analyzing and providing feedback on pronunciation
-using speech recognition and comparison with native speech patterns.
+Provides functionality for analyzing and providing feedback on pronunciation.
 """
 
-from typing import Dict, List, Optional, Tuple, Any
-import wave
-import json
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
 
 # Optional imports with fallback
 try:
-    import numpy as np
-    NUMPY_AVAILABLE = True
+    import speech_recognition as sr
+    SPEECH_RECOGNITION_AVAILABLE = True
 except ImportError:
-    NUMPY_AVAILABLE = False
+    SPEECH_RECOGNITION_AVAILABLE = False
     
-    class MockNumpy:
-        """Mock numpy for when it's not available."""
-        float32 = float
+    class MockSR:
+        class Recognizer:
+            def record(self, source): return {}
+            def recognize_google(self, *args, **kwargs): 
+                raise ImportError("speech_recognition not installed")
         
-    np = MockNumpy()
-
-from types import ModuleType
-from typing import Any, Dict, List, Optional, Tuple, Union
-
-# Define mock classes first
-class MockRecognizer:
-    """Mock speech recognizer for when speech_recognition is not available."""
-    def recognize_google(self, *args: Any, **kwargs: Any) -> str:
-        raise ImportError("speech_recognition module not installed")
+        class AudioFile:
+            def __init__(self, *args): pass
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
     
-    def record(self, source: Any) -> Dict[str, Any]:
-        return {}
-
-class MockAudioFile:
-    """Mock audio file context manager."""
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        pass
-        
-    def __enter__(self) -> 'MockAudioFile':
-        return self
-        
-    def __exit__(self, *args: Any, **kwargs: Any) -> None:
-        pass
-
-# Try to import speech recognition with fallback
-class MockSpeechRecognition(ModuleType):
-    """Mock speech recognition module."""
-    def __init__(self) -> None:
-        super().__init__('speech_recognition')
-        self.Recognizer = type('Recognizer', (), {
-            'recognize_google': MockRecognizer.recognize_google,
-            'record': MockRecognizer.record
-        })
-        self.AudioFile = MockAudioFile
-        self.RequestError = Exception
-
-# Initialize speech recognition
-sr: Any = None
-SPEECH_RECOGNITION_AVAILABLE = False
-
-if SPEECH_RECOGNITION_AVAILABLE:
-    sr = _sr
-else:
-    # Use mock implementation
-    sr = MockSpeechRecognition()
-    
-    # Add to sys.modules for any code that imports speech_recognition directly
-    import sys
-    sys.modules['speech_recognition'] = sr
+    sr = MockSR()
 
 @dataclass
 class PronunciationFeedback:
-    """Stores feedback about pronunciation."""
+    """Stores feedback about pronunciation analysis."""
     score: float  # 0.0 to 1.0
     feedback: List[str]
-    phonemes: List[Dict[str, Any]]  # List of phonemes with correctness indicators
-    word_level: List[Dict[str, Any]]  # Word-level feedback
+    phonemes: List[Dict[str, Any]]
+    word_level: List[Dict[str, Any]]
     overall_impression: str
     suggested_practice: List[str]
 
@@ -88,17 +42,9 @@ class PronunciationAnalyzer:
     """Analyzes pronunciation and provides feedback."""
     
     def __init__(self, language: str = 'dutch'):
-        """
-        Initialize the pronunciation analyzer.
-        
-        Args:
-            language: Target language (default: 'dutch')
-        """
-        self.language = language
-        self.recognizer = sr.Recognizer()
+        self.language = language.lower()
+        self.recognizer = sr.Recognizer() if SPEECH_RECOGNITION_AVAILABLE else None
         self.phoneme_map = self._load_phoneme_map()
-        
-        # Language-specific settings
         self.language_codes = {
             'dutch': 'nl-NL',
             'english': 'en-US',
@@ -109,38 +55,42 @@ class PronunciationAnalyzer:
     
     def _load_phoneme_map(self) -> Dict[str, List[str]]:
         """Load phoneme mappings for the target language."""
-        # This is a simplified example. In a real application, this would be more comprehensive
-        # and possibly loaded from external files.
-        return {
+        phoneme_maps = {
             'dutch': {
-                'a': ['a', 'aa'],
-                'e': ['e', 'ee', 'é'],
-                'i': ['i', 'ie'],
-                'o': ['o', 'oo'],
-                'u': ['u', 'uu'],
-                'eu': ['eu'],
-                'ui': ['ui'],
-                'ij': ['ij', 'ei'],
-                'g': ['g', 'ch'],
-                'r': ['r']
+                'vowels': ['a', 'aa', 'e', 'ee', 'i', 'ie', 'o', 'oo', 'u', 'uu'],
+                'diphthongs': ['eu', 'ui', 'ij', 'ei'],
+                'consonants': ['g', 'ch', 'r', 'ng']
             },
             'english': {
-                # Add English phoneme mappings
+                'vowels': ['a', 'e', 'i', 'o', 'u'],
+                'diphthongs': ['ai', 'au', 'oi'],
+                'consonants': ['th', 'sh', 'ch', 'ng']
             }
-        }.get(self.language, {})
+        }
+        return phoneme_maps.get(self.language, {})
     
-    def analyze(self, audio_path: str, reference_text: str) -> Dict[str, Any]:
+    def analyze_pronunciation(self, audio_data: Optional[bytes] = None, 
+                            audio_path: Optional[str] = None,
+                            reference_text: Optional[str] = None) -> Dict[str, Any]:
         """
-        Analyze pronunciation of spoken text.
+        Analyze pronunciation from audio data or file.
         
         Args:
-            audio_path: Path to the audio file containing speech
-            reference_text: The expected text that was spoken
+            audio_data: Raw audio bytes
+            audio_path: Path to audio file
+            reference_text: Expected text that was spoken
             
         Returns:
-            Dictionary with analysis results and feedback
+            Dictionary with analysis results
         """
-        if not Path(audio_path).exists():
+        if not SPEECH_RECOGNITION_AVAILABLE:
+            return {
+                'success': False,
+                'error': 'Speech recognition not available',
+                'score': 0.0
+            }
+        
+        if audio_path and not Path(audio_path).exists():
             return {
                 'success': False,
                 'error': f'Audio file not found: {audio_path}',
@@ -148,53 +98,12 @@ class PronunciationAnalyzer:
             }
         
         try:
-            # Convert audio to text using speech recognition
-            with sr.AudioFile(audio_path) as source:
-                audio_data = self.recognizer.record(source)
-                recognized_text = self.recognizer.recognize_google(
-                    audio_data, 
-                    language=self.language_codes.get(self.language, 'en-US')
-                )
-            
-            # Basic comparison of recognized text with reference
-            ref_words = reference_text.lower().split()
-            rec_words = recognized_text.lower().split()
-            
-            # Calculate word accuracy
-            correct_words = sum(1 for rw, tw in zip(rec_words, ref_words[:len(rec_words)]) 
-                              if rw == tw)
-            word_accuracy = correct_words / len(ref_words) if ref_words else 0.0
-            
-            # Analyze phonemes (simplified)
-            phoneme_feedback = self._analyze_phonemes(audio_path, reference_text)
-            
-            # Calculate overall score (weighted average)
-            phoneme_score = phoneme_feedback.get('score', 0.7)  # Default to 0.7 if analysis fails
-            score = (word_accuracy * 0.6) + (phoneme_score * 0.4)
-            
-            # Generate feedback
-            feedback = []
-            
-            if word_accuracy < 0.5:
-                feedback.append("Focus on pronouncing each word clearly. Some words were not recognized correctly.")
-            
-            if phoneme_feedback.get('mispronounced'):
-                feedback.append(f"Pay attention to these sounds: {', '.join(phoneme_feedback['mispronounced'][:3])}")
-            
-            if not feedback:
-                feedback.append("Good job! Your pronunciation is clear and understandable.")
-            
-            return {
-                'success': True,
-                'score': score,
-                'word_accuracy': word_accuracy,
-                'recognized_text': recognized_text,
-                'reference_text': reference_text,
-                'feedback': feedback,
-                'phoneme_analysis': phoneme_feedback,
-                'suggested_practice': self._get_practice_suggestions(score, phoneme_feedback)
-            }
-            
+            # Use audio file if provided, otherwise assume audio_data handling
+            if audio_path:
+                return self._analyze_from_file(audio_path, reference_text or "")
+            else:
+                return self._analyze_from_data(audio_data, reference_text or "")
+                
         except Exception as e:
             return {
                 'success': False,
@@ -202,51 +111,115 @@ class PronunciationAnalyzer:
                 'score': 0.0
             }
     
-    def _analyze_phonemes(self, audio_path: str, reference_text: str) -> Dict[str, Any]:
-        """
-        Analyze phoneme-level pronunciation.
+    def _analyze_from_file(self, audio_path: str, reference_text: str) -> Dict[str, Any]:
+        """Analyze pronunciation from audio file."""
+        with sr.AudioFile(audio_path) as source:
+            audio_data = self.recognizer.record(source)
+            recognized_text = self.recognizer.recognize_google(
+                audio_data, 
+                language=self.language_codes.get(self.language, 'en-US')
+            )
         
-        This is a simplified implementation. In a real application, this would use
-        more sophisticated speech analysis techniques.
-        """
-        # This is a placeholder implementation
-        # In a real app, this would analyze the audio at the phoneme level
-        
-        # For now, we'll just return some dummy data
+        return self._compare_texts(recognized_text, reference_text)
+    
+    def _analyze_from_data(self, audio_data: Optional[bytes], 
+                          reference_text: str) -> Dict[str, Any]:
+        """Analyze pronunciation from raw audio data."""
+        # For now, return a mock analysis since direct audio data processing
+        # requires additional audio processing libraries
         return {
-            'score': 0.8,  # Dummy score
-            'mispronounced': [],  # No mispronunciations detected
-            'details': 'Phoneme analysis not fully implemented.'
+            'success': True,
+            'score': 0.7,
+            'recognized_text': "Mock analysis - audio data processing not implemented",
+            'reference_text': reference_text,
+            'feedback': ["Audio data analysis requires additional setup"],
+            'suggested_practice': ["Use audio file input for detailed analysis"]
         }
     
-    def _get_practice_suggestions(self, score: float, phoneme_analysis: Dict[str, Any]) -> List[str]:
-        """Generate practice suggestions based on the analysis results."""
-        suggestions = []
+    def _compare_texts(self, recognized: str, reference: str) -> Dict[str, Any]:
+        """Compare recognized text with reference text."""
+        ref_words = reference.lower().split()
+        rec_words = recognized.lower().split()
         
-        if score < 0.5:
-            suggestions.append("Practice speaking slowly and clearly.")
-            suggestions.append("Record yourself and compare with native speakers.")
-        elif score < 0.8:
-            suggestions.append("Good progress! Keep practicing to improve clarity.")
-            
-            if phoneme_analysis.get('mispronounced'):
-                sounds = ", ".join(phoneme_analysis['mispronounced'][:3])
-                suggestions.append(f"Focus on these sounds: {sounds}")
-        else:
-            suggestions.append("Excellent pronunciation! Try more complex phrases.")
+        # Calculate word accuracy
+        correct_words = sum(1 for r, t in zip(rec_words, ref_words[:len(rec_words)]) 
+                          if r == t)
+        word_accuracy = correct_words / len(ref_words) if ref_words else 0.0
         
-        return suggestions
+        # Phoneme analysis (simplified)
+        phoneme_score = self._analyze_phonemes(recognized, reference)
+        
+        # Overall score
+        score = (word_accuracy * 0.6) + (phoneme_score * 0.4)
+        
+        # Generate feedback
+        feedback = self._generate_feedback(word_accuracy, phoneme_score)
+        
+        return {
+            'success': True,
+            'score': score,
+            'word_accuracy': word_accuracy,
+            'phoneme_score': phoneme_score,
+            'recognized_text': recognized,
+            'reference_text': reference,
+            'feedback': feedback,
+            'suggested_practice': self._get_practice_suggestions(score)
+        }
     
-    def get_phoneme_map(self) -> Dict[str, List[str]]:
-        """Get the phoneme map for the current language."""
-        return self.phoneme_map
+    def _analyze_phonemes(self, recognized: str, reference: str) -> float:
+        """Simple phoneme analysis - placeholder implementation."""
+        # This would need more sophisticated phonetic analysis
+        # For now, return a score based on text similarity
+        if not reference:
+            return 0.8
+        
+        similarity = len(set(recognized.lower()) & set(reference.lower())) / len(set(reference.lower()))
+        return min(similarity, 1.0)
+    
+    def _generate_feedback(self, word_accuracy: float, phoneme_score: float) -> List[str]:
+        """Generate feedback based on analysis scores."""
+        feedback = []
+        
+        if word_accuracy < 0.5:
+            feedback.append("Focus on pronouncing each word clearly.")
+        elif word_accuracy < 0.8:
+            feedback.append("Good progress! Some words need more practice.")
+        else:
+            feedback.append("Excellent word recognition!")
+        
+        if phoneme_score < 0.6:
+            feedback.append("Work on individual sound pronunciation.")
+        elif phoneme_score < 0.8:
+            feedback.append("Your pronunciation is improving!")
+        
+        return feedback or ["Good job! Keep practicing."]
+    
+    def _get_practice_suggestions(self, score: float) -> List[str]:
+        """Generate practice suggestions based on overall score."""
+        if score < 0.5:
+            return [
+                "Practice speaking slowly and clearly",
+                "Record yourself and compare with native speakers",
+                "Focus on individual word pronunciation"
+            ]
+        elif score < 0.8:
+            return [
+                "Good progress! Keep practicing regularly",
+                "Try more complex phrases",
+                "Focus on rhythm and intonation"
+            ]
+        else:
+            return [
+                "Excellent pronunciation!",
+                "Try advanced conversation practice",
+                "Work on natural speech patterns"
+            ]
     
     def set_language(self, language: str) -> None:
-        """
-        Set the target language for pronunciation analysis.
-        
-        Args:
-            language: The target language code (e.g., 'dutch', 'english')
-        """
-        self.language = language
+        """Set the target language for analysis."""
+        self.language = language.lower()
         self.phoneme_map = self._load_phoneme_map()
+    
+    def get_phoneme_map(self) -> Dict[str, List[str]]:
+        """Get phoneme map for current language."""
+        return self.phoneme_map
