@@ -43,10 +43,13 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             self.rate_window = config.get("rate_limit_window", self.rate_window)
         else:
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
             logger.warning("No security manager provided, using default configuration")
         
         logger.info(f"Security middleware initialized (rate limit: {self.rate_limit} req/{self.rate_window}s)")
 =======
+=======
+>>>>>>> Stashed changes
             # Access config directly from security_manager
             config = getattr(self.security_manager, 'config', {})
             self.rate_limit = config.get("rate_limit", 100)

@@ -216,10 +216,11 @@ class LLMCore:
 
     def _initialize_model(self) -> None:
         """Initialize model with better error handling and fallbacks"""
+        import importlib
         with self._model_lock:
             if self._model_initialized:
                 return
-                
+
             transformers_kwargs = {
                 'torch_dtype': 'auto',
                 'device_map': 'auto' if torch.cuda.is_available() else None,
@@ -231,17 +232,26 @@ class LLMCore:
                 try:
                     self.logger.info(f"Attempting to load model: {model_name}")
                     self._cleanup_existing_model()
-                    
-                    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-                    self.model = AutoModelForCausalLM.from_pretrained(model_name, **transformers_kwargs)
 
-                    if torch.cuda.is_available():
-                        self.model = self.model.to("cuda")
+                    # Detect spaCy models (by name pattern or explicit list)
+                    if model_name.startswith("nl_core_news_") or model_name.startswith("en_core_web_"):
+                        import spacy
+                        self.model = spacy.load(model_name)
+                        self.tokenizer = self.model.tokenizer
+                        self._model_initialized = True
+                        self.logger.info(f"Successfully loaded spaCy model: {model_name}")
+                        return
+                    else:
+                        # Try HuggingFace transformers
+                        from transformers import AutoModelForCausalLM, AutoTokenizer
+                        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                        self.model = AutoModelForCausalLM.from_pretrained(model_name, **transformers_kwargs)
+                        if torch.cuda.is_available():
+                            self.model = self.model.to("cuda")
+                        self._model_initialized = True
+                        self.logger.info(f"Successfully loaded transformer model: {model_name}")
+                        return
 
-                    self._model_initialized = True
-                    self.logger.info(f"Successfully loaded model: {model_name}")
-                    return
-                    
                 except Exception as e:
                     errors.append(f"Failed to load {model_name}: {str(e)}")
                     continue
@@ -264,63 +274,72 @@ class LLMCore:
     @lru_cache(maxsize=32)
     def _cached_tokenize(self, text: str):
         """Cached tokenization to avoid repeated processing of the same text"""
+        from transformers import PreTrainedTokenizer
         if not self._model_initialized:
             self._initialize_model()
-            
-        if hasattr(self.model, "tokenizer"):
-            return self.model.tokenizer(text)
-        elif self.tokenizer is not None:
+
+        # HuggingFace transformer
+        if self.tokenizer is not None and isinstance(self.tokenizer, PreTrainedTokenizer):
             return self.tokenizer(text, return_tensors="pt")
+        # spaCy model
+        elif self.model is not None and hasattr(self.model, 'tokenizer'):
+            return self.model(text)
         else:
-            # For spaCy models
-            return self.model.tokenizer(text)
-    
+            raise RuntimeError("Model or tokenizer not initialized correctly.")
+
     def generate_response(self, prompt: str, context: Optional[Dict] = None) -> str:
         """Generate response with optimized memory usage"""
+        from transformers import PreTrainedModel, PreTrainedTokenizer
+        import spacy.language
+        import torch
         # Ensure model is loaded
         if not self._model_initialized:
             self._initialize_model()
-        
+
+        if self.model is None:
+            return "Error: Model is not initialized."
+
         # Get relevant context from memory
         context_data = self.memory.get_context(prompt) if hasattr(self, 'memory') and context is None else context or {}
-        
-        # Prepare input with context
         enhanced_prompt = self._prepare_prompt(prompt, context_data)
-        
-        # Generate response
+
         try:
-            # Use cached tokenization
-            inputs = self._cached_tokenize(enhanced_prompt)
-            
-            # Move inputs to the correct device
-            if hasattr(inputs, "to") and self.device == "cuda":
-                inputs = inputs.to(self.device)
-            
-            # Generate with memory optimization
-            with torch.no_grad():  # Disable gradient calculation to save memory
-                outputs = self.model.generate(
-                    inputs["input_ids"] if isinstance(inputs, dict) else inputs,
-                    max_length=self.config.get("max_length", 100),
-                    num_return_sequences=1,
-                    pad_token_id=self.tokenizer.eos_token_id
-                )
-            
-            # Decode the generated text
-            response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-            
-            # Clean up memory
-            del inputs, outputs
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                
+            # HuggingFace transformer: PreTrainedModel and PreTrainedTokenizer
+            if (
+                self.tokenizer is not None and
+                isinstance(self.model, PreTrainedModel) and
+                isinstance(self.tokenizer, PreTrainedTokenizer)
+            ):
+                inputs = self._cached_tokenize(enhanced_prompt)
+                if isinstance(inputs, dict) and self.device == "cuda":
+                    inputs = {k: v.to(self.device) for k, v in inputs.items()}
+                if isinstance(inputs, dict) and "input_ids" in inputs:
+                    input_ids = inputs["input_ids"]
+                else:
+                    raise RuntimeError("Invalid input for HuggingFace model.")
+                with torch.no_grad():
+                    outputs = self.model.generate(
+                        input_ids,
+                        max_length=self.config.get("max_length", 100),
+                        num_return_sequences=1,
+                        pad_token_id=getattr(self.tokenizer, 'eos_token_id', None)
+                    )
+                response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+                del inputs, outputs
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            # spaCy model: Language object
+            elif isinstance(self.model, spacy.language.Language):
+                doc = self.model(enhanced_prompt)
+                response = doc.text if hasattr(doc, 'text') else str(doc)
+            else:
+                response = "Error: Model type not supported."
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             response = f"Error generating response: {str(e)}"
-        
-        # Store interaction in memory if available
+
         if hasattr(self, 'memory'):
             self.memory.store_interaction(prompt, response, context_data)
-        
         return response
 
     def _prepare_prompt(self, prompt: str, context: Dict) -> str:

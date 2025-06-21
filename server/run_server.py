@@ -585,7 +585,8 @@ def main():
     # Setup argument parser
     parser = argparse.ArgumentParser(description='JARVIS Server')
     parser.add_argument('--host', default='127.0.0.1', help='Host to bind')
-    parser.add_argument('--port', type=int, default=8000, help='Port to listen on')
+    parser.add_argument('--port', type=int, default=8080, help='Port to listen on (default: 8080)')
+    parser.add_argument('--host', default='127.0.0.1', help='Host to bind (default: 127.0.0.1)')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
     

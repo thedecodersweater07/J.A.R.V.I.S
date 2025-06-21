@@ -8,9 +8,11 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List, Union
 from contextlib import asynccontextmanager
+import socket
 
 # Third-party imports
 import jwt
+from jwt.exceptions import PyJWTError
 import bcrypt
 from fastapi import (
     FastAPI, Depends, HTTPException, status, Request, 
@@ -18,7 +20,7 @@ from fastapi import (
 )
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -43,6 +45,10 @@ sys.path.insert(0, str(PROJECT_ROOT))
 BASE_DIR = Path(__file__).parent
 WEB_DIR = BASE_DIR / "web"
 
+# Set up Vite build output paths
+DIST_DIR = BASE_DIR / "web" / "dist"
+ASSETS_DIR = DIST_DIR / "assets"
+
 # Initialize FastAPI app
 app = FastAPI(
     title="JARVIS Web Interface",
@@ -53,25 +59,42 @@ app = FastAPI(
 )
 
 # Serve static files
-app.mount("/static", StaticFiles(directory=str(WEB_DIR), html=True), name="static")
+app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
 
-# Serve index.html for the root path
-@app.get("/", response_class=HTMLResponse)
-async def serve_home():
-    index_path = WEB_DIR / "index.html"
-    if not index_path.exists():
-        return HTMLResponse(content="<h1>Web interface not found. Please check if the web files are in the correct location.</h1>", status_code=404)
-    return FileResponse(index_path)
+# --- STATIC FILE SERVING ---
 
-# Handle SPA routing - serve index.html for all other routes
-@app.get("/{path:path}", response_class=HTMLResponse)
-async def serve_spa(path: str):
-    # Check if the requested path exists as a file
-    file_path = WEB_DIR / path
-    if file_path.exists() and file_path.is_file():
-        return FileResponse(file_path)
-    # Fallback to index.html for SPA routing
-    return FileResponse(WEB_DIR / "index.html")
+# Detect production mode (set ENV=production for prod)
+IS_PROD = os.environ.get("ENV", "dev").lower() == "production"
+
+if IS_PROD:
+    # Serve the Vite build output as the static root
+    app.mount(
+        "",
+        StaticFiles(directory=str(DIST_DIR), html=True),
+        name="static-root"
+    )
+    logger.info(f"Serving static files from {DIST_DIR} (PRODUCTION mode)")
+    # Redirect / to /index.html for best compatibility
+    @app.get("/")
+    async def prod_root():
+        return RedirectResponse("/index.html")
+else:
+    # DEV: Serve from web/ for hot reload and dev
+    @app.get("/", response_class=HTMLResponse)
+    async def serve_dev_index():
+        index_path = BASE_DIR / "web" / "index.html"
+        if not index_path.exists():
+            return HTMLResponse(content="<h1>index.html not found in web/</h1>", status_code=404)
+        return FileResponse(index_path)
+
+    @app.get("/{full_path:path}", response_class=HTMLResponse)
+    async def serve_spa_fallback_dev(full_path: str):
+        if full_path.startswith("api/") or full_path.startswith("ws/"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        file_path = BASE_DIR / "web" / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(BASE_DIR / "web" / "index.html")
 
 # CORS configuration
 app.add_middleware(
@@ -407,7 +430,7 @@ class AuthManager:
                     detail="Invalid authentication credentials"
                 )
             return payload
-        except jwt.PyJWTError:
+        except PyJWTError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication credentials"
@@ -563,63 +586,85 @@ async def serve_static(file_path: str):
 async def read_root():
     return await serve_static("")
 
-# WebSocket endpoint
-from fastapi import WebSocket, WebSocketDisconnect
-from typing import Dict
-import json
-import uuid
-import logging
+# WebSocket connection manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
 
-# Import ConnectionManager from websocket module
-from .websocket import manager as connection_manager
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
 
-@app.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: str):
-    # Accept the WebSocket connection
-    await connection_manager.connect(websocket, client_id)
-    
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            await connection.send_text(message)
+
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+
+# Initialize the connection manager
+manager = ConnectionManager()
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
     try:
         while True:
-            # Wait for any message from the client
             data = await websocket.receive_text()
-            
             try:
-                # Parse the message as JSON
                 message = json.loads(data)
-                logger.info(f"Received message from {client_id}: {message}")
+                # Get the AI model instance
+                model = get_jarvis_model()
                 
-                # Process the message using the connection manager
-                if isinstance(message, dict) and "text" in message:
-                    await connection_manager.process_message(message["text"], client_id)
-                else:
-                    await connection_manager.send_message(
-                        "Invalid message format. Expected {\"text\": \"your message\"}",
-                        client_id
+                if not model or not model.initialized:
+                    await manager.send_personal_message(
+                        json.dumps({
+                            "type": "error",
+                            "content": "AI model not initialized"
+                        }),
+                        websocket
                     )
-                    
-                # Echo back the received message
-                response = {
-                    'type': 'message_received',
-                    'content': message,
-                    'timestamp': datetime.utcnow().isoformat()
-                }
-                await websocket.send_text(json.dumps(response))
+                    continue
+
+                # Process the message using the AI model
+                response = await model.process_message(message["content"])
+                
+                # Send the response back
+                await manager.send_personal_message(
+                    json.dumps({
+                        "type": "assistant",
+                        "content": response
+                    }),
+                    websocket
+                )
                 
             except json.JSONDecodeError:
-                error_msg = 'Invalid JSON format. Please send a valid JSON message.'
-                await connection_manager.send_message(error_msg, client_id)
-                logger.error(f'JSON decode error from {client_id}')
+                await manager.send_personal_message(
+                    json.dumps({
+                        "type": "error",
+                        "content": "Invalid message format"
+                    }),
+                    websocket
+                )
+            except Exception as e:
+                logger.error(f"Error processing message: {e}")
+                await manager.send_personal_message(
+                    json.dumps({
+                        "type": "error",
+                        "content": f"Error processing message: {str(e)}"
+                    }),
+                    websocket
+                )
                 
     except WebSocketDisconnect:
-        logger.info(f'Client {client_id} disconnected')
-        connection_manager.disconnect(client_id)
-    except Exception as e:
-        logger.error(f'WebSocket error for {client_id}: {str(e)}', exc_info=True)
-        try:
-            await websocket.close()
-        except:
-            pass  # WebSocket is already closed
-        connection_manager.disconnect(client_id)
+        manager.disconnect(websocket)
+        await manager.broadcast(json.dumps({
+            "type": "system",
+            "content": "A client disconnected"
+        }))
 
 # API Routes
 @app.post("/api/token", response_model=Token)
@@ -832,6 +877,23 @@ def shutdown_event():
             logger.info("Database connection closed")
         except Exception as e:
             logger.error(f"Error closing database connection: {e}")
+
+# Print local server URL on startup
+@app.on_event("startup")
+def print_localhost_url():
+    port = int(os.environ.get("JARVIS_PORT", 8080))
+    print(f"\n[INFO] JARVIS Web UI running at:")
+    print(f"  http://localhost:{port}/")
+    print(f"  http://127.0.0.1:{port}/\n")
+
+# Include routers
+from server.auth import router as auth_router
+from server.ai import router as ai_router
+from server.system import router as system_router
+
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
+app.include_router(ai_router, prefix="/ai", tags=["ai"])
+app.include_router(system_router, prefix="/system", tags=["system"])
 
 # Main entry point
 if __name__ == "__main__":
