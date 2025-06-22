@@ -23,7 +23,7 @@ class AIRequestLog(Base):
     input_text = Column(String, nullable=False)
     response_text = Column(String, nullable=False)
     confidence = Column(Float, default=0.0)
-    metadata = Column(JSON, default={})
+    meta_data = Column(JSON, default={})  # <-- hernoemd van 'metadata' naar 'meta_data'
     created_at = Column(DateTime, default=datetime.utcnow)
 
 # Database connection setup

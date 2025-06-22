@@ -3,6 +3,9 @@ JARVIS API Package
 Contains API routes and handlers for the JARVIS server
 """
 
+# API package
+# __all__ verwijderd voor compatibiliteit en om warnings te voorkomen
+
 from fastapi import APIRouter
 
 # Create API router

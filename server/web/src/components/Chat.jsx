@@ -1,119 +1,75 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useWebSocket } from '../hooks/useWebSocket';
 import './Chat.css';
 
-const Chat = () => {
-    const [messages, setMessages] = useState([]);
-    const [inputValue, setInputValue] = useState('');
-    const [isConnected, setIsConnected] = useState(false);
-    const [ws, setWs] = useState(null);
-    const [toast, setToast] = useState(null);
-    const [isTyping, setIsTyping] = useState(false);
-    const messageContainerRef = useRef(null);
+const Chat = ({ clientId }) => {
+  const [messages, setMessages] = useState([]);
+  const [inputValue, setInputValue] = useState('');
+  const { socket, isConnected, error, sendMessage } = useWebSocket(clientId);
 
-    useEffect(() => {
-        const websocket = new WebSocket(`ws://${window.location.host}/ws`);
-
-        websocket.onopen = () => {
-            setIsConnected(true);
-            addMessage('system', 'Connected to JARVIS');
-        };
-
-        websocket.onclose = () => {
-            setIsConnected(false);
-            addMessage('system', 'Disconnected from JARVIS');
-        };
-
-        websocket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === 'typing') {
-                setIsTyping(true);
-                setTimeout(() => setIsTyping(false), 1200);
-            } else {
-                setIsTyping(false);
-                addMessage(data.type, data.content);
-            }
-        };
-
-        setWs(websocket);
-
-        return () => {
-            websocket.close();
-        };
-    }, []);
-
-    const addMessage = (type, content) => {
-        setMessages(prev => [...prev, { type, content, timestamp: new Date() }]);
-        setTimeout(() => {
-            if (messageContainerRef.current) {
-                messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
-            }
-        }, 100);
-    };
-
-    const showToast = (msg) => {
-        setToast(msg);
-        setTimeout(() => setToast(null), 2500);
-    };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (!inputValue.trim()) return;
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-            showToast('Cannot send: Not connected to JARVIS');
-            return;
+  // Koppel WebSocket event voor inkomende berichten
+  useEffect(() => {
+    if (!socket) return;
+    const handler = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'chat') {
+          setMessages((prev) => [...prev, data.payload]);
         }
-        ws.send(JSON.stringify({
-            type: 'user',
-            content: inputValue
-        }));
-        setInputValue('');
+      } catch (e) {
+        // ignore
+      }
     };
+    socket.addEventListener('message', handler);
+    return () => socket.removeEventListener('message', handler);
+  }, [socket]);
 
-    return (
-        <div className="chat-interface" aria-label="AI chat interface">
-            <div className="status-bar">
-                <div className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}>
-                    {isConnected ? 'Connected' : 'Disconnected'}
-                </div>
-            </div>
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!inputValue.trim()) return;
+    sendMessage('chat', {
+      message: inputValue,
+      timestamp: new Date().toISOString(),
+      sender: clientId,
+    });
+    setInputValue('');
+  };
 
-            <div className="message-container" ref={messageContainerRef} id="messageContainer" tabIndex={0} aria-live="polite">
-                {messages.length === 0 && (
-                    <div className="message system empty-state">Start a conversation with JARVIS!</div>
-                )}
-                {messages.map((msg, index) => (
-                    <div key={index} className={`message ${msg.type}`} tabIndex={0} aria-label={`${msg.type} message`}>
-                        <div className="message-content">{msg.content}</div>
-                        <div className="message-timestamp">
-                            {msg.timestamp.toLocaleTimeString()}
-                        </div>
-                    </div>
-                ))}
-                {isTyping && (
-                    <div className="message assistant typing-indicator" aria-live="polite">
-                        <span className="typing-dot"></span>
-                        <span className="typing-dot"></span>
-                        <span className="typing-dot"></span>
-                    </div>
-                )}
-            </div>
-
-            <form onSubmit={handleSubmit} className="input-form" autoComplete="off" role="search">
-                <input
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    placeholder={isConnected ? "Type your message..." : "Connecting to JARVIS..."}
-                    autoFocus
-                    aria-label="Type your message"
-                />
-                <button type="submit" aria-label="Send message">
-                    Send
-                </button>
-            </form>
-            {toast && <div className="chat-toast" role="alert">{toast}</div>}
-        </div>
-    );
+  return (
+    <div className="chat-container">
+      <div className="chat-status">
+        {isConnected ? (
+          <span className="status-connected">Connected</span>
+        ) : (
+          <span className="status-disconnected">Disconnected</span>
+        )}
+        {error && <span className="status-error">{error}</span>}
+      </div>
+      <div className="chat-messages">
+        {messages.map((msg, idx) => (
+          <div key={idx} className={`message ${msg.sender === clientId ? 'sent' : 'received'}`}>
+            <span className="message-sender">{msg.sender}</span>
+            <p className="message-content">{msg.message}</p>
+            <span className="message-time">
+              {new Date(msg.timestamp).toLocaleTimeString()}
+            </span>
+          </div>
+        ))}
+      </div>
+      <form onSubmit={handleSubmit} className="chat-input">
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder="Type a message..."
+          disabled={!isConnected}
+        />
+        <button type="submit" disabled={!isConnected}>
+          Send
+        </button>
+      </form>
+    </div>
+  );
 };
 
 export default Chat;

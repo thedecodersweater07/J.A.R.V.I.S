@@ -1,12 +1,15 @@
 {
     "include": [
-        "tests"
+        "server"
     ],
     "exclude": [
         "**/node_modules",
         "**/__pycache__"
     ],
-    "reportMissingImports": "warning",
+    "venvPath": ".",
+    "venv": ".venv",
+    "reportMissingImports": true,
+    "reportMissingModuleSource": true,
     "pythonVersion": "3.11",
     "typeCheckingMode": "basic"
-} 
+}

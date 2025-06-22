@@ -1,831 +1,660 @@
-import os
-os.environ["TRANSFORMERS_NO_TF"] = "1"
+"""
+J.A.R.V.I.S. FastAPI Server with Auto Frontend Build & Deploy
+-------------------------------------------------------------
+Main server application that handles HTTP and WebSocket endpoints.
+Automatically builds and deploys frontend assets on startup.
+"""
 
-# Standard library imports
-import sys
 import logging
 import asyncio
+import subprocess
+import shutil
 import json
 from pathlib import Path
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List, Union, Type, TypeVar
 from contextlib import asynccontextmanager
-import socket
+from typing import Dict, Any, Optional
 
-# Third-party imports
-import jwt
-from jwt.exceptions import PyJWTError
-import bcrypt
-from fastapi import (
-    FastAPI, Depends, HTTPException, status, Request, 
-    BackgroundTasks, Response, WebSocket, WebSocketDisconnect
-)
-from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse, FileResponse, Response, RedirectResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-# Type variables for generic models
-T = TypeVar('T')
+from server.config import Settings
+from server.api.routes import api_router
+from server.websocket.manager import websocket_router
+from server.middleware.security import add_security_headers
+from server.utils.logging import configure_logging
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('server.log')
-    ]
-)
-logger = logging.getLogger("jarvis-server")
 
-# Add project root to Python path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
-
-# Set up paths
-BASE_DIR = Path(__file__).parent
-WEB_DIR = BASE_DIR / "web"
-DIST_DIR = WEB_DIR / "dist"
-
-# Initialize FastAPI app
-app = FastAPI(
-    title="JARVIS Web Interface",
-    description="JARVIS AI Assistant Web Interface",
-    version="1.0.0",
-    docs_url=None,  # Disable docs in production
-    redoc_url=None,  # Disable redoc in production
-)
-
-# --- Serve static files and SPA frontend ---
-if not DIST_DIR.exists():
-    raise RuntimeError(
-        f"Frontend build not found in {DIST_DIR}. "
-        "Please run 'npm install && npm run build' in 'server/web' before starting the server."
-    )
-
-# Serve /assets, /static, etc.
-for static_folder in ["assets", "static"]:
-    static_path = DIST_DIR / static_folder
-    if static_path.exists():
-        app.mount(f"/{static_folder}", StaticFiles(directory=str(static_path)), name=static_folder)
-
-# Serve favicon if present
-favicon_path = DIST_DIR / "favicon.ico"
-if favicon_path.exists():
-    app.mount("/favicon.ico", StaticFiles(directory=str(DIST_DIR)), name="favicon")
-
-# Serve all other frontend files and SPA fallback
-@app.get("/", response_class=HTMLResponse)
-async def serve_index():
-    return FileResponse(DIST_DIR / "index.html")
-
-@app.get("/{full_path:path}", response_class=HTMLResponse)
-async def serve_spa(full_path: str):
-    file_path = DIST_DIR / full_path
-    if file_path.exists() and file_path.is_file():
-        return FileResponse(file_path)
-    # Fallback to index.html for SPA routes
-    return FileResponse(DIST_DIR / "index.html")
-
-# Health check endpoint - must be registered before other routes
-@app.get("/health")
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "version": "1.0.0",
-        "timestamp": datetime.utcnow().isoformat(),
-        "components": {
-            "ai_registry": ai_registry.initialized,
-            "user_store": len(user_store) > 0
-        },
-        "version": "2.0.0"
-    }
-
-# CORS configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
-
-def initialize_jarvis_model():
-    """
-    Initialize the Jarvis model with proper error handling.
+class FrontendBuilder:
+    """Handles frontend build and deployment operations."""
     
-    Returns:
-        An instance of JarvisModel
-    """
-    try:
-        # Add project root to Python path if not already there
-        if str(PROJECT_ROOT) not in sys.path:
-            sys.path.insert(0, str(PROJECT_ROOT))
-        # Import the model and base classes
-        from models.jarvis import JarvisModel, LLMBase, NLPProtocol, NLPBase
-        
-        # Create a simple LLM implementation
-        class SimpleLLM(LLMBase):
-            def generate(self, prompt: str, **kwargs: Any) -> Dict[str, Any]:
-                return {"response": "Simple LLM response", "success": True}
-                
-            def complete(self, text: str, **kwargs: Any) -> Dict[str, Any]:
-                return {"response": text + " [completed]", "success": True}
-                
-            def predict(self, text: str, **kwargs: Any) -> Dict[str, Any]:
-                return {"prediction": "This is a prediction", "confidence": 0.9, "success": True}
-                
-            def summarize(self, text: str, **kwargs: Any) -> Dict[str, Any]:
-                words = text.split()
-                summary = ' '.join(words[:30]) + ('...' if len(words) > 30 else '')
-                return {
-                    "summary": summary,
-                    "success": True,
-                    "model": "simple-llm"
-                }
-        
-        # Create a simple NLP analyzer
-        class SimpleNLPAnalyzer(NLPBase):
-            def analyze(self, text: str) -> Dict[str, Any]:
-                return {
-                    "entities": [{"text": text, "type": "UNKNOWN"}],
-                    "sentiment": {"polarity": 0.0, "label": "neutral"},
-                    "success": True
-                }
-                
-            def analyze_sentiment(self, text: str) -> Dict[str, Any]:
-                return {"sentiment": "neutral", "score": 0.0, "success": True}
-                
-            def extract_entities(self, text: str) -> List[Dict[str, Any]]:
-                return [{"text": text, "type": "UNKNOWN", "start": 0, "end": len(text)}]
-                
-            def __call__(self, text: str) -> Dict[str, Any]:
-                return self.analyze(text)
-        
-        # Initialize the model with the simple components
-        llm = SimpleLLM()
-        nlp_analyzer = SimpleNLPAnalyzer()
-        
-        # Try to import and use real implementations if available
+    def __init__(self, logger: logging.Logger):
+        self.logger = logger
+        self.base_path = Path(__file__).parent.parent
+        self.frontend_dir = self.base_path / "frontend"
+        self.build_dir = self.frontend_dir / "build" 
+        self.dist_dir = self.frontend_dir / "dist"
+        self.deploy_dir = self.base_path / "web" / "static"
+    
+    async def auto_build_and_deploy(self) -> bool:
+        """Automatically detect, build and deploy frontend."""
         try:
-            from llm.core.llm_core import LLMCore
-            llm = LLMCore()
-            logger.info("Initialized real LLM")
-        except ImportError as e:
-            logger.warning(f"Could not import LLM: {e}")
-            logger.info("Using simple LLM implementation")
+            # Check if frontend directory exists
+            if not self.frontend_dir.exists():
+                self.logger.info("No frontend directory found - skipping auto build")
+                return False
+            
+            # Detect frontend type and build
+            build_success = await self._detect_and_build()
+            if not build_success:
+                return False
+            
+            # Deploy built assets
+            deploy_success = await self._deploy_assets()
+            if deploy_success:
+                self.logger.info("✅ Frontend auto-build and deploy completed successfully")
+                return True
+            
         except Exception as e:
-            logger.error(f"Error initializing LLM: {e}", exc_info=True)
-            logger.info("Falling back to simple LLM implementation due to error")
+            self.logger.error(f"❌ Frontend auto-build failed: {e}")
+            
+        return False
+    
+    async def _detect_and_build(self) -> bool:
+        """Detect frontend type and run appropriate build command."""
+        package_json = self.frontend_dir / "package.json"
         
-        # Initialize the model
-        model = JarvisModel(
-            llm=llm,
-            nlp_analyzer=nlp_analyzer,
-            config={"version": "1.0.0"}
-        )
+        if not package_json.exists():
+            self.logger.warning("No package.json found - trying manual JSX/JS detection")
+            return await self._build_manual()
         
-        logger.info("Jarvis model initialized successfully")
-        return model
-        
-    except ImportError as e:
-        logger.warning(f"Could not import Jarvis model: {e}")
-        
-        # Create a dummy model as fallback
-        class DummyJarvisModel:
-            def __init__(self):
-                self.model_name = "dummy-model"
+        # Parse package.json to determine build type
+        try:
+            with open(package_json, 'r', encoding='utf-8') as f:
+                pkg_data = json.load(f)
+            
+            scripts = pkg_data.get('scripts', {})
+            dependencies = {**pkg_data.get('dependencies', {}), **pkg_data.get('devDependencies', {})}
+            
+            # Detect framework and build
+            if 'react' in dependencies or 'react-scripts' in dependencies:
+                return await self._build_react(scripts)
+            elif 'vue' in dependencies or '@vue/cli' in dependencies:
+                return await self._build_vue(scripts)
+            elif 'vite' in dependencies:
+                return await self._build_vite(scripts)
+            elif 'webpack' in dependencies:
+                return await self._build_webpack(scripts)
+            else:
+                return await self._build_generic(scripts)
                 
-            def process_input(self, text: str, user_id: str = "default", **kwargs) -> Dict[str, Any]:
-                return {
-                    "response": "Dummy model response - JARVIS is not properly initialized",
-                    "success": False,
-                    "error": "Dummy model - JARVIS not properly initialized"
-                }
-        
-        logger.warning("Falling back to dummy model")
-        return DummyJarvisModel()
-        
-    except Exception as e:
-        logger.critical(f"Critical error initializing Jarvis model: {e}", exc_info=True)
-        raise RuntimeError(f"Failed to initialize Jarvis model: {e}")
-        logger.warning(f"Could not import Jarvis model: {e}")
-        logger.warning("Falling back to dummy model")
-        
-# Database dependency
-def get_db():
-    """Dependency for getting database session"""
-    from db import init_db
-    
-    # Initialize the database and get a session
-    db = init_db()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# Initialize the model when the module loads
-jarvis_model = initialize_jarvis_model()
-app.state.jarvis_model = jarvis_model
-
-def get_jarvis_model() -> Any:
-    """
-    Get the Jarvis model instance.
-    
-    Returns:
-        An instance of JarvisModel or a fallback dummy model.
-    """
-    if not hasattr(app.state, 'jarvis_model'):
-        app.state.jarvis_model = initialize_jarvis_model()
-    return app.state.jarvis_model
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('jarvis.log')
-    ]
-)
-logger = logging.getLogger("jarvis-server")
-
-# Security Configuration
-class SecurityConfig:
-    JWT_SECRET: str = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-in-production")
-    ALGORITHM: str = "HS256"
-    TOKEN_EXPIRE_HOURS: int = 12
-    PASSWORD_MIN_LENGTH: int = 8
-    MAX_LOGIN_ATTEMPTS: int = 5
-    LOCKOUT_DURATION: int = 15  # minutes
-
-# Pydantic Models
-class AIRequest(BaseModel):
-    query: str = Field(..., min_length=1, max_length=1000)
-    request_type: str = Field(..., pattern="^(text|nlp|ml|analysis)$")
-    context: Optional[Dict[str, Any]] = None
-
-class AIResponse(BaseModel):
-    response: Any
-    request_id: str
-    processing_time: float
-    timestamp: datetime
-    success: bool = True
-
-class UserCreate(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50)
-    password: str = Field(..., min_length=8)
-    role: str = Field(default="user", pattern="^(admin|user|guest)$")
-
-class UserResponse(BaseModel):
-    id: str
-    username: str
-    role: str
-    created_at: datetime
-    last_login: Optional[datetime] = None
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    expires_in: int
-    user: Dict[str, str]
-
-# In-memory stores (replace with database in production)
-user_store: Dict[str, Dict[str, Any]] = {}
-failed_attempts: Dict[str, Dict[str, Any]] = {}
-
-# OAuth2 scheme
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/token")
-
-# AI Components Registry
-class AIComponentRegistry:
-    def __init__(self):
-        self.components = {}
-        self.initialized = False
-    
-    async def initialize(self):
-        """Initialize AI components asynchronously"""
-        try:
-            # Mock AI components - replace with real implementations
-            self.components = {
-                "text": self._mock_text_processor,
-                "nlp": self._mock_nlp_processor,
-                "ml": self._mock_ml_processor,
-                "analysis": self._mock_analysis_processor
-            }
-            self.initialized = True
-            logger.info("AI components initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize AI components: {e}")
-            raise
+            self.logger.error(f"Error parsing package.json: {e}")
+            return await self._build_manual()
     
-    async def process_request(self, request_type: str, query: str, context: Dict[str, Any]) -> Any:
-        """Process AI request"""
-        if not self.initialized:
-            raise HTTPException(status_code=503, detail="AI components not initialized")
+    async def _build_react(self, scripts: dict) -> bool:
+        """Build React application."""
+        self.logger.info("🔨 Building React application...")
         
-        processor = self.components.get(request_type)
-        if not processor:
-            raise HTTPException(status_code=400, detail=f"Unknown request type: {request_type}")
+        build_cmd = scripts.get('build', 'npm run build')
+        if await self._run_build_command(build_cmd):
+            # React typically builds to 'build' directory
+            self.build_output_dir = self.build_dir
+            return True
+        return False
+    
+    async def _build_vue(self, scripts: dict) -> bool:
+        """Build Vue application."""
+        self.logger.info("🔨 Building Vue application...")
         
-        return await processor(query, context)
+        build_cmd = scripts.get('build', 'npm run build')
+        if await self._run_build_command(build_cmd):
+            # Vue typically builds to 'dist' directory
+            self.build_output_dir = self.dist_dir
+            return True
+        return False
     
-    # Mock processors - replace with real AI implementations
-    async def _mock_text_processor(self, query: str, context: Dict[str, Any]) -> str:
-        await asyncio.sleep(0.1)  # Simulate processing time
-        return f"Text response for: {query[:50]}..."
+    async def _build_vite(self, scripts: dict) -> bool:
+        """Build Vite application."""
+        self.logger.info("🔨 Building Vite application...")
+        
+        build_cmd = scripts.get('build', 'npm run build')
+        if await self._run_build_command(build_cmd):
+            # Vite typically builds to 'dist' directory
+            self.build_output_dir = self.dist_dir
+            return True
+        return False
     
-    async def _mock_nlp_processor(self, query: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        await asyncio.sleep(0.2)
-        return {
-            "tokens": len(query.split()),
-            "sentiment": "neutral",
-            "entities": [],
-            "language": "en"
-        }
+    async def _build_webpack(self, scripts: dict) -> bool:
+        """Build Webpack application."""
+        self.logger.info("🔨 Building Webpack application...")
+        
+        build_cmd = scripts.get('build', 'npm run build')
+        if await self._run_build_command(build_cmd):
+            # Check both common output directories
+            if self.build_dir.exists():
+                self.build_output_dir = self.build_dir
+            elif self.dist_dir.exists():
+                self.build_output_dir = self.dist_dir
+            else:
+                self.logger.error("No build output found in 'build' or 'dist' directories")
+                return False
+            return True
+        return False
     
-    async def _mock_ml_processor(self, query: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        await asyncio.sleep(0.3)
-        return {
-            "prediction": "positive",
-            "confidence": 0.85,
-            "model": "mock_classifier"
-        }
+    async def _build_generic(self, scripts: dict) -> bool:
+        """Build generic Node.js application."""
+        self.logger.info("🔨 Building generic frontend application...")
+        
+        # Try common build commands
+        for cmd in ['npm run build', 'yarn build', 'pnpm build']:
+            if await self._run_build_command(cmd, ignore_errors=True):
+                # Find the build output
+                for output_dir in [self.build_dir, self.dist_dir]:
+                    if output_dir.exists():
+                        self.build_output_dir = output_dir
+                        return True
+        
+        return False
     
-    async def _mock_analysis_processor(self, query: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        await asyncio.sleep(0.4)
-        return {
-            "summary": f"Analysis of query with {len(query)} characters",
-            "key_points": ["Point 1", "Point 2"],
-            "recommendations": ["Recommendation 1"]
-        }
-
-# Global AI registry
-ai_registry = AIComponentRegistry()
-
-# Authentication utilities
-class AuthManager:
-    @staticmethod
-    def hash_password(password: str) -> str:
-        """Hash password using bcrypt"""
-        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    async def _build_manual(self) -> bool:
+        """Manual build for simple JSX/JS files using basic tools."""
+        self.logger.info("🔨 Attempting manual JSX/JS build...")
+        
+        # Check for JSX files
+        jsx_files = list(self.frontend_dir.rglob("*.jsx")) + list(self.frontend_dir.rglob("*.js"))
+        if not jsx_files:
+            self.logger.warning("No JSX/JS files found for manual build")
+            return False
+        
+        # Create a simple build directory and copy files
+        manual_build_dir = self.frontend_dir / "manual_build"
+        manual_build_dir.mkdir(exist_ok=True)
+        
+        # Copy all frontend files to build directory
+        for file_path in self.frontend_dir.iterdir():
+            if file_path.is_file() and file_path.suffix in ['.html', '.js', '.jsx', '.css']:
+                shutil.copy2(file_path, manual_build_dir)
+        
+        self.build_output_dir = manual_build_dir
+        self.logger.info(f"Manual build completed: {len(jsx_files)} files processed")
+        return True
     
-    @staticmethod
-    def verify_password(plain_password: str, hashed_password: str) -> bool:
-        """Verify password against hash"""
+    async def _run_build_command(self, command: str, ignore_errors: bool = False) -> bool:
+        """Run a build command asynchronously."""
         try:
-            return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-        except Exception:
+            self.logger.info(f"Running: {command}")
+            
+            # Split command for subprocess
+            cmd_parts = command.split()
+            
+            # Run the command
+            process = await asyncio.create_subprocess_exec(
+                *cmd_parts,
+                cwd=self.frontend_dir,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            stdout, stderr = await process.communicate()
+            
+            if process.returncode == 0:
+                self.logger.info("✅ Build command completed successfully")
+                if stdout:
+                    self.logger.debug(f"Build output: {stdout.decode()}")
+                return True
+            else:
+                if not ignore_errors:
+                    self.logger.error(f"❌ Build command failed with code {process.returncode}")
+                    if stderr:
+                        self.logger.error(f"Build error: {stderr.decode()}")
+                return False
+                
+        except FileNotFoundError:
+            if not ignore_errors:
+                self.logger.error(f"❌ Command not found: {command}")
+            return False
+        except Exception as e:
+            if not ignore_errors:
+                self.logger.error(f"❌ Build command error: {e}")
             return False
     
-    @staticmethod
-    def create_access_token(data: Dict[str, Any]) -> str:
-        """Create JWT access token"""
-        to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(hours=SecurityConfig.TOKEN_EXPIRE_HOURS)
-        to_encode.update({"exp": expire})
-        return jwt.encode(to_encode, SecurityConfig.JWT_SECRET, algorithm=SecurityConfig.ALGORITHM)
-    
-    @staticmethod
-    def verify_token(token: str) -> Dict[str, Any]:
-        """Verify and decode JWT token"""
+    async def _deploy_assets(self) -> bool:
+        """Deploy built assets to web/static directory."""
         try:
-            payload = jwt.decode(token, SecurityConfig.JWT_SECRET, algorithms=[SecurityConfig.ALGORITHM])
-            username: str = payload.get("sub")
-            if username is None:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid authentication credentials"
-                )
-            return payload
-        except PyJWTError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials"
-            )
-
-# User management
-class UserManager:
-    @staticmethod
-    def create_user(username: str, password: str, role: str = "user") -> Dict[str, Any]:
-        """Create a new user"""
-        if username in user_store:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already registered"
-            )
+            if not hasattr(self, 'build_output_dir') or not self.build_output_dir.exists():
+                self.logger.error("No build output directory found")
+                return False
             
-        hashed_password = AuthManager.hash_password(password)
-        user_id = str(len(user_store) + 1)
-        user_data = {
-            "id": user_id,
-            "username": username,
-            "hashed_password": hashed_password,
-            "role": role,
-            "created_at": datetime.utcnow(),
-            "last_login": None,
-            "is_active": True
-        }
-        user_store[username] = user_data
-        return user_data
-    
-    @staticmethod
-    def get_user(username: Optional[str]) -> Optional[Dict[str, Any]]:
-        """Get user by username"""
-        if not username:
-            return None
-        return user_store.get(username)
-    
-    @staticmethod
-    def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
-        """Authenticate user credentials"""
-        user = UserManager.get_user(username)
-        if not user or not user.get("is_active", True):
-            return None
+            # Ensure deploy directory exists
+            self.deploy_dir.mkdir(parents=True, exist_ok=True)
             
-        if not AuthManager.verify_password(password, user["hashed_password"]):
-            return None
+            # Clear existing deployment
+            for item in self.deploy_dir.iterdir():
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)
             
-        return user
-
-# Initialize default users
-def create_default_users():
-    """Create default admin user"""
-    try:
-        UserManager.create_user("admin", "admin123", "admin")
-        UserManager.create_user("demo", "demo123", "user")
-        logger.info("Default users created")
-    except HTTPException:
-        logger.info("Default users already exist")
-
-# Dependency functions
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
-    """Get current user from JWT token"""
-    payload = AuthManager.verify_token(token)
-    username = payload.get("sub")
-    user = UserManager.get_user(username)
-    
-    if user is None or not user.get("is_active", True):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive"
-        )
-    return user
-
-async def get_admin_user(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
-    """Ensure current user is admin"""
-    if current_user.get("role") != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required"
-        )
-    return current_user
-
-# Application lifespan
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    logger.info("Starting JARVIS server...")
-    create_default_users()
-    await ai_registry.initialize()
-    logger.info("JARVIS server started successfully")
-    
-    yield
-    
-    # Shutdown
-    logger.info("JARVIS server shutting down...")
-
-# FastAPI app initialization
-app = FastAPI(
-    title="JARVIS AI Assistant",
-    description="Advanced AI Assistant API with authentication and multiple AI capabilities",
-    version="2.0.0",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    lifespan=lifespan
-)
-
-# Middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
-
-# WebSocket connection manager
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
-
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
-
-# Initialize the connection manager
-manager = ConnectionManager()
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    try:
-        while True:
-            data = await websocket.receive_text()
-            try:
-                message = json.loads(data)
-                # Get the AI model instance
-                model = get_jarvis_model()
+            # Copy built assets
+            deployed_files = 0
+            for item in self.build_output_dir.iterdir():
+                if item.is_file():
+                    shutil.copy2(item, self.deploy_dir)
+                    deployed_files += 1
+                elif item.is_dir():
+                    shutil.copytree(item, self.deploy_dir / item.name)
+                    deployed_files += len(list(item.rglob("*")))
+            
+            self.logger.info(f"✅ Deployed {deployed_files} files to {self.deploy_dir}")
+            
+            # Verify index.html exists
+            index_file = self.deploy_dir / "index.html"
+            if index_file.exists():
+                self.logger.info("✅ index.html successfully deployed")
+                return True
+            else:
+                self.logger.warning("⚠️ No index.html found in build output")
+                return False
                 
-                if not model or not model.initialized:
-                    await manager.send_personal_message(
-                        json.dumps({
-                            "type": "error",
-                            "content": "AI model not initialized"
-                        }),
-                        websocket
-                    )
-                    continue
-
-                # Process the message using the AI model
-                response = await model.process_message(message["content"])
-                
-                # Send the response back
-                await manager.send_personal_message(
-                    json.dumps({
-                        "type": "assistant",
-                        "content": response
-                    }),
-                    websocket
-                )
-                
-            except json.JSONDecodeError:
-                await manager.send_personal_message(
-                    json.dumps({
-                        "type": "error",
-                        "content": "Invalid message format"
-                    }),
-                    websocket
-                )
-            except Exception as e:
-                logger.error(f"Error processing message: {e}")
-                await manager.send_personal_message(
-                    json.dumps({
-                        "type": "error",
-                        "content": f"Error processing message: {str(e)}"
-                    }),
-                    websocket
-                )
-                
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        await manager.broadcast(json.dumps({
-            "type": "system",
-            "content": "A client disconnected"
-        }))
-
-# API Routes
-@app.post("/api/token", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    """Authenticate user and return access token"""
-    user = UserManager.authenticate_user(form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password"
-        )
-    
-    access_token = AuthManager.create_access_token(
-        data={"sub": user["username"], "role": user["role"]}
-    )
-    
-    return Token(
-        access_token=access_token,
-        token_type="bearer",
-        expires_in=SecurityConfig.TOKEN_EXPIRE_HOURS * 3600,
-        user={"username": user["username"], "role": user["role"]}
-    )
-
-@app.get("/api/users/me", response_model=UserResponse)
-async def get_current_user_info(current_user: Dict[str, Any] = Depends(get_current_user)):
-    """Get current user information"""
-    return UserResponse(
-        id=current_user["id"],
-        username=current_user["username"],
-        role=current_user["role"],
-        created_at=current_user["created_at"],
-        last_login=current_user.get("last_login")
-    )
-
-@app.post("/api/users", response_model=UserResponse)
-async def create_new_user(
-    user: UserCreate,
-    current_user: Dict[str, Any] = Depends(get_admin_user)
-):
-    """Create a new user (admin only)"""
-    created_user = UserManager.create_user(user.username, user.password, user.role)
-    return UserResponse(
-        id=created_user["id"],
-        username=created_user["username"],
-        role=created_user["role"],
-        created_at=created_user["created_at"]
-    )
-
-@app.get("/api/users", response_model=List[UserResponse])
-async def list_users(current_user: Dict[str, Any] = Depends(get_admin_user)):
-    """List all users (admin only)"""
-    return [
-        UserResponse(
-            id=user["id"],
-            username=user["username"],
-            role=user["role"],
-            created_at=user["created_at"],
-            last_login=user.get("last_login")
-        )
-        for user in user_store.values()
-    ]
-
-@app.post("/api/ai/query", response_model=AIResponse)
-async def process_ai_request(
-    request: AIRequest,
-    background_tasks: BackgroundTasks,
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
-    """
-    Process AI query with authentication and proper error handling.
-    
-    Args:
-        request: The AI request containing query and context
-        background_tasks: FastAPI background tasks
-        current_user: Authenticated user information
-        db: Database session dependency
-        
-    Returns:
-        Dict containing the AI response and metadata
-        
-    Raises:
-        HTTPException: If there's an error processing the request
-    """
-    start_time = datetime.utcnow()
-    request_id = f"req_{int(start_time.timestamp())}_{current_user['username']}"
-    
-    try:
-        # Get the model instance
-        model = get_jarvis_model()
-        
-        # Ensure the model has access to the database session
-        if hasattr(model, 'db') and model.db is None:
-            model.db = db
-        
-        # Process the request
-        response = model.process_input(
-            text=request.query,
-            user_id=str(current_user.get('id', 'anonymous')),
-            **({} if request.context is None else request.context)
-        )
-        
-        # Ensure response is serializable
-        response_data = response.get("response", "I'm sorry, I couldn't process that request.")
-        if not isinstance(response_data, (str, int, float, bool, type(None))):
-            response_data = str(response_data)
-        
-        # Log the request in background
-        processing_time = (datetime.utcnow() - start_time).total_seconds()
-        background_tasks.add_task(
-            log_ai_request,
-            request_id=request_id,
-            username=current_user['username'],
-            request_type=request.request_type,
-            processing_time=processing_time
-        )
-        
-        return {
-            "request_id": request_id,
-            "response": response_data,
-            "processing_time": processing_time,
-            "model": response.get("model", "unknown"),
-            "timestamp": datetime.utcnow().isoformat(),
-            "success": True
-        }
-        
-    except HTTPException:
-        # Re-raise HTTP exceptions as-is
-        raise
-        
-    except Exception as e:
-        error_msg = f"Error processing request: {str(e)}"
-        logger.error(error_msg, exc_info=True)
-        
-        # Log the error in the background
-        error_time = (datetime.utcnow() - start_time).total_seconds()
-        background_tasks.add_task(
-            log_ai_request,
-            request_id=request_id,
-            username=current_user['username'],
-            request_type=request.request_type,
-            processing_time=error_time
-        )
-        
-        # Return a structured error response
-        error_detail = {
-            "error": "Internal server error",
-            "details": error_msg,
-            "request_id": request_id,
-            "success": False
-        }
-        
-        # Log the full error for debugging
-        logger.error(f"Error processing request {request_id}: {error_msg}", exc_info=True)
-        
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=error_detail
-        )
-
-# Health check endpoint moved to the top of the file
-
-@app.get("/api/stats")
-async def get_stats():
-    """Get server statistics"""
-    try:
-        jarvis = get_jarvis_model()
-        return {
-            "model_type": "Jarvis",
-            "status": "active",
-            "is_processing": False,
-            "uptime": int((datetime.utcnow() - getattr(app.state, 'start_time', datetime.utcnow())).total_seconds()),
-            "components": {
-                "llm": hasattr(jarvis, 'llm_service'),
-                "nlp": hasattr(jarvis, 'nlp_processor'),
-                "ml": hasattr(jarvis, 'model')
-            }
-        }
-    except Exception as e:
-        logger.error(f"Error getting stats: {e}")
-        return {
-            "model_type": "Jarvis",
-            "status": "error",
-            "error": str(e)
-        }
-
-# Background tasks
-async def log_ai_request(request_id: str, username: str, request_type: str, processing_time: float):
-    """Log AI request for analytics"""
-    logger.info(f"AI Request - ID: {request_id}, User: {username}, Type: {request_type}, Time: {processing_time:.3f}s")
-
-# Cleanup function to close database connections
-@app.on_event("shutdown")
-def shutdown_event():
-    """Cleanup database connections on shutdown"""
-    if hasattr(app.state, 'db'):
-        try:
-            app.state.db.close()
-            logger.info("Database connection closed")
         except Exception as e:
-            logger.error(f"Error closing database connection: {e}")
+            self.logger.error(f"❌ Asset deployment failed: {e}")
+            return False
 
-# Print local server URL on startup
-@app.on_event("startup")
-def print_localhost_url():
-    port = int(os.environ.get("JARVIS_PORT", 8080))
-    print(f"\n[INFO] JARVIS Web UI running at:")
-    print(f"  http://localhost:{port}/")
-    print(f"  http://127.0.0.1:{port}/\n")
 
-# Include routers
-from server.auth import router as auth_router
-from server.ai import router as ai_router
-from server.system import router as system_router
+class JarvisServer:
+    """Main server class for J.A.R.V.I.S. web interface."""
+    
+    def __init__(self):
+        self.settings = Settings()
+        self.logger = configure_logging(self.settings)
+        self.frontend_builder = FrontendBuilder(self.logger)
+        self.app = self._create_app()
+        self._setup_static_paths()
+        self._setup_middleware()
+        self._setup_routes()
+        self._setup_static_files()
+        self._setup_exception_handlers()
+    
+    def _create_app(self) -> FastAPI:
+        """Create and configure the FastAPI application."""
+        return FastAPI(
+            title="J.A.R.V.I.S. Web UI",
+            description="A modern, integrated web interface for the J.A.R.V.I.S. system.",
+            version=self.settings.version,
+            docs_url="/api/docs" if self.settings.debug else None,
+            redoc_url="/api/redoc" if self.settings.debug else None,
+            lifespan=self._lifespan
+        )
+    
+    def _setup_static_paths(self):
+        """Initialize static file paths."""
+        base_path = Path(__file__).parent.parent
+        self._static_dir = (base_path / "web" / "static").resolve()
+        self._web_dir = (base_path / "web").resolve()
+        
+        # Log the paths for debugging
+        self.logger.info(f"Static directory: {self._static_dir}")
+        self.logger.info(f"Web directory: {self._web_dir}")
+    
+    @asynccontextmanager
+    async def _lifespan(self, app: FastAPI):
+        """Handle application startup and shutdown."""
+        self.logger.info("🚀 J.A.R.V.I.S. server startup initiated")
+        
+        # Auto-build and deploy frontend
+        await self.frontend_builder.auto_build_and_deploy()
+        
+        # Initialize other services
+        await self._startup_tasks()
+        
+        self.logger.info("✅ J.A.R.V.I.S. server startup complete")
+        yield
+        
+        # Cleanup services, cache, etc.
+        await self._shutdown_tasks()
+        self.logger.info("🛑 J.A.R.V.I.S. server shutdown complete")
+    
+    async def _startup_tasks(self):
+        """Execute startup tasks."""
+        # Add your startup initialization here
+        pass
+    
+    async def _shutdown_tasks(self):
+        """Execute shutdown cleanup tasks."""
+        # Add your cleanup tasks here
+        pass
+    
+    def _setup_middleware(self):
+        """Configure application middleware."""
+        # CORS middleware
+        self.app.add_middleware(
+            CORSMiddleware,
+            allow_origins=self.settings.cors_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+        
+        # Compression middleware
+        self.app.add_middleware(GZipMiddleware, minimum_size=1000)
+        
+        # Security headers middleware
+        self.app.add_middleware(BaseHTTPMiddleware, dispatch=add_security_headers)
+    
+    def _setup_routes(self):
+        """Configure application routes."""
+        self.app.include_router(api_router, prefix="/api")
+        self.app.include_router(websocket_router)
 
-app.include_router(auth_router, prefix="/auth", tags=["auth"])
-app.include_router(ai_router, prefix="/ai", tags=["ai"])
-app.include_router(system_router, prefix="/system", tags=["system"])
+        # Root endpoint - serve index.html directly
+        @self.app.get("/")
+        async def root():
+            return await self._serve_index()
+        
+        # Health check endpoint
+        @self.app.get("/health")
+        async def health_check():
+            return {
+                "status": "healthy", 
+                "version": self.settings.version,
+                "frontend_deployed": (self._static_dir / "index.html").exists()
+            }
+        
+        # Manual rebuild endpoint (development only)
+        @self.app.post("/api/rebuild-frontend")
+        async def rebuild_frontend():
+            if not self.settings.debug:
+                raise HTTPException(status_code=403, detail="Rebuild only available in debug mode")
+            
+            success = await self.frontend_builder.auto_build_and_deploy()
+            return {
+                "success": success,
+                "message": "Frontend rebuild completed" if success else "Frontend rebuild failed"
+            }
+    
+    def _setup_static_files(self):
+        """Configure static file serving."""
+        # Only mount directories that exist and have files
+        if self._directory_has_files(self._static_dir):
+            self.app.mount("/static", StaticFiles(directory=str(self._static_dir)), name="static")
+            self.logger.info(f"📁 Mounted static directory: {self._static_dir}")
 
-# Main entry point
+        if self._directory_has_files(self._web_dir):
+            # Mount web directory for other assets
+            self.app.mount("/assets", StaticFiles(directory=str(self._web_dir)), name="web-assets")
+            self.logger.info(f"📁 Mounted web assets directory: {self._web_dir}")
+    
+    def _setup_exception_handlers(self):
+        """Configure global exception handlers."""
+        @self.app.exception_handler(Exception)
+        async def global_exception_handler(request: Request, exc: Exception):
+            self.logger.error(f"Unhandled error on {request.url}: {exc}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error", "path": str(request.url.path)}
+            )
+        
+        @self.app.exception_handler(StarletteHTTPException)
+        async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+            self.logger.warning(f"HTTP {exc.status_code} on {request.url}: {exc.detail}")
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"detail": exc.detail, "path": str(request.url.path)}
+            )
+        
+        @self.app.exception_handler(404)
+        async def not_found_handler(request: Request, exc: HTTPException):
+            # Try to serve index.html for SPA routing
+            if not request.url.path.startswith("/api/"):
+                index_response = await self._serve_index()
+                if isinstance(index_response, FileResponse):
+                    return index_response
+            
+            return JSONResponse(
+                status_code=404,
+                content={"detail": f"Resource not found: {request.url.path}"}
+            )
+    
+    async def _serve_index(self) -> Response:
+        """Serve the main index.html file or fallback."""
+        # Priority: static/index.html first, then web/index.html
+        static_index = self._static_dir / "index.html"
+        web_index = self._web_dir / "index.html"
+        
+        if static_index.exists():
+            self.logger.debug(f"📄 Serving index.html from: {static_index}")
+            return FileResponse(
+                static_index,
+                media_type="text/html",
+                headers={"Cache-Control": "no-cache"}
+            )
+        
+        if web_index.exists():
+            self.logger.debug(f"📄 Serving index.html from: {web_index}")
+            return FileResponse(
+                web_index,
+                media_type="text/html",
+                headers={"Cache-Control": "no-cache"}
+            )
+        
+        # Fallback: show status page when no index.html is found
+        self.logger.warning("⚠️ No index.html found - serving status page")
+        return await self._serve_status_page()
+    
+    async def _serve_status_page(self) -> HTMLResponse:
+        """Serve a status page when index.html is missing."""
+        html_content = """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>J.A.R.V.I.S. Server Status</title>
+            <style>
+                body { 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: linear-gradient(135deg, #0f1419 0%, #1a1f29 100%);
+                    color: #e8eaed;
+                    margin: 0;
+                    padding: 2rem;
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .container {
+                    max-width: 700px;
+                    text-align: center;
+                    background: rgba(255, 255, 255, 0.05);
+                    padding: 3rem;
+                    border-radius: 20px;
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                }
+                h1 { 
+                    font-size: 2.5rem;
+                    margin-bottom: 1rem;
+                    background: linear-gradient(45deg, #00d4ff, #0099cc);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                }
+                .status { 
+                    font-size: 1.5rem;
+                    margin: 1rem 0;
+                    padding: 1rem;
+                    background: rgba(0, 255, 0, 0.1);
+                    border-radius: 10px;
+                    border: 1px solid rgba(0, 255, 0, 0.3);
+                }
+                .error {
+                    background: rgba(255, 0, 0, 0.1);
+                    border: 1px solid rgba(255, 0, 0, 0.3);
+                    color: #ff6b6b;
+                }
+                .info-box {
+                    text-align: left;
+                    background: rgba(255, 255, 255, 0.03);
+                    padding: 1.5rem;
+                    border-radius: 10px;
+                    margin: 2rem 0;
+                }
+                .info-box h3 {
+                    color: #00d4ff;
+                    margin-top: 0;
+                }
+                ul { 
+                    list-style: none;
+                    padding: 0;
+                }
+                li {
+                    padding: 0.5rem 0;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                }
+                li:last-child {
+                    border-bottom: none;
+                }
+                code {
+                    background: rgba(0, 0, 0, 0.3);
+                    padding: 0.2rem 0.5rem;
+                    border-radius: 4px;
+                    font-family: 'Courier New', monospace;
+                }
+                a {
+                    color: #00d4ff;
+                    text-decoration: none;
+                }
+                a:hover {
+                    text-decoration: underline;
+                }
+                .rebuild-btn {
+                    background: linear-gradient(45deg, #00d4ff, #0099cc);
+                    color: white;
+                    border: none;
+                    padding: 1rem 2rem;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    font-size: 1rem;
+                    margin: 1rem;
+                    transition: transform 0.2s;
+                }
+                .rebuild-btn:hover {
+                    transform: scale(1.05);
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🤖 J.A.R.V.I.S.</h1>
+                <div class="status">
+                    ✅ Server Online & Auto-Build Ready
+                </div>
+                <div class="status error">
+                    ❌ Frontend Build Missing
+                </div>
+                
+                <div class="info-box">
+                    <h3>🔨 Auto-Build Support:</h3>
+                    <ul>
+                        <li>React (create-react-app, Next.js)</li>
+                        <li>Vue.js (Vue CLI, Nuxt.js)</li>
+                        <li>Vite (React, Vue, Vanilla)</li>
+                        <li>Webpack (custom configs)</li>
+                        <li>Manual JSX/JS files</li>
+                    </ul>
+                </div>
+                
+                <div class="info-box">
+                    <h3>📁 Expected Structure:</h3>
+                    <ul>
+                        <li><code>frontend/package.json</code> - For npm/yarn projects</li>
+                        <li><code>frontend/src/</code> - Source files (JSX/JS/CSS)</li>
+                        <li><code>frontend/*.jsx</code> - For manual builds</li>
+                        <li>Output: <code>web/static/index.html</code></li>
+                    </ul>
+                </div>
+                
+                <div class="info-box">
+                    <h3>🚀 Quick Start:</h3>
+                    <ul>
+                        <li>Create <code>frontend/</code> directory</li>
+                        <li>Add your React/Vue/JS project files</li>
+                        <li>Restart server for auto-build</li>
+                        <li>Or use manual rebuild button below</li>
+                    </ul>
+                </div>
+                
+                <button class="rebuild-btn" onclick="rebuildFrontend()">
+                    🔨 Manual Rebuild Frontend
+                </button>
+                
+                <div style="margin-top: 2rem;">
+                    <a href="/api/health">📊 Server Health</a> |
+                    <a href="/api/docs">📚 API Docs</a>
+                </div>
+            </div>
+            
+            <script>
+                async function rebuildFrontend() {
+                    const btn = document.querySelector('.rebuild-btn');
+                    btn.disabled = true;
+                    btn.textContent = '🔨 Building...';
+                    
+                    try {
+                        const response = await fetch('/api/rebuild-frontend', { method: 'POST' });
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            btn.textContent = '✅ Build Complete!';
+                            setTimeout(() => location.reload(), 2000);
+                        } else {
+                            btn.textContent = '❌ Build Failed';
+                            setTimeout(() => {
+                                btn.textContent = '🔨 Manual Rebuild Frontend';
+                                btn.disabled = false;
+                            }, 3000);
+                        }
+                    } catch (error) {
+                        btn.textContent = '❌ Error';
+                        setTimeout(() => {
+                            btn.textContent = '🔨 Manual Rebuild Frontend';
+                            btn.disabled = false;
+                        }, 3000);
+                    }
+                }
+            </script>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content, status_code=200)
+    
+    @staticmethod
+    def _directory_has_files(directory: Path) -> bool:
+        """Check if directory exists and contains files."""
+        return directory.exists() and any(directory.iterdir())
+    
+    def get_app(self) -> FastAPI:
+        """Get the configured FastAPI application."""
+        return self.app
+
+
+# Create server instance
+server = JarvisServer()
+app = server.get_app()
+
+
 if __name__ == "__main__":
     import uvicorn
+    
+    # Development server configuration
     uvicorn.run(
-        "app:app",
+        "main:app",
         host="127.0.0.1",
-        port=8080,
+        port=8000,
         reload=True,
-        ssl_keyfile=None,
-        ssl_certfile=None
+        log_level="info"
     )
