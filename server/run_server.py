@@ -1,12 +1,45 @@
 from __future__ import annotations
 
-# Apply compatibility patches first
-import sys
+# Standard library imports
+import argparse
+import json
+import logging
 import os
+import sys
+import traceback
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
+from typing import (
+    Any, Awaitable, Callable, Dict, List, Literal, Mapping, Optional, 
+    Protocol, Sequence, Tuple, Type, TypeVar, Union, cast, TypedDict, TYPE_CHECKING
+)
+
+# Third-party imports
+from dotenv import load_dotenv
+import uvicorn
+from fastapi import (
+    APIRouter,
+    FastAPI,
+    FileResponse,
+    HTTPException,
+    HTMLResponse,
+    JSONResponse,
+    Request,
+    Response,
+    status,
+    WebSocket,
+    staticfiles,
+    StaticFiles,
+)
+from fastapi.exceptions import RequestValidationError, WebSocketDisconnect
+from fastapi.middleware import Middleware
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 # Load environment variables from .env file
-from dotenv import load_dotenv
 env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
@@ -14,22 +47,11 @@ load_dotenv(dotenv_path=env_path)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import compatibility patches
-from compat import *  # noqa
-
-import argparse
-import json
-import logging
-import traceback
-import uvicorn
-from typing import (
-    Any, Awaitable, Callable, Dict, List, Optional, Type, TypeVar, Union, cast,
-    Protocol, TYPE_CHECKING, Mapping, Sequence, Tuple, TypedDict, Literal
-)
-from dataclasses import dataclass
-from enum import Enum
-
-# Import fastapi_framework after environment is loaded
-import fastapi_framework
+try:
+    from compat import *  # noqa
+except ImportError:
+    # Define minimal compat layer if compat.py is missing
+    pass
 
 # Import for type checking only
 if TYPE_CHECKING:
@@ -37,23 +59,15 @@ if TYPE_CHECKING:
     from fastapi.routing import APIRouter as FastAPIRouterType
     from fastapi.responses import FileResponse as FastAPIFileResponseType
 
-from fastapi import (
-    FastAPI,
-    HTTPException,
-    Request,
-    WebSocket,
-    status,
-    APIRouter,
-    FileResponse,
-    JSONResponse,
-    HTMLResponse,
-    StaticFiles,
-)
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.exceptions import RequestValidationError, WebSocketDisconnect
-from fastapi.middleware import Middleware
-from starlette.types import ASGIApp, Receive, Scope, Send
-import uvicorn
+# Try to import fastapi_framework with fallback
+try:
+    import fastapi_framework
+    FASTAPI_FRAMEWORK_AVAILABLE = True
+except ImportError:
+    FASTAPI_FRAMEWORK_AVAILABLE = False
+    
+# Constants
+FASTAPI_AVAILABLE = True
 
 FASTAPI_AVAILABLE = True
 

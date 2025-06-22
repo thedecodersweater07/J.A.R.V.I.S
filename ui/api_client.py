@@ -14,7 +14,7 @@ class APIClient:
     Provides methods for authentication and AI requests
     """
     
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://localhost:8080"):
         self.base_url = base_url
         self.token = None
         self.user_info = None

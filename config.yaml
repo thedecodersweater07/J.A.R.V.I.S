@@ -2,7 +2,7 @@
 
 # Server settings
 server:
-  host: 0.0.0.0
+  host: 127.0.0.1
   port: 8001
   debug: true
   reload: true

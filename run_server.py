@@ -69,11 +69,11 @@ async def health_check():
             detail=f"Service unavailable: {str(e)}"
         )
 
-def run_server(host: str = "0.0.0.0", port: int = 8000, reload: bool = False):
+def run_server(host: str = "127.0.0.1", port: int = 8000, reload: bool = False):
     """Run the FastAPI server with Uvicorn.
     
     Args:
-        host: The host to bind to. Defaults to "0.0.0.0".
+        host: The host to bind to. Defaults to "127.0.0.1".
         port: The port to bind to. Defaults to 8000.
         reload: Whether to enable auto-reload. Defaults to False.
     """
@@ -112,8 +112,8 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Run JARVIS server")
-    parser.add_argument("--host", type=str, default=os.getenv("HOST", "0.0.0.0"), 
-                       help="Host to bind to (default: 0.0.0.0)")
+    parser.add_argument("--host", type=str, default=os.getenv("HOST", "127.0.0.1"), 
+                       help="Host to bind to (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=int(os.getenv("PORT", 8000)),
                        help="Port to bind to (default: 8000)")
     parser.add_argument("--reload", action="store_true",

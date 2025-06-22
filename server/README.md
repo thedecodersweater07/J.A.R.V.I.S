@@ -34,10 +34,10 @@ export MODEL_PATH=/path/to/models
 
 ```bash
 # Using run_server.py (recommended)
-python run_server.py --host 0.0.0.0 --port 8000 --debug
+python run_server.py --host 127.0.0.1 --port 8000 --debug
 
 # Using launcher.py
-python launcher.py --host 0.0.0.0 --port 8000 --debug
+python launcher.py --host 127.0.0.1 --port 8000 --debug
 
 # Directly using app.py
 python app.py

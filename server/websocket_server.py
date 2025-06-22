@@ -85,7 +85,7 @@ app.mount("/static", StaticFiles(directory="tests"), name="static")
 async def read_root():
     return FileResponse("tests/index.html")
 
-def start_websocket_server(host="0.0.0.0", port=8000):
+def start_websocket_server(host="127.0.0.1", port=8080):
     """Start de WebSocket server"""
     config = uvicorn.Config(
         app,

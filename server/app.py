@@ -1,12 +1,14 @@
-# Standard library imports
 import os
+os.environ["TRANSFORMERS_NO_TF"] = "1"
+
+# Standard library imports
 import sys
 import logging
 import asyncio
 import json
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List, Union, Type, TypeVar
 from contextlib import asynccontextmanager
 import socket
 
@@ -18,13 +20,15 @@ from fastapi import (
     FastAPI, Depends, HTTPException, status, Request, 
     BackgroundTasks, Response, WebSocket, WebSocketDisconnect
 )
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from pydantic import BaseModel, Field
+
+# Type variables for generic models
+T = TypeVar('T')
 
 # Configure logging
 logging.basicConfig(
@@ -44,10 +48,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # Set up paths
 BASE_DIR = Path(__file__).parent
 WEB_DIR = BASE_DIR / "web"
-
-# Set up Vite build output paths
-DIST_DIR = BASE_DIR / "web" / "dist"
-ASSETS_DIR = DIST_DIR / "assets"
+DIST_DIR = WEB_DIR / "dist"
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -58,43 +59,52 @@ app = FastAPI(
     redoc_url=None,  # Disable redoc in production
 )
 
-# Serve static files
-app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
-
-# --- STATIC FILE SERVING ---
-
-# Detect production mode (set ENV=production for prod)
-IS_PROD = os.environ.get("ENV", "dev").lower() == "production"
-
-if IS_PROD:
-    # Serve the Vite build output as the static root
-    app.mount(
-        "",
-        StaticFiles(directory=str(DIST_DIR), html=True),
-        name="static-root"
+# --- Serve static files and SPA frontend ---
+if not DIST_DIR.exists():
+    raise RuntimeError(
+        f"Frontend build not found in {DIST_DIR}. "
+        "Please run 'npm install && npm run build' in 'server/web' before starting the server."
     )
-    logger.info(f"Serving static files from {DIST_DIR} (PRODUCTION mode)")
-    # Redirect / to /index.html for best compatibility
-    @app.get("/")
-    async def prod_root():
-        return RedirectResponse("/index.html")
-else:
-    # DEV: Serve from web/ for hot reload and dev
-    @app.get("/", response_class=HTMLResponse)
-    async def serve_dev_index():
-        index_path = BASE_DIR / "web" / "index.html"
-        if not index_path.exists():
-            return HTMLResponse(content="<h1>index.html not found in web/</h1>", status_code=404)
-        return FileResponse(index_path)
 
-    @app.get("/{full_path:path}", response_class=HTMLResponse)
-    async def serve_spa_fallback_dev(full_path: str):
-        if full_path.startswith("api/") or full_path.startswith("ws/"):
-            raise HTTPException(status_code=404, detail="Not Found")
-        file_path = BASE_DIR / "web" / full_path
-        if file_path.exists() and file_path.is_file():
-            return FileResponse(file_path)
-        return FileResponse(BASE_DIR / "web" / "index.html")
+# Serve /assets, /static, etc.
+for static_folder in ["assets", "static"]:
+    static_path = DIST_DIR / static_folder
+    if static_path.exists():
+        app.mount(f"/{static_folder}", StaticFiles(directory=str(static_path)), name=static_folder)
+
+# Serve favicon if present
+favicon_path = DIST_DIR / "favicon.ico"
+if favicon_path.exists():
+    app.mount("/favicon.ico", StaticFiles(directory=str(DIST_DIR)), name="favicon")
+
+# Serve all other frontend files and SPA fallback
+@app.get("/", response_class=HTMLResponse)
+async def serve_index():
+    return FileResponse(DIST_DIR / "index.html")
+
+@app.get("/{full_path:path}", response_class=HTMLResponse)
+async def serve_spa(full_path: str):
+    file_path = DIST_DIR / full_path
+    if file_path.exists() and file_path.is_file():
+        return FileResponse(file_path)
+    # Fallback to index.html for SPA routes
+    return FileResponse(DIST_DIR / "index.html")
+
+# Health check endpoint - must be registered before other routes
+@app.get("/health")
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat(),
+        "components": {
+            "ai_registry": ai_registry.initialized,
+            "user_store": len(user_store) > 0
+        },
+        "version": "2.0.0"
+    }
 
 # CORS configuration
 app.add_middleware(
@@ -106,38 +116,6 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# Initialize templates
-try:
-    if WEB_DIR.exists():
-        templates = Jinja2Templates(directory=str(WEB_DIR))
-        logger.info(f"Templates initialized from {WEB_DIR}")
-    else:
-        logger.warning(f"Web directory not found: {WEB_DIR}")
-        # Create web directory if it doesn't exist
-        WEB_DIR.mkdir(parents=True, exist_ok=True)
-        # Create a basic index.html if it doesn't exist
-        (WEB_DIR / "index.html").write_text(
-            """<!DOCTYPE html>
-            <html>
-            <head>
-                <title>JARVIS Web Interface</title>
-                <style>
-                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                    h1 { color: #2c3e50; }
-                </style>
-            </head>
-            <body>
-                <h1>JARVIS Web Interface</h1>
-                <p>Welcome to JARVIS AI Assistant</p>
-                <p>Place your web interface files in the 'server/web' directory.</p>
-            </body>
-            </html>""")
-        logger.info(f"Created default web interface at {WEB_DIR}/index.html")
-        templates = Jinja2Templates(directory=str(WEB_DIR))
-except Exception as e:
-    logger.error(f"Failed to initialize web interface: {e}")
-    raise
-
 def initialize_jarvis_model():
     """
     Initialize the Jarvis model with proper error handling.
@@ -147,12 +125,8 @@ def initialize_jarvis_model():
     """
     try:
         # Add project root to Python path if not already there
-        import sys
-        from pathlib import Path
-        project_root = Path(__file__).parent.parent
-        if str(project_root) not in sys.path:
-            sys.path.insert(0, str(project_root))
-        
+        if str(PROJECT_ROOT) not in sys.path:
+            sys.path.insert(0, str(PROJECT_ROOT))
         # Import the model and base classes
         from models.jarvis import JarvisModel, LLMBase, NLPProtocol, NLPBase
         
@@ -540,51 +514,11 @@ app = FastAPI(
 # Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
+    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
-
-# Static files setup
-web_dir = Path(__file__).parent / "web"
-
-# Create web directory if it doesn't exist
-web_dir.mkdir(parents=True, exist_ok=True)
-
-# Mount static files from web directory
-app.mount("/static", StaticFiles(directory=str(web_dir)), name="static")
-
-templates = Jinja2Templates(directory=str(web_dir))
-
-# Serve static files directly from web directory
-@app.get("/{file_path:path}")
-async def serve_static(file_path: str):
-    # Skip WebSocket upgrade requests
-    if file_path == 'ws' or file_path.startswith('ws/'):
-        raise HTTPException(status_code=404, detail="Not Found")
-        
-    # Handle root path
-    if not file_path or file_path == "/":
-        file_path = "index.html"
-    
-    static_file = web_dir / file_path
-    
-    # Try to serve the requested file
-    if static_file.exists() and static_file.is_file():
-        return FileResponse(static_file)
-    
-    # For API routes, return 404
-    if file_path.startswith("api/"):
-        raise HTTPException(status_code=404, detail="Not Found")
-    
-    # Fall back to index.html for SPA routing
-    return FileResponse(web_dir / "index.html")
-
-# Serve index.html for root path
-@app.get("/")
-async def read_root():
-    return await serve_static("")
 
 # WebSocket connection manager
 class ConnectionManager:
@@ -825,18 +759,7 @@ async def process_ai_request(
             detail=error_detail
         )
 
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "components": {
-            "ai_registry": ai_registry.initialized,
-            "user_store": len(user_store) > 0
-        },
-        "version": "2.0.0"
-    }
+# Health check endpoint moved to the top of the file
 
 @app.get("/api/stats")
 async def get_stats():
@@ -900,8 +823,8 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "app:app",
-        host="0.0.0.0",
-        port=8000,
+        host="127.0.0.1",
+        port=8080,
         reload=True,
         ssl_keyfile=None,
         ssl_certfile=None

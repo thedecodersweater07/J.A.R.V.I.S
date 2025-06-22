@@ -89,189 +89,88 @@
 
 ## 💻 Installatie
 
-<div class="code-container">
+### Vereisten
+
+- Python 3.10+
+- Node.js 18+ en npm 9+
+- pip (Python package manager)
+
+### Installatiestappen
 
 ```bash
-# 1. Kloon de repository
+# Kloon de repository
 git clone https://github.com/username/jarvis-ai.git
 cd jarvis-ai
 
-# 2. Creëer een virtuele omgeving
+# Maak en activeer een virtuele omgeving (aanbevolen)
 python -m venv venv
-
-# 3. Activeer de omgeving
-## Voor Linux/Mac:
+# Op Windows:
+.\venv\Scripts\activate
+# Op macOS/Linux:
 source venv/bin/activate
-## Voor Windows:
-venv\Scripts\activate
 
-# 4. Installeer benodigde packages
-pip install -r requirements.txt
+# Installeer Python afhankelijkheden
+pip install -r server/requirements.txt
 
-# 5. Optioneel: Installeer GPU-ondersteuning (aanbevolen)
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# Installeer Node.js afhankelijkheden
+cd server/web
+npm install
+cd ../..
 ```
 
-</div>
+### Configuratie
 
-<div class="installation-notes">
-  <h3>📝 Systeemvereisten</h3>
-  <ul>
-    <li>Python 3.9+</li>
-    <li>8GB RAM (16GB aanbevolen)</li>
-    <li>NVIDIA GPU met CUDA-ondersteuning (voor optimale prestaties)</li>
-    <li>50GB vrije schijfruimte</li>
-  </ul>
-</div>
+Maak een `.env` bestand aan in de hoofdmap met de volgende variabelen:
+
+```env
+# Server
+HOST=127.0.0.1
+PORT=8080
+
+# Authenticatie
+JWT_SECRET=jouw-super-geheim-wachtwoord
+JWT_ALGORITME=HS256
+JWT_VERLOOPT_IN_MINUTEN=1440  # 24 uur
+
+# Database
+DATABASE_URL=sqlite:///./jarvis.db
+```
 
 ---
 
-## ⚙️ Configuratie
+## 🖥️ Gebruik
 
-<div class="config-container">
-  <div class="config-text">
-    <p>JARVIS biedt uitgebreide configuratiemogelijkheden via JSON-bestanden, onderverdeeld in verschillende categorieën:</p>
-  </div>
-  
-  <div class="config-structure">
-    <h3>Bestandsstructuur</h3>
-    <pre>
-config/
-├── main.json             # Hoofdconfiguratie
-├── modules/              # Modulaire configuraties
-├── profiles/             # Gebruikersprofielen
-└── environments/         # Omgevingsinstellingen
-    </pre>
-  </div>
-</div>
+### Ontwikkelmodus
 
-### Configuratiemethoden
+Start zowel de backend- als frontend-ontwikkelservers:
 
-<div class="config-methods">
-  <div class="config-method">
-    <h4>1. Via Configuratiebestanden</h4>
-    <p>Bewerk JSON-bestanden direct:</p>
-    <pre>nano config/main.json</pre>
-    <pre>
-{
-  "system": {
-    "name": "JARVIS",
-    "version": "2.5.0",
-    "language": "nl-NL",
-    "log_level": "INFO",
-    "memory_limit": "16G",
-    "gpu_enabled": true
-  }
-}
-    </pre>
-  </div>
+```bash
+# Start de volledige applicatie (backend + frontend)
+python run.py
+```
 
-  <div class="config-method">
-    <h4>2. Via Configuratie-API</h4>
-    <pre>
-import jarvis
+Dit start:
+- Backend server op http://localhost:8080
+- Frontend ontwikkelserver op http://localhost:3000
 
-# Verbinding maken met configuratiesysteem
-config = jarvis.Configuration()
+### Productiegebruik
 
-# Spraaksnelheid aanpassen
-config.set("speech.tts.rate", 1.2)
+Maak eerst een productiebuild van de frontend:
 
-# Meerdere instellingen tegelijk wijzigen
-config.update({
-    "system.name": "FRIDAY",
-    "ui.theme": "minimal",
-    "speech.tts.voice": "friday_nl_female"
-})
+```bash
+cd server/web
+npm run build
+cd ../..
 
-# Configuratie opslaan
-config.save()
-    </pre>
-  </div>
+# Start de productieserver
+python -m uvicorn server.app:app --host 0.0.0.0 --port 8080
+```
 
-  <div class="config-method">
-    <h4>3. Via Commando-interface</h4>
-    <pre>
-# Instelling wijzigen
-jarvis-config --set speech.tts.voice=jarvis_nl_male
+### API Documentatie
 
-# Instelling ophalen
-jarvis-config --get system.version
-
-# Configuratie importeren/exporteren
-jarvis-config --import my_config.json
-jarvis-config --export backup_config.json
-    </pre>
-  </div>
-</div>
-
-### Configuratieprofielen
-
-<div class="config-profiles">
-  <pre>
-# Profielen bekijken
-jarvis-config --list-profiles
-
-# Profiel activeren
-jarvis-config --activate-profile home_automation
-
-# Nieuw profiel maken
-jarvis-config --create-profile minimal_resources
-jarvis-config --set-profile minimal_resources system.memory_limit=4G
-  </pre>
-</div>
-
-### Geavanceerde Configuratie
-
-<div class="advanced-config">
-  <div class="config-option">
-    <h4>Gedistribueerde Instellingen</h4>
-    <pre>
-{
-  "distributed": {
-    "cluster_mode": true,
-    "master_node": "jarvis-master.local",
-    "worker_nodes": [
-      "jarvis-worker1.local",
-      "jarvis-worker2.local"
-    ],
-    "load_balancing": "adaptive"
-  }
-}
-    </pre>
-  </div>
-
-  <div class="config-option">
-    <h4>Prestatie-optimalisatie</h4>
-    <pre>
-{
-  "performance": {
-    "cpu_allocation": "dynamic",
-    "gpu_memory": "10G",
-    "model_precision": "mixed",
-    "optimization_level": "balanced"
-  }
-}
-    </pre>
-  </div>
-
-  <div class="config-option">
-    <h4>Veilige Configuratie</h4>
-    <pre>
-{
-  "api_keys": {
-    "weather_service": "${WEATHER_API_KEY}",
-    "news_service": "${NEWS_API_KEY}"
-  },
-  "secrets_manager": {
-    "provider": "vault",
-    "url": "VAULT_SERVER_ADDRESS",
-    "auth_method": "token"
-  }
-}
-    </pre>
-  </div>
-</div>
+Wanneer de server draait, is de interactieve API-documentatie beschikbaar op:
+- Swagger UI: http://localhost:8080/docs
+- ReDoc: http://localhost:8080/redoc
 
 ---
 
@@ -312,26 +211,6 @@ jarvis-config --set-profile minimal_resources system.memory_limit=4G
   }
 }
     </pre>
-  </div>
-</div>
-
----
-
-## 🖥️ Gebruik
-
-<div class="usage-container">
-  <div class="usage-start">
-    <h3>Start het systeem</h3>
-    <pre>python main.py</pre>
-  </div>
-  
-  <div class="usage-methods">
-    <h3>Interactie met JARVIS:</h3>
-    <ul>
-      <li><strong>Spraakcommando's</strong>: Activeer met wekwoord "JARVIS"</li>
-      <li><strong>Chatinterface</strong>: Beschikbaar via webinterface op <code>http://localhost:8080</code></li>
-      <li><strong>CLI</strong>: Gebruik <code>jarvis-cli</code> voor command-line interactie</li>
-    </ul>
   </div>
 </div>
 
@@ -399,21 +278,7 @@ print(f"Verwijdering succesvol: {result.success}")
 
 ## 👨‍💻 Ontwikkeling
 
-<div class="development-container">
-  <div class="dev-instructions">
-    <p>Voor ontwikkelaars die willen bijdragen:</p>
-    <ol>
-      <li>Fork de repository</li>
-      <li>Maak een nieuwe branch: <code>git checkout -b feature/amazing-feature</code></li>
-      <li>Commit je wijzigingen: <code>git commit -m 'Voeg een geweldige feature toe'</code></li>
-      <li>Push naar je branch: <code>git push origin feature/amazing-feature</code></li>
-      <li>Open een Pull Request</li>
-    </ol>
-  </div>
-  
-  <div class="dev-environment">
-    <h3>Ontwikkelomgeving</h3>
-    <pre>
+### Projectstructuur
 # Installeer ontwikkeltools
 pip install -r requirements-dev.txt
 

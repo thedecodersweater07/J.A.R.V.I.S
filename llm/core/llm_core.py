@@ -145,8 +145,8 @@ class LLMCore:
             mem_thresh = mem_config.get("memory_threshold", 85.0)
             gpu_thresh = mem_config.get("gpu_threshold", 85.0)
 
-            # Check CPU usage with average over 1 second
-            cpu_percent = psutil.cpu_percent(interval=1)
+            # Check CPU usage (non-blocking)
+            cpu_percent = psutil.cpu_percent(interval=0)
             
             # Check memory usage
             memory = psutil.virtual_memory()
