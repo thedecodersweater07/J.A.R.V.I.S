@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S. Chat</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f1419 0%, #1a1f29 100%);
+            color: #e8eaed;
+            font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-container {
+            max-width: 480px;
+            margin: 40px auto 0 auto;
+            background: rgba(30, 34, 44, 0.98);
+            border-radius: 18px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 600px;
+            border: 1px solid #222b3a;
+        }
+        .chat-header {
+            padding: 1.2rem 2rem 1rem 2rem;
+            border-bottom: 1px solid #222b3a;
+            background: linear-gradient(90deg, #00d4ff 0%, #0099cc 100%);
+            color: #fff;
+            border-radius: 18px 18px 0 0;
+            font-size: 1.5rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 1.2rem 2rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.7rem;
+        }
+        .message {
+            padding: 0.7rem 1.1rem;
+            border-radius: 12px;
+            max-width: 80%;
+            word-break: break-word;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+        .message.user {
+            align-self: flex-end;
+            background: linear-gradient(90deg, #00d4ff 0%, #0099cc 100%);
+            color: #fff;
+        }
+        .message.bot {
+            align-self: flex-start;
+            background: #232b3b;
+            color: #e8eaed;
+        }
+        .chat-input-row {
+            display: flex;
+            border-top: 1px solid #222b3a;
+            padding: 1rem 2rem;
+            background: #181c24;
+            border-radius: 0 0 18px 18px;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 0.7rem 1rem;
+            border-radius: 8px;
+            border: none;
+            font-size: 1rem;
+            background: #232b3b;
+            color: #e8eaed;
+        }
+        .chat-input:focus {
+            outline: 2px solid #00d4ff;
+        }
+        .send-btn {
+            margin-left: 1rem;
+            background: linear-gradient(90deg, #00d4ff 0%, #0099cc 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0.7rem 1.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .send-btn:hover {
+            background: linear-gradient(90deg, #0099cc 0%, #00d4ff 100%);
+        }
+        .rebuild-btn {
+            margin: 1.5rem auto 0 auto;
+            display: block;
+            background: linear-gradient(90deg, #ffb347 0%, #ffcc33 100%);
+            color: #222b3a;
+            border: none;
+            border-radius: 8px;
+            padding: 0.7rem 2rem;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: background 0.2s;
+        }
+        .rebuild-btn:hover {
+            background: linear-gradient(90deg, #ffcc33 0%, #ffb347 100%);
+        }
+        .status-bar {
+            text-align: center;
+            font-size: 0.95rem;
+            color: #7fd7ff;
+            margin: 0.5rem 0 0.5rem 0;
+            min-height: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">J.A.R.V.I.S. Chat</div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <form class="chat-input-row" id="chat-form" autocomplete="off">
+            <input type="text" class="chat-input" id="chat-input" placeholder="Typ een bericht..." autocomplete="off" required />
+            <button type="submit" class="send-btn">Verstuur</button>
+        </form>
+    </div>
+    <button class="rebuild-btn" id="rebuild-btn">🔄 Frontend handmatig rebuilden</button>
+    <div class="status-bar" id="status-bar"></div>
+    <script>
+        // Chat logic
+        const chatMessages = document.getElementById('chat-messages');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const statusBar = document.getElementById('status-bar');
+        let ws;
+        let reconnectTimeout = null;
+
+        function appendMessage(text, sender) {
+            const msg = document.createElement('div');
+            msg.className = 'message ' + sender;
+            msg.textContent = text;
+            chatMessages.appendChild(msg);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function connectWS() {
+            if (ws) ws.close();
+            ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+            statusBar.textContent = '🔌 Verbindt met J.A.R.V.I.S...';
+            ws.onopen = () => {
+                statusBar.textContent = '✅ Verbonden met J.A.R.V.I.S.';
+            };
+            ws.onmessage = (event) => {
+                appendMessage(event.data, 'bot');
+            };
+            ws.onclose = () => {
+                statusBar.textContent = '❌ Verbinding verbroken. Probeer opnieuw...';
+                reconnectTimeout = setTimeout(connectWS, 3000);
+            };
+            ws.onerror = () => {
+                statusBar.textContent = '⚠️ WebSocket fout.';
+            };
+        }
+        connectWS();
+
+        chatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const text = chatInput.value.trim();
+            if (!text || !ws || ws.readyState !== 1) return;
+            appendMessage(text, 'user');
+            ws.send(text);
+            chatInput.value = '';
+        });
+
+        // Manual rebuild button
+        document.getElementById('rebuild-btn').onclick = async function() {
+            this.disabled = true;
+            this.textContent = '⏳ Bezig met rebuild...';
+            statusBar.textContent = 'Frontend wordt opnieuw opgebouwd...';
+            try {
+                const resp = await fetch('/api/rebuild-frontend', {method: 'POST'});
+                const data = await resp.json();
+                if (data.success) {
+                    this.textContent = '✅ Rebuild gelukt!';
+                    statusBar.textContent = 'Frontend succesvol opnieuw opgebouwd. Pagina wordt herladen...';
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    this.textContent = '❌ Rebuild mislukt';
+                    statusBar.textContent = 'Rebuild mislukt: ' + (data.message || 'Onbekende fout');
+                    setTimeout(() => {
+                        this.textContent = '🔄 Frontend handmatig rebuilden';
+                        this.disabled = false;
+                    }, 3000);
+                }
+            } catch (e) {
+                this.textContent = '❌ Fout';
+                statusBar.textContent = 'Rebuild request fout.';
+                setTimeout(() => {
+                    this.textContent = '🔄 Frontend handmatig rebuilden';
+                    this.disabled = false;
+                }, 3000);
+            }
+        };
+    </script>
+</body>
+</html>

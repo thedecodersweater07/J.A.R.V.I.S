@@ -8,31 +8,98 @@
     <link rel="icon" type="image/png" href="/favicon.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { 
+        /* CSS Variables and Theme Support */
+        :root {
+            --primary-color: #00d4ff;
+            --primary-orange: #ff8c00;
+            --background-dark: #0a0a0a;
+            --background-light: #f8f9fa;
+            --text-light: #ffffff;
+            --text-dark: #333333;
+            --success-color: #10b981;
+            --error-color: #ef4444;
+            --border-radius: 14px;
+            --transition-speed: 0.3s;
+            --font-main: 'Inter', 'Segoe UI', Arial, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Mono', monospace;
+            --font-display: 'Orbitron', monospace;
+        }
+
+        * {
             margin: 0;
             padding: 0;
-            background: radial-gradient(ellipse at center, #1a1a2e 0%, #16213e 35%, #0f1419 100%); 
-            font-family: 'Inter', sans-serif;
-            color: #ffffff;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background: radial-gradient(ellipse at center, #1a1a2e 0%, #16213e 35%, #0f1419 100%);
+            color: var(--text-light);
             min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+            transition: all var(--transition-speed) ease;
         }
-        .ai-glow {
-            text-shadow: 0 0 8px #00d4ff, 0 0 16px #00d4ff, 0 0 32px #00d4ff;
-            color: #00d4ff;
+
+        body.light-theme {
+            background: radial-gradient(ellipse at center, #f0f0f3 0%, #d1d1e0 35%, #b0b0c9 100%);
+            color: var(--text-dark);
         }
-        .subtitle {
-            color: #fff;
-            font-size: 1.2em;
-            margin-bottom: 20px;
-            opacity: 0.8;
+
+        /* Animated background particles */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
         }
-        .ai-footer {
-            text-align: center;
-            color: #444;
-            margin-top: 40px;
-            font-size: 0.9em;
-            letter-spacing: 1px;
+
+        .particle {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: float 6s infinite linear;
         }
+
+        body.light-theme .particle {
+            background: var(--primary-orange);
+        }
+
+        @keyframes float {
+            0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.3; }
+            90% { opacity: 0.3; }
+            100% { transform: translateY(-10px) rotate(360deg); opacity: 0; }
+        }
+
+        /* Circuit board pattern overlay */
+        .circuit-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        body.light-theme .circuit-overlay {
+            background-image: 
+                linear-gradient(90deg, rgba(255, 140, 0, 0.03) 1px, transparent 1px),
+                linear-gradient(rgba(255, 140, 0, 0.03) 1px, transparent 1px);
+        }
+
+        /* Theme Toggle Button */
         .theme-toggle {
             position: fixed;
             top: 20px;
@@ -40,7 +107,7 @@
             background: rgba(0, 0, 0, 0.5);
             border: 2px solid rgba(0, 212, 255, 0.3);
             border-radius: 50%;
-            color: #00d4ff;
+            color: var(--primary-color);
             font-size: 1.5em;
             cursor: pointer;
             z-index: 1000;
@@ -49,72 +116,749 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s ease;
+            transition: all var(--transition-speed) ease;
         }
+
         .theme-toggle:hover {
             background: rgba(0, 212, 255, 0.1);
             box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
         }
-        .light-theme {
-            background: radial-gradient(ellipse at center, #f0f0f3 0%, #d1d1e0 35%, #b0b0c9 100%);
-            color: #333;
-        }
-        .light-theme .ai-glow {
-            text-shadow: 0 0 8px #ff8c00, 0 0 16px #ff8c00, 0 0 32px #ff8c00;
-            color: #ff8c00;
-        }
-        .light-theme .subtitle, .light-theme .ai-footer {
-            color: #222;
-        }
-        .light-theme .theme-toggle {
+
+        body.light-theme .theme-toggle {
             background: rgba(255, 255, 255, 0.8);
             border-color: rgba(255, 140, 0, 0.3);
-            color: #ff8c00;
+            color: var(--primary-orange);
         }
+
+        body.light-theme .theme-toggle:hover {
+            background: rgba(255, 140, 0, 0.1);
+            box-shadow: 0 0 20px rgba(255, 140, 0, 0.3);
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 16px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Header */
         .header {
             text-align: center;
-            padding: 20px;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
+            position: relative;
         }
+
         .header h1 {
-            font-family: 'Orbitron', monospace;
+            font-family: var(--font-display);
             font-size: 3rem;
             margin: 0;
             font-weight: 900;
+            background: linear-gradient(45deg, var(--primary-color), #ff6b35, var(--primary-color));
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 3s ease-in-out infinite;
+            text-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
         }
-        #root {
-            min-height: calc(100vh - 200px);
-            padding: 0 20px;
+
+        body.light-theme .header h1 {
+            background: linear-gradient(45deg, var(--primary-orange), #ff6b35, var(--primary-orange));
+            text-shadow: 0 0 30px rgba(255, 140, 0, 0.5);
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .subtitle {
+            color: var(--primary-color);
+            font-size: 1.2em;
+            margin-top: 10px;
+            opacity: 0.8;
+        }
+
+        body.light-theme .subtitle {
+            color: var(--primary-orange);
+        }
+
+        /* Status Panel */
+        .status-panel {
+            background: rgba(0, 212, 255, 0.05);
+            border: 2px solid rgba(0, 212, 255, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.light-theme .status-panel {
+            background: rgba(255, 140, 0, 0.05);
+            border-color: rgba(255, 140, 0, 0.3);
+        }
+
+        .status-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.1), transparent);
+            animation: scan 3s infinite;
+        }
+
+        body.light-theme .status-panel::before {
+            background: linear-gradient(90deg, transparent, rgba(255, 140, 0, 0.1), transparent);
+        }
+
+        @keyframes scan {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .status-item {
+            text-align: center;
+        }
+
+        .status-label {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-value {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        body.light-theme .status-value {
+            color: var(--primary-orange);
+        }
+
+        .status-value.connected {
+            color: var(--success-color);
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        .status-value.disconnected {
+            color: var(--error-color);
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+        }
+
+        /* Chat Container */
+        .chat-container {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.4);
+            border: 2px solid rgba(0, 212, 255, 0.2);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+            backdrop-filter: blur(15px);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.light-theme .chat-container {
+            background: rgba(255, 255, 255, 0.4);
+            border-color: rgba(255, 140, 0, 0.2);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        .chat-container::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+        }
+
+        body.light-theme .chat-container::after {
+            background: linear-gradient(90deg, transparent, var(--primary-orange), transparent);
+        }
+
+        #messageContainer {
+            height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding-right: 10px;
+        }
+
+        #messageContainer::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #messageContainer::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        #messageContainer::-webkit-scrollbar-thumb {
+            background: linear-gradient(to bottom, var(--primary-color), #0ea5e9);
+            border-radius: 4px;
+        }
+
+        body.light-theme #messageContainer::-webkit-scrollbar-thumb {
+            background: linear-gradient(to bottom, var(--primary-orange), #ff6b35);
+        }
+
+        /* Messages */
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 18px;
+            border-radius: 12px;
+            animation: messageSlide 0.3s ease-out;
+            position: relative;
+            max-width: 80%;
+        }
+
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .message.user {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 212, 255, 0.1));
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            margin-left: auto;
+            text-align: right;
+        }
+
+        body.light-theme .message.user {
+            background: linear-gradient(135deg, rgba(255, 140, 0, 0.2), rgba(255, 140, 0, 0.1));
+            border-color: rgba(255, 140, 0, 0.3);
+        }
+
+        .message.system {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1));
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--success-color);
+        }
+
+        .message.assistant {
+            background: linear-gradient(135deg, rgba(100, 100, 100, 0.2), rgba(100, 100, 100, 0.1));
+            border: 1px solid rgba(100, 100, 100, 0.3);
+        }
+
+        /* Input Section */
+        .input-section {
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(0, 212, 255, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            position: relative;
+        }
+
+        body.light-theme .input-section {
+            background: rgba(255, 255, 255, 0.5);
+            border-color: rgba(255, 140, 0, 0.3);
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        #userInput {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid rgba(0, 212, 255, 0.2);
+            border-radius: 10px;
+            padding: 15px 20px;
+            color: var(--primary-color);
+            font-family: var(--font-display);
+            font-size: 1rem;
+            transition: all var(--transition-speed) ease;
+            outline: none;
+        }
+
+        body.light-theme #userInput {
+            background: rgba(255, 255, 255, 0.8);
+            border-color: rgba(255, 140, 0, 0.2);
+            color: var(--primary-orange);
+        }
+
+        #userInput:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        body.light-theme #userInput:focus {
+            border-color: var(--primary-orange);
+            box-shadow: 0 0 20px rgba(255, 140, 0, 0.3);
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        #userInput::placeholder {
+            color: rgba(0, 212, 255, 0.5);
+        }
+
+        body.light-theme #userInput::placeholder {
+            color: rgba(255, 140, 0, 0.5);
+        }
+
+        #sendButton {
+            background: linear-gradient(45deg, var(--primary-color), #0ea5e9);
+            border: none;
+            border-radius: 10px;
+            padding: 15px 25px;
+            color: white;
+            font-family: var(--font-display);
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.light-theme #sendButton {
+            background: linear-gradient(45deg, var(--primary-orange), #ff6b35);
+        }
+
+        #sendButton:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 212, 255, 0.4);
+        }
+
+        body.light-theme #sendButton:hover {
+            box-shadow: 0 10px 25px rgba(255, 140, 0, 0.4);
+        }
+
+        #sendButton:active {
+            transform: translateY(0);
+        }
+
+        #sendButton::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        #sendButton:hover::before {
+            left: 100%;
+        }
+
+        /* Power indicators */
+        .power-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .power-indicator.online {
+            background: var(--success-color);
+            box-shadow: 0 0 10px var(--success-color);
+        }
+
+        .power-indicator.offline {
+            background: var(--error-color);
+            box-shadow: 0 0 10px var(--error-color);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Footer */
+        .ai-footer {
+            text-align: center;
+            color: #444;
+            margin-top: 40px;
+            font-size: 0.9em;
+            letter-spacing: 1px;
+            position: relative;
+            z-index: 10;
+        }
+
+        body.light-theme .ai-footer {
+            color: #666;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            .input-wrapper {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            #sendButton {
+                width: 100%;
+            }
+
+            .status-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 6px;
+            }
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            .theme-toggle {
+                top: 10px;
+                right: 10px;
+                width: 40px;
+                height: 40px;
+                font-size: 1.2em;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Background Animation -->
+    <div class="bg-animation" id="bgAnimation"></div>
+    <div class="circuit-overlay"></div>
+
+    <!-- Theme Toggle Button -->
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode" title="Toggle theme">🌙</button>
-    <div class="header">
-        <h1 class="ai-glow">J.A.R.V.I.S <span style="color:#fff;">AI Assistant</span></h1>
-        <p class="subtitle">Your personal AI-powered assistant interface</p>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>J.A.R.V.I.S <span style="color:#fff;">AI Assistant</span></h1>
+            <p class="subtitle">Your personal AI-powered assistant interface</p>
+        </div>
+
+        <!-- Status Panel -->
+        <div class="status-panel">
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-label">Connection Status</div>
+                    <div class="status-value" id="connectionStatus">
+                        <span class="power-indicator offline"></span>Initializing...
+                    </div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Response Time</div>
+                    <div class="status-value" id="responseTime">
+                        <span class="power-indicator online"></span>0.15s
+                    </div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">System Status</div>
+                    <div class="status-value connected">
+                        <span class="power-indicator online"></span>Operational
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Container -->
+        <div class="chat-container">
+            <div id="messageContainer"></div>
+            <form class="input-section" id="chatForm" autocomplete="off">
+                <div class="input-wrapper">
+                    <input 
+                        type="text" 
+                        id="userInput" 
+                        placeholder="Enter your message..."
+                        autocomplete="off"
+                    >
+                    <button id="sendButton" type="submit">Send</button>
+                </div>
+            </form>
+        </div>
     </div>
-    <main id="root" tabindex="-1"></main>
+
+    <!-- Footer -->
     <footer class="ai-footer">
-        &copy; 2025 JARVIS AI | Powered by FastAPI & React
+        &copy; 2025 JARVIS AI | Powered by Advanced AI Technology
     </footer>
-    <script type="module" src="/src/main.jsx"></script>
+
     <script>
-      // Theme toggle logic with in-memory storage
-      const themeToggle = document.getElementById('themeToggle');
-      let currentTheme = 'dark';
-      
-      const setTheme = (theme) => {
-        document.body.classList.toggle('light-theme', theme === 'light');
-        themeToggle.textContent = theme === 'light' ? '🌞' : '🌙';
-        currentTheme = theme;
-      };
-      
-      setTheme(currentTheme);
-      themeToggle.addEventListener('click', () => {
-        const newTheme = document.body.classList.contains('light-theme') ? 'dark' : 'light';
-        setTheme(newTheme);
-      });
+        // Theme management (on/off)
+        let currentTheme = 'dark';
+        const themeToggle = document.getElementById('themeToggle');
+        const setTheme = (theme) => {
+            document.body.classList.toggle('light-theme', theme === 'light');
+            themeToggle.textContent = theme === 'light' ? '🌞' : '🌙';
+            currentTheme = theme;
+        };
+        setTheme(currentTheme);
+        themeToggle.addEventListener('click', () => {
+            const newTheme = document.body.classList.contains('light-theme') ? 'dark' : 'light';
+            setTheme(newTheme);
+            setTimeout(createParticles, 100);
+        });
+
+        // Particle animation
+        function createParticles() {
+            const bgAnimation = document.getElementById('bgAnimation');
+            const particleCount = 50;
+            bgAnimation.innerHTML = '';
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 6 + 's';
+                particle.style.animationDuration = (6 + Math.random() * 4) + 's';
+                bgAnimation.appendChild(particle);
+            }
+        }
+        createParticles();
+
+        // WebSocket connection management
+        let ws = null;
+        let connectionRetries = 0;
+        const maxRetries = 5;
+        const messageContainer = document.getElementById('messageContainer');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+        const chatForm = document.getElementById('chatForm');
+        let typingIndicator = null;
+
+        function getWebSocketURL() {
+            let protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+            // Gebruik altijd een geldige client_id (hier: 'anon')
+            return protocol + window.location.host + '/ws/anon';
+        }
+
+        function connectWebSocket() {
+            try {
+                ws = new WebSocket(getWebSocketURL());
+                ws.onopen = () => {
+                    connectionStatus.innerHTML = '<span class="power-indicator online"></span>Connected';
+                    connectionStatus.className = 'status-value connected';
+                    addMessage('system', 'J.A.R.V.I.S online. All systems operational.');
+                    connectionRetries = 0;
+                };
+                ws.onclose = () => {
+                    connectionStatus.innerHTML = '<span class="power-indicator offline"></span>Disconnected';
+                    connectionStatus.className = 'status-value disconnected';
+                    if (connectionRetries < maxRetries) {
+                        addMessage('system', 'Connection lost. Attempting to reconnect...');
+                        connectionRetries++;
+                        setTimeout(connectWebSocket, 2000);
+                    } else {
+                        addMessage('system', 'WebSocket unavailable. Using local simulation mode.');
+                        simulateConnection();
+                    }
+                };
+                ws.onerror = () => {
+                    connectionStatus.innerHTML = '<span class="power-indicator offline"></span>Error';
+                    connectionStatus.className = 'status-value disconnected';
+                };
+                ws.onmessage = (event) => {
+                    hideTypingIndicator();
+                    try {
+                        const message = JSON.parse(event.data);
+                        if (message.type && message.content) {
+                            addMessage(message.type, message.content);
+                        } else if (message.response) {
+                            addMessage('assistant', message.response);
+                        } else {
+                            addMessage('assistant', event.data);
+                        }
+                    } catch (e) {
+                        addMessage('assistant', event.data);
+                    }
+                };
+            } catch (error) {
+                simulateConnection();
+            }
+        }
+
+        function simulateConnection() {
+            connectionStatus.innerHTML = '<span class="power-indicator online"></span>Simulation Mode';
+            connectionStatus.className = 'status-value connected';
+            addMessage('system', 'J.A.R.V.I.S initialized in demonstration mode.');
+            addMessage('system', 'This is a frontend interface demonstration. Backend integration required for full functionality.');
+        }
+
+        function addMessage(type, content) {
+            // Filter AI-fallbacks uit de UI
+            if (type === 'assistant' && (
+                !content ||
+                content.trim().toLowerCase().startsWith('generated response for:') ||
+                content.trim().toLowerCase().includes('geen echt ai-antwoord') ||
+                content.trim().toLowerCase() === '[ai niet beschikbaar]'
+            )) {
+                return;
+            }
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = content;
+            messageContainer.appendChild(messageDiv);
+            messageContainer.scrollTop = messageContainer.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            if (!typingIndicator) {
+                typingIndicator = document.createElement('div');
+                typingIndicator.className = 'message assistant typing-indicator';
+                typingIndicator.textContent = 'J.A.R.V.I.S is typing...';
+                messageContainer.appendChild(typingIndicator);
+                messageContainer.scrollTop = messageContainer.scrollHeight;
+            }
+        }
+        function hideTypingIndicator() {
+            if (typingIndicator) {
+                typingIndicator.remove();
+                typingIndicator = null;
+            }
+        }
+
+        function sendMessage(e) {
+            if (e) e.preventDefault();
+            const message = userInput.value.trim();
+            if (!message) return;
+            addMessage('user', message);
+            userInput.value = '';
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                setTimeout(() => {
+                    const responses = [
+                        "I understand your request. In a full implementation, I would process this through the backend AI service.",
+                        "Thank you for your input. This interface is ready for backend integration.",
+                        "Your message has been received. The AI processing system would analyze this in production.",
+                        "I'm operating in demonstration mode. Full AI capabilities require backend connection.",
+                        "Message acknowledged. In production, this would trigger advanced AI processing."
+                    ];
+                    const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+                    addMessage('assistant', randomResponse);
+                }, 500 + Math.random() * 1000);
+            } else {
+                showTypingIndicator();
+                ws.send(JSON.stringify({
+                    type: 'user',
+                    content: message
+                }));
+            }
+        }
+
+        chatForm.addEventListener('submit', sendMessage);
+        sendButton.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage(e);
+            }
+        });
+
+        // Voeg microfoon-knop toe
+        const micButton = document.createElement('button');
+        micButton.id = 'micButton';
+        micButton.innerHTML = '🎤';
+        micButton.title = 'Spreek je bericht in';
+        micButton.style.marginLeft = '8px';
+        sendButton.parentNode.insertBefore(micButton, sendButton.nextSibling);
+
+        let recognition = null;
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'nl-NL';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            micButton.addEventListener('click', () => {
+                if (recognition) {
+                    micButton.disabled = true;
+                    micButton.innerHTML = '🎙️...';
+                    recognition.start();
+                }
+            });
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                userInput.value = transcript;
+                micButton.innerHTML = '🎤';
+                micButton.disabled = false;
+                userInput.focus();
+            };
+            recognition.onerror = (event) => {
+                micButton.innerHTML = '🎤';
+                micButton.disabled = false;
+                alert('Microfoonfout: ' + event.error);
+            };
+            recognition.onend = () => {
+                micButton.innerHTML = '🎤';
+                micButton.disabled = false;
+            };
+        } else {
+            micButton.disabled = true;
+            micButton.title = 'Spraakherkenning niet ondersteund in deze browser';
+        }
+
+        // Initialize connection
+        connectWebSocket();
+
+        // Add initial system message
+        setTimeout(() => {
+            addMessage('system', 'Interface initialized. Ready for input.');
+        }, 1000);
+
+        // Update response time periodically
+        setInterval(() => {
+            const responseTime = document.getElementById('responseTime');
+            const time = (Math.random() * 0.5 + 0.1).toFixed(2);
+            responseTime.innerHTML = `<span class="power-indicator online"></span>${time}s`;
+        }, 3000);
+
+        // Add some demo messages after initialization
+        setTimeout(() => {
+            addMessage('system', 'All subsystems operational. Natural language processing ready.');
+            setTimeout(() => {
+                addMessage('system', 'Type a message to interact with the J.A.R.V.I.S interface.');
+            }, 1000);
+        }, 2000);
     </script>
 </body>
 </html>

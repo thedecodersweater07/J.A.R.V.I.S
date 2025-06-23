@@ -79,7 +79,7 @@ class LLMAdapter(LLMBase):
         try:
             if hasattr(self.llm, 'generate'):
                 return self.llm.generate(prompt, **kwargs)
-            return {"response": f"Generated response for: {prompt}", "success": True}
+            return {"response": "[AI niet beschikbaar]", "success": False}
         except Exception as e:
             return {"response": f"LLM error: {str(e)}", "success": False}
     
@@ -177,19 +177,6 @@ class DefaultNLP(NLPBase):
     def __call__(self, text: str) -> Dict[str, Any]:
         return self.analyze(text)
 
-# Initialize implementations
-try:
-    from llm.core.llm_core import LLMCore
-    LLMImplementation = LLMAdapter(LLMCore())
-except ImportError:
-    LLMImplementation = DefaultLLM()
-
-try:
-    from nlp.processor import NLPProcessor
-    NLPAnalyzerImplementation = NLPAdapter(NLPProcessor())
-except ImportError:
-    NLPAnalyzerImplementation = DefaultNLP()
-
 class JarvisModel:
     """
     Main model for processing user input pipelines.
@@ -220,7 +207,12 @@ class JarvisModel:
         
         # Initialize LLM with default implementation if not provided
         if llm is None:
-            self.llm = LLMImplementation
+            try:
+                from llm.core.llm_core import LLMCore
+                self.llm = LLMAdapter(LLMCore())
+            except Exception as e:
+                self.logger.warning(f"Falling back to DefaultLLM: {e}")
+                self.llm = DefaultLLM()
         elif not isinstance(llm, LLMProtocol):
             self.llm = LLMAdapter(llm)
         else:
@@ -228,7 +220,12 @@ class JarvisModel:
             
         # Initialize NLP analyzer with default implementation if not provided
         if nlp_analyzer is None:
-            self.nlp_analyzer = NLPAnalyzerImplementation
+            try:
+                from nlp.processor import NLPProcessor
+                self.nlp_analyzer = NLPAdapter(NLPProcessor())
+            except Exception as e:
+                self.logger.warning(f"Falling back to DefaultNLP: {e}")
+                self.nlp_analyzer = DefaultNLP()
         elif not isinstance(nlp_analyzer, NLPProtocol):
             self.nlp_analyzer = NLPAdapter(nlp_analyzer)
         else:

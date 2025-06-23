@@ -1,18 +1,22 @@
-import torch
-import torch.nn as nn
-from transformers import AutoTokenizer, AutoModel
-import re
 from typing import Dict, Optional
+import re
 
-class IntentClassifier(nn.Module):
+
+class IntentClassifier:
     def __init__(self):
-        super().__init__()
+        # Lazy import torch and transformers
+        import torch
+        import torch.nn as nn
+        from transformers import AutoTokenizer, AutoModel
+        self.torch = torch
+        self.nn = nn
+        self.AutoTokenizer = AutoTokenizer
+        self.AutoModel = AutoModel
         # Use Dutch BERT model
         self.model_name = "GroNLP/bert-base-dutch-cased"
-        self.bert = AutoModel.from_pretrained(self.model_name)
-        self.classifier = nn.Linear(768, 12)  # 12 Dutch intent classes
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        
+        self.bert = self.AutoModel.from_pretrained(self.model_name)
+        self.classifier = self.nn.Linear(768, 12)  # 12 Dutch intent classes
+        self.tokenizer = self.AutoTokenizer.from_pretrained(self.model_name)
         # Dutch-specific intent patterns
         self.intent_patterns = {
             "begroeting": r"\b(hallo|hoi|hey|goedemorgen|goedemiddag|goedenavond)\b",
@@ -25,25 +29,25 @@ class IntentClassifier(nn.Module):
             "hulp": r"\b(help|hulp|assistent|ondersteuning)\b"
         }
 
-    def classify(self, text: str) -> Dict[str, float]:
+    def classify(self, text: str) -> Dict[str, object]:
         # Pattern matching voor eenvoudige gevallen
         for intent, pattern in self.intent_patterns.items():
             if re.search(pattern, text.lower()):
                 return {"intent": intent, "confidence": 1.0}
-                
+        # Lazy import torch in classify (for static analysis)
+        torch = self.torch
         # BERT classificatie voor complexere gevallen
         try:
             inputs = self.tokenizer(
-                text, 
-                return_tensors="pt", 
-                truncation=True, 
+                text,
+                return_tensors="pt",
+                truncation=True,
                 max_length=512
             )
             outputs = self.bert(**inputs)
             logits = self.classifier(outputs.pooler_output)
             probs = torch.softmax(logits, dim=1)[0]
-            
-            intent_idx = torch.argmax(probs).item()
+            intent_idx = int(torch.argmax(probs).item())
             return {
                 "intent": self._get_intent_label(intent_idx),
                 "confidence": float(probs[intent_idx])

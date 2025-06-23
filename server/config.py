@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     """Application settings managed by Pydantic."""
     
     # Basic settings
-    debug: bool = False
+    debug: bool = True  # Set debug default to True
     environment: str = "development"
     version: str = "2.0.0"
     
@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "allow"
 
 # Create global settings instance
 settings = Settings()
