@@ -3,7 +3,7 @@ import os
 import sys
 import time
 import yaml
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 
 # Add project root to the Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -12,11 +12,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 # Graceful imports for optional dependencies
-try:
-    import psutil
-except ImportError:
-    psutil = None
-    print("[WARNING] psutil not found. System metric monitoring will be disabled.")
+# psutil import removed because it was not used
 
 try:
     from core.logging.logger import setup_logging
@@ -28,6 +24,18 @@ try:
 except ImportError as e:
     print(f"[ERROR] Failed to import a critical module: {e}. Please check your project structure.")
     sys.exit(1)
+
+class ScreenManager:
+    """A simple manager for the Screen component."""
+    def __init__(self, screen: Optional[Screen] = None):
+        self.screen = screen if screen else Screen()
+        # Only call setup if it exists
+        # Removed call to self.screen.setup() because Screen has no setup method
+
+# -*- coding: utf-8 -*-
+# This file is part of the J.A.R.V.I.S. project.
+# Define the main J.A.R.V.I.S. class
+# This class orchestrates the initialization and running of the application.
 
 class JARVIS:
     """The main orchestrator for the J.A.R.V.I.S. application."""
@@ -52,7 +60,7 @@ class JARVIS:
         try:
             self._init_core_components()
             self._init_ai_components()
-            # self._init_ui() # UI is disabled for now
+            self._init_ui()  # UI wordt nu geactiveerd
         except Exception as e:
             self.logger.critical(f"A critical error occurred during initialization: {e}", exc_info=True)
             sys.exit(1)
@@ -92,13 +100,13 @@ class JARVIS:
         self.logger.info("JarvisModel orchestrator initialized.")
 
     def _init_ui(self):
-        """Initializes the user interface (currently disabled)."""
+        """Initializes the user interface."""
         if not self.config.get('ui', {}).get('enabled', False):
             self.logger.info("UI is disabled in the configuration.")
             return
         self.logger.info("Initializing UI...")
         try:
-            self.ui = Screen()
+            self.ui = Screen(model=self.model)
             self.logger.info("UI initialized successfully.")
         except Exception as e:
             self.logger.error(f"UI initialization failed: {e}. Running in headless mode.", exc_info=True)
@@ -106,17 +114,26 @@ class JARVIS:
 
     def run(self):
         """Starts the main application loop."""
-        self.logger.info("J.A.R.V.I.S. is now running in headless mode.")
-        self.logger.info("Press Ctrl+C to exit.")
-        try:
-            while True:
-                # In headless mode, the app will wait here. 
-                # Future implementations could handle background tasks.
-                time.sleep(1)
-        except KeyboardInterrupt:
-            self.logger.info("Shutdown signal received.")
-        finally:
-            self.shutdown()
+        if self.config.get('ui', {}).get('enabled', False) and self.ui:
+            self.logger.info("J.A.R.V.I.S. UI wordt gestart.")
+            try:
+                self.ui.run()  # Zorg dat Screen/run() bestaat en de UI start
+            except KeyboardInterrupt:
+                self.logger.info("UI closed by user (KeyboardInterrupt).")
+                self.shutdown()
+            except Exception as e:
+                self.logger.error(f"UI crashte: {e}. Valt terug op headless mode.", exc_info=True)
+                self.ui = None
+        if not self.config.get('ui', {}).get('enabled', False) or not self.ui:
+            self.logger.info("J.A.R.V.I.S. draait in headless mode.")
+            self.logger.info("Press Ctrl+C to exit.")
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                self.logger.info("Shutdown signal received.")
+            finally:
+                self.shutdown()
 
     def shutdown(self):
         """Gracefully shuts down the application."""
@@ -127,3 +144,5 @@ class JARVIS:
 if __name__ == '__main__':
     jarvis_app = JARVIS()
     jarvis_app.run()
+# This is the main entry point for the J.A.R.V.I.S. application.
+# It initializes the JARVIS class and starts the application loop.

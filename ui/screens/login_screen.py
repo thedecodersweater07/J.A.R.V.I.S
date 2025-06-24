@@ -1,129 +1,77 @@
-import imgui
-from typing import Optional, Callable, Dict, Any
-import logging
-from datetime import datetime, timedelta
-import socket
+import tkinter as tk
+from tkinter import messagebox
 from security.auth.auth_service import AuthService
-import glfw
-from OpenGL import GL
 from ui.themes.theme_manager import ThemeManager
 from .base_screen import BaseScreen
+import logging
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
 class LoginScreen(BaseScreen):
-    def __init__(self, auth_service: AuthService):
+    def __init__(self, auth_service: AuthService, master=None):
         super().__init__()
+        self.master = master
         self.initialized = False
         self.auth_service = auth_service
         self.username = ""
         self.password = ""
-        self.error_message: Optional[str] = None
-        self.success_callback: Optional[Callable] = None
+        self.error_message = None
+        self.success_callback = None
         self.attempt_count = 0
-        self.locked_until: Optional[datetime] = None
+        self.locked_until = None
         self.theme = ThemeManager()
-        self._setup_styling()
+        self.frame = None
+        self.username_entry = None
+        self.password_entry = None
+        self.status_label = None
 
     def init(self) -> bool:
-        self.initialized = True
-        return True
-    
-    def handle_input(self, input_data: Dict[str, Any]) -> None:
-        pass  # Login handled through imgui interface
-
-    def render(self, frame_data: Dict[str, Any]) -> None:
-        if not self.initialized:
-            return
-
-        imgui_manager = frame_data.get("imgui_manager")
-        if not imgui_manager:
-            return
-
-        with imgui_manager.window("Login", flags=imgui.WINDOW_NO_RESIZE):
-            try:
-                if self._check_lockout():
-                    return
-
-                self._render_logo()
-                self._render_inputs()
-                self._render_login_button()
-                self._render_error()
-                
-            except Exception as e:
-                logger.error(f"Error rendering login screen: {e}")
-                self.error_message = "System error occurred"
-                
-            finally:
-                imgui.end()
-
-    def _setup_styling(self):
-        """Initialize custom styling for login screen"""
-        self.colors = {
-            "normal": (0.2, 0.6, 1.0, 1.0),
-            "error": (1.0, 0.3, 0.3, 1.0),
-            "success": (0.3, 0.8, 0.3, 1.0)
-        }
-
-    def _check_lockout(self) -> bool:
-        if self.locked_until and datetime.now() < self.locked_until:
-            remaining = (self.locked_until - datetime.now()).seconds
-            imgui.text_colored(f"Account locked. Try again in {remaining} seconds", *self.colors["error"])
-            imgui.end()
+        try:
+            self.frame = tk.Frame(self.master)
+            self.frame.pack(fill=tk.BOTH, expand=True)
+            tk.Label(self.frame, text="Login", font=("Arial", 16, "bold")).pack(pady=10)
+            tk.Label(self.frame, text="Username:").pack()
+            self.username_entry = tk.Entry(self.frame)
+            self.username_entry.pack()
+            tk.Label(self.frame, text="Password:").pack()
+            self.password_entry = tk.Entry(self.frame, show="*")
+            self.password_entry.pack()
+            tk.Button(self.frame, text="Login", command=self._on_login).pack(pady=10)
+            self.status_label = tk.Label(self.frame, text="", fg="red")
+            self.status_label.pack()
+            self.initialized = True
             return True
-        return False
+        except Exception as e:
+            logger.error(f"LoginScreen init failed: {e}")
+            return False
 
-    def _render_logo(self):
-        imgui.dummy(0, 10)
-        imgui.text_centered("Nova Industries")
-        imgui.dummy(0, 10)
+    def _on_login(self):
+        if not self.username_entry or not self.password_entry or not self.status_label:
+            return
+        username = self.username_entry.get()
+        password = self.password_entry.get()
+        if self.locked_until and datetime.now() < self.locked_until:
+            self.status_label.config(text=f"Locked. Try again at {self.locked_until.strftime('%H:%M:%S')}")
+            return
+        if self.auth_service.authenticate(username, password):
+            self.status_label.config(text="Login successful!", fg="green")
+            if self.success_callback:
+                self.success_callback()
+        else:
+            self.attempt_count += 1
+            self.status_label.config(text="Login failed.", fg="red")
+            if self.attempt_count >= 3:
+                self.locked_until = datetime.now() + timedelta(minutes=1)
+                self.status_label.config(text="Too many attempts. Locked for 1 minute.")
 
-    def _render_inputs(self):
-        # Username input with validation
-        changed, self.username = imgui.input_text(
-            "Username", 
-            self.username, 
-            256,
-            flags=imgui.INPUT_TEXT_NO_SPACES
-        )
-        
-        # Password input with masking
-        changed, self.password = imgui.input_text(
-            "Password", 
-            self.password, 
-            256,
-            flags=imgui.INPUT_TEXT_PASSWORD
-        )
+    def handle_input(self, input_data: dict) -> None:
+        pass
 
-    def _render_login_button(self):
-        if imgui.button("Login", width=120):
-            try:
-                ip_address = socket.gethostbyname(socket.gethostname())
-                token = self.auth_service.authenticate(self.username, self.password, ip_address)
-                
-                if token:
-                    self._handle_success(token)
-                else:
-                    self._handle_failure()
-                    
-            except Exception as e:
-                logger.error(f"Login error: {e}")
-                self.error_message = "Authentication error occurred"
+    def render(self, frame_data: dict) -> None:
+        pass
 
-    def _handle_success(self, token: str):
-        if self.success_callback:
-            self.success_callback(token)
-        self.attempt_count = 0
-        self.error_message = None
-        logger.info(f"Successful login for user: {self.username}")
-
-    def _handle_failure(self):
-        self.attempt_count += 1
-        self.error_message = "Invalid credentials"
-        if self.attempt_count >= 3:
-            self.locked_until = datetime.now() + timedelta(minutes=15)
-            logger.warning(f"Account locked for user: {self.username}")
-
-    def _render_error(self):
-        if self.error_message:
-            imgui.text_colored(self.error_message, *self.colors["error"])
+    def cleanup(self) -> None:
+        if self.frame:
+            self.frame.destroy()
+        self.initialized = False

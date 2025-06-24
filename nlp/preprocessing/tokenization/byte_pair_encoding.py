@@ -20,7 +20,6 @@ class BPETokenizer:
     It can be trained on a corpus to learn subword units that provide a good balance
     between word-level and character-level representations.
     """
-    """Byte Pair Encoding tokenizer implementation."""
     
     def __init__(self, 
                  vocab_size: int = 1000, 
@@ -58,9 +57,9 @@ class BPETokenizer:
         self.token_to_id = {}
         self.id_to_token = {}
         
-        # Regex pattern for tokenization
+        # Regex pattern for tokenization - fixed to work with standard Python regex
         self.pattern = re.compile(
-            r"'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+\S*|\s+",
+            r"'s|'t|'re|'ve|'m|'ll|'d| ?[a-zA-Z]+| ?[0-9]+| ?[^\s\w]+|\s+(?=\S)|\s+",
             re.UNICODE
         )
         
@@ -84,6 +83,8 @@ class BPETokenizer:
         # Tokenize the input texts into words
         words = []
         for text in texts:
+            if self.lowercase:
+                text = text.lower()
             tokens = self._tokenize_text(text)
             words.extend(tokens)
         
@@ -91,17 +92,18 @@ class BPETokenizer:
         vocab = self._get_vocab(words)
         
         # Perform BPE merges
-        while len(vocab) < self.vocab_size:
+        num_merges = self.vocab_size - len(self.special_tokens) - len(vocab)
+        for _ in range(max(0, num_merges)):
             # Find the most frequent pair
             pairs = self._get_pairs(words)
             if not pairs:
                 break
                 
-            most_frequent_pair = max(pairs, key=pairs.get)  # type: ignore
+            most_frequent_pair = max(pairs.keys(), key=lambda k: pairs[k])
             
             # Merge the most frequent pair
             new_word = "".join(most_frequent_pair)
-            vocab[new_word] = sum(count for word, count in words if new_word in word)
+            vocab[new_word] = pairs[most_frequent_pair]
             
             # Update words by merging the pair
             words = self._merge_pair(words, most_frequent_pair, new_word)
@@ -113,7 +115,7 @@ class BPETokenizer:
         self.vocab = vocab
         
         # Update token mappings
-        for i, token in enumerate(sorted(vocab.keys())):
+        for token in sorted(vocab.keys()):
             if token not in self.token_to_id:
                 self.token_to_id[token] = len(self.token_to_id)
                 self.id_to_token[len(self.id_to_token)] = token
@@ -174,8 +176,10 @@ class BPETokenizer:
             Updated list of (word, count) tuples
         """
         new_words = []
+        pair_str = "".join(pair)
         for word, count in words:
-            new_word = word.replace("".join(pair), new_token)
+            # Replace all occurrences of the pair in the word
+            new_word = word.replace(pair_str, new_token)
             new_words.append((new_word, count))
         return new_words
     
@@ -188,6 +192,9 @@ class BPETokenizer:
         Returns:
             List of token IDs
         """
+        if self.lowercase:
+            text = text.lower()
+        
         tokens = self.pattern.findall(text)
         token_ids = []
         
@@ -195,14 +202,14 @@ class BPETokenizer:
             if token in self.token_to_id:
                 token_ids.append(self.token_to_id[token])
             else:
-                # Handle unknown tokens (can be improved with subword splitting)
+                # Handle unknown tokens by character-level encoding
                 for char in token:
                     if char in self.token_to_id:
                         token_ids.append(self.token_to_id[char])
                     else:
-                        # Use UNK token if available, otherwise skip
-                        if "<UNK>" in self.token_to_id:
-                            token_ids.append(self.token_to_id["<UNK>"])
+                        # Use UNK token if available
+                        if self.unk_token in self.token_to_id:
+                            token_ids.append(self.token_to_id[self.unk_token])
         
         return token_ids
     
@@ -215,8 +222,22 @@ class BPETokenizer:
         Returns:
             Decoded text
         """
-        tokens = [self.id_to_token.get(token_id, "<UNK>") for token_id in token_ids]
-        return "".join(tokens).replace(" ", " ").strip()
+        tokens = [self.id_to_token.get(token_id, self.unk_token) for token_id in token_ids]
+        return "".join(tokens)
+    
+    def tokenize(self, text: str) -> List[str]:
+        """Tokenize text into tokens.
+        
+        Args:
+            text: Input text
+            
+        Returns:
+            List of tokens
+        """
+        if self.lowercase:
+            text = text.lower()
+        
+        return self.pattern.findall(text)
     
     def save(self, filepath: str) -> None:
         """Save the tokenizer to a file.
@@ -227,10 +248,15 @@ class BPETokenizer:
         data = {
             'vocab_size': self.vocab_size,
             'special_tokens': self.special_tokens,
+            'lowercase': self.lowercase,
+            'unk_token': self.unk_token,
+            'pad_token': self.pad_token,
+            'bos_token': self.bos_token,
+            'eos_token': self.eos_token,
             'vocab': self.vocab,
             'merges': {','.join(k): v for k, v in self.merges.items()},
             'token_to_id': self.token_to_id,
-            'id_to_token': {int(k): v for k, v in self.id_to_token.items()}
+            'id_to_token': {str(k): v for k, v in self.id_to_token.items()}
         }
         
         with open(filepath, 'w', encoding='utf-8') as f:
@@ -251,12 +277,21 @@ class BPETokenizer:
         
         tokenizer = cls(
             vocab_size=data['vocab_size'],
-            special_tokens=data['special_tokens']
+            special_tokens=data['special_tokens'],
+            lowercase=data.get('lowercase', False),
+            unk_token=data.get('unk_token', '[UNK]'),
+            pad_token=data.get('pad_token', '[PAD]'),
+            bos_token=data.get('bos_token', '[BOS]'),
+            eos_token=data.get('eos_token', '[EOS]')
         )
         
         tokenizer.vocab = data['vocab']
         tokenizer.merges = {tuple(k.split(',')): v for k, v in data['merges'].items()}
-        tokenizer.token_to_id = {k: int(v) if isinstance(v, str) else v for k, v in data['token_to_id'].items()}
+        tokenizer.token_to_id = data['token_to_id']
         tokenizer.id_to_token = {int(k): v for k, v in data['id_to_token'].items()}
         
         return tokenizer
+    
+    def __call__(self, text: str) -> List[str]:
+        """Alias for tokenize method to make the instance callable."""
+        return self.tokenize(text)

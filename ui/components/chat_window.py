@@ -22,3 +22,8 @@ class ChatWindow(tk.Frame):
         user_input = self.input_field.get()
         response = await self.llm_manager.process_input(user_input, "current_user")
         self.display_message(user_input, response)
+        
+    def display_message(self, user_input, response):
+        self.chat_area.insert(tk.END, f"You: {user_input}\n")
+        self.chat_area.insert(tk.END, f"JARVIS: {response}\n")
+        self.chat_area.see(tk.END)

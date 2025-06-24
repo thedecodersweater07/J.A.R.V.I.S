@@ -47,8 +47,8 @@ python-dotenv==1.0.0
 # AI/ML stack - using versions compatible with Python 3.12
 --extra-index-url https://download.pytorch.org/whl/cu118
 torch==2.2.1+cu118
-torchvision==0.17.1+cu118
-torchaudio==2.2.1+cu118
+# torchvision==0.17.1+cu118  # Removed, not needed for LLMs
+# torchaudio==2.2.1+cu118   # Remove if not needed
 numpy>=1.26.0,<2.0.0
 pandas>=2.1.0,<3.0.0
 spacy>=3.7.0,<4.0.0

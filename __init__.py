@@ -39,19 +39,20 @@ os.environ["PYTHONPATH"] = os.pathsep.join(
 try:
     from core.logging import setup_logging, get_logger
     from server import app as server_app
-    from models.database import init_db, get_db
+    from db.sql.database_manager import Database
     from config import settings
-    from utils.helpers import setup_environment
+    # Comment out or remove unresolved import for utils.helpers
+    # from utils.helpers import setup_environment
     
     # Set up logging
     setup_logging()
     logger = get_logger(__name__)
     
     # Initialize environment
-    setup_environment()
+    # setup_environment()
     
-    # Initialize database
-    init_db()
+    # Initialize database (if needed)
+    Database.get_instance()
     
     logger.info("JARVIS package initialized successfully")
     

@@ -4,8 +4,13 @@ import sys
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-def setup_logging(level: str = "INFO", log_file: Optional[str] = None, log_dir: Optional[str] = None) -> None:
+def setup_logging(config_or_level: Any = "INFO", log_file: Optional[str] = None, log_dir: Optional[str] = None) -> None:
     """Enhanced logging setup with better configuration"""
+    # Determine log level
+    if isinstance(config_or_level, dict):
+        level = config_or_level.get("level", "INFO")
+    else:
+        level = config_or_level
     # Create log directory if needed
     if log_dir:
         Path(log_dir).mkdir(parents=True, exist_ok=True)
@@ -29,17 +34,17 @@ def setup_logging(level: str = "INFO", log_file: Optional[str] = None, log_dir: 
         },
         "root": {
             "handlers": ["console"],
-            "level": level.upper()
+            "level": str(level).upper()
         },
         "loggers": {
             "jarvis": {
                 "handlers": ["console"],
-                "level": level.upper(),
+                "level": str(level).upper(),
                 "propagate": False
             },
             "jarvis-server": {
                 "handlers": ["console"],
-                "level": level.upper(),
+                "level": str(level).upper(),
                 "propagate": False
             }
         }

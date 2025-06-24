@@ -7,15 +7,6 @@ class EnhancedMemoryManager:
         self.config = config
         self.cache = {}
         self.priority_scores = {}
-class EnhancedMemoryManager:
-    def __init__(self, config):
-        self.config = config
-
-    def get_context(self, prompt):
-        return {}
-
-    def store_interaction(self, prompt, response, context_data):
-        pass
         
     def get_context(self, query: str) -> Dict:
         relevant_history = self._find_relevant_history(query)

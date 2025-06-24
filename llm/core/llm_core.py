@@ -3,11 +3,10 @@ import logging
 import gc
 from pathlib import Path
 import yaml
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union, List, Tuple
 from functools import lru_cache
 import threading
 import psutil
-from transformers import AutoModelForCausalLM, AutoTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +14,7 @@ class LLMCore:
     _instance = None
     _lock = threading.Lock()
     
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *_, **__):
         with cls._lock:
             if not cls._instance:
                 cls._instance = super().__new__(cls)
@@ -23,7 +22,7 @@ class LLMCore:
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         # Initialize logger first
-        self.logger = logging.getLogger(__name__)  # Changed to use standard logging
+        self.logger = logging.getLogger(__name__)
         
         # Then continue with rest of initialization
         if hasattr(self, '_initialized'):
@@ -216,7 +215,6 @@ class LLMCore:
 
     def _initialize_model(self) -> None:
         """Initialize model with better error handling and fallbacks"""
-        import importlib
         with self._model_lock:
             if self._model_initialized:
                 return
@@ -233,21 +231,34 @@ class LLMCore:
                     self.logger.info(f"Attempting to load model: {model_name}")
                     self._cleanup_existing_model()
 
-                    # Detect spaCy models (by name pattern or explicit list)
-                    if model_name.startswith("nl_core_news_") or model_name.startswith("en_core_web_"):
-                        import spacy
-                        self.model = spacy.load(model_name)
-                        self.tokenizer = self.model.tokenizer
+                    # Only allow HuggingFace/transformer models
+                    if model_name.startswith("gpt2") or model_name.startswith("distilgpt2"):
+                        from transformers.models.gpt2.modeling_gpt2 import GPT2LMHeadModel
+                        from transformers import AutoTokenizer
+                        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                        self.model = GPT2LMHeadModel.from_pretrained(model_name, **transformers_kwargs)
+                        if torch.cuda.is_available():
+                            self.model = self.model.to("cuda")  # type: ignore
                         self._model_initialized = True
-                        self.logger.info(f"Successfully loaded spaCy model: {model_name}")
+                        self.logger.info(f"Successfully loaded GPT2 model: {model_name}")
+                        return
+                    elif model_name.startswith("bert"):
+                        from transformers.models.bert.modeling_bert import BertForMaskedLM
+                        from transformers import AutoTokenizer
+                        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                        self.model = BertForMaskedLM.from_pretrained(model_name, **transformers_kwargs)
+                        if torch.cuda.is_available():
+                            self.model = self.model.to("cuda")  # type: ignore
+                        self._model_initialized = True
+                        self.logger.info(f"Successfully loaded BERT model: {model_name}")
                         return
                     else:
-                        # Try HuggingFace transformers
+                        # Try HuggingFace transformers generic fallback
                         from transformers import AutoModelForCausalLM, AutoTokenizer
                         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
                         self.model = AutoModelForCausalLM.from_pretrained(model_name, **transformers_kwargs)
                         if torch.cuda.is_available():
-                            self.model = self.model.to("cuda")
+                            self.model = self.model.to("cuda")  # type: ignore
                         self._model_initialized = True
                         self.logger.info(f"Successfully loaded transformer model: {model_name}")
                         return
@@ -274,7 +285,7 @@ class LLMCore:
     @lru_cache(maxsize=32)
     def _cached_tokenize(self, text: str):
         """Cached tokenization to avoid repeated processing of the same text"""
-        from transformers import PreTrainedTokenizer
+        from transformers.tokenization_utils import PreTrainedTokenizer
         if not self._model_initialized:
             self._initialize_model()
 
@@ -288,14 +299,14 @@ class LLMCore:
             raise RuntimeError("Model or tokenizer not initialized correctly.")
 
     def generate_response(self, prompt: str, context: Optional[Dict] = None) -> str:
-        """Generate response with optimized memory usage"""
-        from transformers import PreTrainedModel, PreTrainedTokenizer
-        import spacy.language
+        """Generate response with optimized memory usage and improved type safety"""
+        from transformers.modeling_utils import PreTrainedModel
+        from transformers.tokenization_utils import PreTrainedTokenizer
         import torch
+        
         # Ensure model is loaded
         if not self._model_initialized:
             self._initialize_model()
-
         if self.model is None:
             return "Error: Model is not initialized."
 
@@ -304,11 +315,11 @@ class LLMCore:
         enhanced_prompt = self._prepare_prompt(prompt, context_data)
 
         try:
-            # HuggingFace transformer: PreTrainedModel and PreTrainedTokenizer
+            # HuggingFace transformer: check for generate/decode methods
             if (
                 self.tokenizer is not None and
-                isinstance(self.model, PreTrainedModel) and
-                isinstance(self.tokenizer, PreTrainedTokenizer)
+                callable(getattr(self.model, "generate", None)) and
+                callable(getattr(self.tokenizer, "decode", None))
             ):
                 inputs = self._cached_tokenize(enhanced_prompt)
                 if isinstance(inputs, dict) and self.device == "cuda":
@@ -317,23 +328,29 @@ class LLMCore:
                     input_ids = inputs["input_ids"]
                 else:
                     raise RuntimeError("Invalid input for HuggingFace model.")
+                
                 with torch.no_grad():
-                    outputs = self.model.generate(
-                        input_ids,
+                    generate_fn = getattr(self.model, "generate", None)
+                    if not callable(generate_fn):
+                        raise RuntimeError("Loaded model does not support text generation.")
+                    outputs = generate_fn(
+                        input_ids,  # type: ignore
                         max_length=self.config.get("max_length", 100),
                         num_return_sequences=1,
                         pad_token_id=getattr(self.tokenizer, 'eos_token_id', None)
                     )
-                response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-                del inputs, outputs
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-            # spaCy model: Language object
-            elif isinstance(self.model, spacy.language.Language):
-                doc = self.model(enhanced_prompt)
-                response = doc.text if hasattr(doc, 'text') else str(doc)
+                
+                # Improved type-safe output handling
+                # Ensure outputs is of the correct type before decoding
+                if isinstance(outputs, (torch.Tensor, list, tuple)):
+                    response = self._decode_model_output(outputs)
+                else:
+                    response = f"Error: Unexpected output type from model: {type(outputs)}"
+                
+            # Custom fallback: if model is not supported, return error
             else:
-                response = "Error: Model type not supported."
+                response = "Error: Model or tokenizer not initialized correctly."
+                
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             response = f"Error generating response: {str(e)}"
@@ -341,6 +358,37 @@ class LLMCore:
         if hasattr(self, 'memory'):
             self.memory.store_interaction(prompt, response, context_data)
         return response
+
+    def _decode_model_output(self, outputs: Union[torch.Tensor, List, Tuple]) -> str:
+        """Safely decode model outputs with proper type checking"""
+        if self.tokenizer is None:
+            return "Error: Tokenizer not available for decoding."
+        
+        try:
+            # Handle torch.Tensor outputs
+            if isinstance(outputs, torch.Tensor):
+                # Check if it's a batch of sequences
+                if outputs.dim() >= 2 and outputs.size(0) > 0:
+                    return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+                else:
+                    return self.tokenizer.decode(outputs, skip_special_tokens=True)
+            
+            # Handle list/tuple outputs
+            elif isinstance(outputs, (list, tuple)) and len(outputs) > 0:
+                # Get the first item if it's a batch
+                first_output = outputs[0]
+                if isinstance(first_output, torch.Tensor):
+                    return self.tokenizer.decode(first_output, skip_special_tokens=True)
+                else:
+                    return self.tokenizer.decode(outputs, skip_special_tokens=True)
+            
+            # Fallback for other types
+            else:
+                return self.tokenizer.decode(outputs, skip_special_tokens=True)
+                
+        except Exception as e:
+            logger.error(f"Error decoding model output: {e}")
+            return f"Error decoding response: {str(e)}"
 
     def _prepare_prompt(self, prompt: str, context: Dict) -> str:
         """Prepare prompt with context in an optimized way"""
@@ -387,3 +435,15 @@ class LLMCore:
             self.unload_model()
         except:
             pass
+
+    def generate(self, prompt: str, context: Optional[dict] = None, **kwargs) -> dict:
+        """
+        Unified generate method for compatibility with JarvisModel and UI.
+        Returns a dict with a 'text' key for the generated response.
+        """
+        try:
+            text = self.generate_response(prompt, context)
+            return {"text": text}
+        except Exception as e:
+            logger.error(f"[LLMCore.generate] Error in AI: {e}", exc_info=True)
+            return {"text": f"[Error in AI: {e}]"}

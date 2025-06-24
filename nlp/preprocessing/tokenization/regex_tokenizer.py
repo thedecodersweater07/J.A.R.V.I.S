@@ -19,7 +19,7 @@ class RegexTokenizer:
                  gaps: bool = False,
                  discard_empty: bool = True,
                  lowercase: bool = False,
-                 strip_chars: str = None,
+                 strip_chars: Optional[str] = None,
                  preserve_case: bool = False):
         """Initialize the regex tokenizer.
         
@@ -125,13 +125,24 @@ class RegexTokenizer:
         text = unicodedata.normalize('NFKC', text)
         
         spans = []
-        for match in self.regex.finditer(text):
-            if self.gaps:
-                # For gaps, we want the text between matches
-                continue
-            start, end = match.span()
-            spans.append((start, end))
+        if self.gaps:
+            # For gaps, we need to track positions between matches
+            last_end = 0
+            for match in self.regex.finditer(text):
+                start = last_end
+                end = match.start()
+                if start < end:  # There's text between matches
+                    spans.append((start, end))
+                last_end = match.end()
             
+            # Add the final segment if any
+            if last_end < len(text):
+                spans.append((last_end, len(text)))
+        else:
+            for match in self.regex.finditer(text):
+                start, end = match.span()
+                spans.append((start, end))
+        
         return spans
     
     def tokenize_with_spans(self, text: str) -> List[Tuple[str, Tuple[int, int]]]:
@@ -147,30 +158,66 @@ class RegexTokenizer:
             return []
             
         # Normalize unicode
+        original_text = text
         text = unicodedata.normalize('NFKC', text)
         
         tokens_with_spans = []
-        for match in self.regex.finditer(text):
-            if self.gaps:
-                # For gaps, we want the text between matches
-                continue
-                
-            token = match.group()
-            start, end = match.span()
+        
+        if self.gaps:
+            # For gaps, we want the text between matches
+            last_end = 0
+            for match in self.regex.finditer(text):
+                start = last_end
+                end = match.start()
+                if start < end:  # There's text between matches
+                    token = text[start:end]
+                    # Process token
+                    processed_token = self._process_token(token)
+                    if processed_token is not None:
+                        tokens_with_spans.append((processed_token, (start, end)))
+                last_end = match.end()
             
-            # Process token
-            if self.strip_chars is not None:
-                stripped = token.strip(self.strip_chars)
-                if not stripped and self.discard_empty:
-                    continue
-                token = stripped
+            # Add the final segment if any
+            if last_end < len(text):
+                token = text[last_end:]
+                processed_token = self._process_token(token)
+                if processed_token is not None:
+                    tokens_with_spans.append((processed_token, (last_end, len(text))))
+        else:
+            for match in self.regex.finditer(text):
+                token = match.group()
+                start, end = match.span()
                 
-            if self.lowercase and not self.preserve_case:
-                token = token.lower()
-                
-            tokens_with_spans.append((token, (start, end)))
-            
+                # Process token
+                processed_token = self._process_token(token)
+                if processed_token is not None:
+                    tokens_with_spans.append((processed_token, (start, end)))
+        
         return tokens_with_spans
+    
+    def _process_token(self, token: str) -> Optional[str]:
+        """Process a single token according to the tokenizer settings.
+        
+        Args:
+            token: Token to process
+            
+        Returns:
+            Processed token or None if it should be discarded
+        """
+        if not token and self.discard_empty:
+            return None
+            
+        # Strip characters if specified
+        if self.strip_chars is not None:
+            token = token.strip(self.strip_chars)
+            if not token and self.discard_empty:
+                return None
+        
+        # Convert to lowercase if specified
+        if self.lowercase and not self.preserve_case:
+            token = token.lower()
+        
+        return token
     
     def tokenize_with_types(self, text: str) -> List[Tuple[str, str]]:
         """Tokenize text and classify each token with a type.
@@ -189,35 +236,46 @@ class RegexTokenizer:
         
         tokens_with_types = []
         
+        # Create a working copy of the text for replacement
+        working_text = text
+        processed_positions = []
+        
         # First, handle special patterns
         for token_type, pattern in self.patterns.items():
-            for match in re.finditer(pattern, text, re.UNICODE):
-                token = match.group()
-                tokens_with_types.append((token, token_type))
-                # Replace matched text with spaces to avoid reprocessing
-                text = text[:match.start()] + ' ' * len(token) + text[match.end():]
+            pattern_regex = re.compile(pattern, re.UNICODE)
+            for match in pattern_regex.finditer(text):
+                start, end = match.span()
+                # Check if this position hasn't been processed yet
+                if not any(s <= start < e or s < end <= e for s, e in processed_positions):
+                    token = match.group()
+                    processed_token = self._process_token(token)
+                    if processed_token is not None:
+                        tokens_with_types.append((processed_token, token_type))
+                        processed_positions.append((start, end))
         
         # Then handle remaining text with the main pattern
         for match in self.regex.finditer(text):
-            token = match.group()
-            if not token.strip() and self.discard_empty:
-                continue
-                
-            # Determine token type
-            token_type = 'UNKNOWN'
-            for pattern, t_type in self.token_types.items():
-                if re.fullmatch(pattern, token, re.UNICODE):
-                    token_type = t_type
-                    break
-            
-            tokens_with_types.append((token, token_type))
+            start, end = match.span()
+            # Check if this position hasn't been processed yet
+            if not any(s <= start < e or s < end <= e for s, e in processed_positions):
+                token = match.group()
+                processed_token = self._process_token(token)
+                if processed_token is not None:
+                    # Determine token type
+                    token_type = 'UNKNOWN'
+                    for pattern, t_type in self.token_types.items():
+                        if re.fullmatch(pattern, token, re.UNICODE):
+                            token_type = t_type
+                            break
+                    
+                    tokens_with_types.append((processed_token, token_type))
         
-        # Sort by position in original text
-        tokens_with_types.sort(key=lambda x: text.find(x[0]))
+        # Sort by position in original text to maintain order
+        tokens_with_types.sort(key=lambda x: text.find(x[0]) if x[0] in text else 0)
         
         return tokens_with_types
     
-    def add_pattern(self, name: str, pattern: str, token_type: str = None) -> None:
+    def add_pattern(self, name: str, pattern: str, token_type: Optional[str] = None) -> None:
         """Add a custom pattern to the tokenizer.
         
         Args:

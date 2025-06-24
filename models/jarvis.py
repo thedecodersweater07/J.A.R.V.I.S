@@ -393,28 +393,25 @@ class JarvisModel:
             
         try:
             # Import inside the function to avoid circular imports
-            from db import AIRequestLog
-            
+            from db.sql.models.request_log import AIRequestLog
             # Create and save the log entry
             log_entry = AIRequestLog(
                 user_id=user_id,
                 input_text=input_text,
                 response_text=response,
                 confidence=min(max(0.0, float(confidence)), 1.0),  # Ensure confidence is between 0 and 1
-                metadata={
+                extra_data={
                     'timestamp': datetime.utcnow().isoformat(),
                     'model': getattr(self, 'model_name', 'unknown'),
                     **(metadata or {})
                 }
             )
-            
             try:
                 # Add and commit the log entry
                 self.db.add(log_entry)
                 self.db.commit()
                 log_id = log_entry.id
                 self.logger.debug(f"Logged interaction with ID: {log_id}")
-                
             except Exception as db_error:
                 self.logger.error(f"Database error in log_interaction: {db_error}", exc_info=True)
                 try:
@@ -521,3 +518,14 @@ class JarvisModel:
             "status": "processed",
             "timestamp": datetime.utcnow().isoformat()
         }
+    
+    def generate(self, prompt: str, **kwargs) -> dict:
+        """
+        Unified generate method for compatibility with UI and API.
+        Calls process_input and returns the response dict.
+        """
+        try:
+            return self.process_input(prompt, **kwargs)
+        except Exception as e:
+            self.logger.error(f"[generate] Fout bij AI: {e}", exc_info=True)
+            return {"text": f"[Fout bij AI: {e}]"}

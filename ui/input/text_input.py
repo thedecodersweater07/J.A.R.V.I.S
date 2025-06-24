@@ -1,6 +1,7 @@
 from typing import Callable, Optional
 import queue
 import logging
+import tkinter as tk
 
 class TextInputHandler:
     def __init__(self):
@@ -29,16 +30,17 @@ class TextInputHandler:
         except queue.Empty:
             return None
 
-class TextInput:
-    """Handles text input processing"""
-    
-    def __init__(self):
-        self.logger = logging.getLogger(self.__class__.__name__)
+class TextInput(tk.Frame):
+    def __init__(self, master=None, on_submit=None, **kwargs):
+        super().__init__(master, **kwargs)
+        self.input_var = tk.StringVar()
+        self.entry = tk.Entry(self, textvariable=self.input_var, font=("Consolas", 12), bg="#23272e", fg="#e8eaed", insertbackground="#e8eaed", bd=0, relief=tk.FLAT)
+        self.entry.pack(fill=tk.X, expand=True, ipady=6)
+        self.entry.bind('<Return>', self._on_submit)
+        self.on_submit = on_submit
 
-    def get_input(self) -> Optional[str]:
-        """Get text input from user"""
-        try:
-            return input("> ")
-        except Exception as e:
-            self.logger.error(f"Input error: {e}")
-            return None
+    def _on_submit(self, event=None):
+        text = self.input_var.get().strip()
+        if text and self.on_submit:
+            self.on_submit(text)
+        self.input_var.set("")

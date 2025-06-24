@@ -24,8 +24,6 @@ def main():
     requirements = [
         "numpy>=1.26.0,<2.0.0",
         "torch==2.2.1+cu118 --extra-index-url https://download.pytorch.org/whl/cu118",
-        "torchvision==0.17.1+cu118 --extra-index-url https://download.pytorch.org/whl/cu118",
-        "torchaudio==2.2.1+cu118 --extra-index-url https://download.pytorch.org/whl/cu118",
         "pandas>=2.1.0,<3.0.0",
         "spacy>=3.7.0,<4.0.0",
         "transformers>=4.35.0,<5.0.0"

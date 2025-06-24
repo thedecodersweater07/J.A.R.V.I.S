@@ -1,13 +1,19 @@
 import numpy as np
 import logging
 from typing import Optional, Callable
+import tkinter as tk
 
 logger = logging.getLogger(__name__)
 
-class VoiceInput:
+class VoiceInput(tk.Frame):
     """Handles voice input processing"""
     
-    def __init__(self):
+    def __init__(self, master=None, on_voice=None, **kwargs):
+        super().__init__(master, **kwargs)
+        self.on_voice = on_voice
+        self.button = tk.Button(self, text="🎤 Spreek", font=("Consolas", 12, "bold"), bg="#00d4ff", fg="#181c20", bd=0, relief=tk.FLAT, activebackground="#0099cc", command=self._on_voice)
+        self.button.pack(fill=tk.X, expand=True)
+
         self.logger = logging.getLogger(self.__class__.__name__)
         self.initialized = False
 
@@ -27,6 +33,11 @@ class VoiceInput:
             return None
         # Voice input implementation
         return None
+
+    def _on_voice(self):
+        if self.on_voice:
+            self.on_voice()
+        # Hier kun je eventueel spraakherkenning integreren
 
 class VoiceInputHandler:
     def __init__(self, sample_rate: int = 44100):

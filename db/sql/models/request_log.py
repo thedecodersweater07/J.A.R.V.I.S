@@ -14,7 +14,7 @@ class AIRequestLog(Base):
     input_text = Column(String, nullable=False)
     response_text = Column(String, nullable=False)
     confidence = Column(Float, default=0.0)
-    metadata = Column(JSON, default={})
+    extra_data = Column(JSON, default={})  # Renamed from 'metadata' to avoid SQLAlchemy reserved name
     created_at = Column(DateTime, default=datetime.utcnow)
     
     def __repr__(self):

@@ -16,7 +16,7 @@ DATABASE_PATHS = {
 }
 
 class DatabaseManager:
-    def __init__(self):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.db_root = Path(__file__).parent.parent / "data" / "db"
         self.db_root.mkdir(parents=True, exist_ok=True)
         self.connections = {}

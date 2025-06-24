@@ -11,7 +11,7 @@ class KnowledgeManager:
 
     def __init__(self, db_manager: DatabaseManager):
         self.db_manager = db_manager
-        self.conn = self.db_manager.get_connection()
+        self.conn = self.db_manager.get_connection("knowledge")
         self.knowledge_cache = {}
         self.initialize()
 

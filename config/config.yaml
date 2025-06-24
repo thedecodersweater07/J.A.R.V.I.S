@@ -1,0 +1,14 @@
+# Basic config for JARVIS
+ui:
+  enabled: true
+logging:
+  level: INFO
+llm:
+  model:
+    name: distilgpt2  # Ensure model name is present for LLMCore
+  model_name: distilgpt2  # Add flat key for compatibility
+database:
+  type: sqlite
+  path: "db/knowledge.db"
+jarvis_model:
+  name: "JARVIS"

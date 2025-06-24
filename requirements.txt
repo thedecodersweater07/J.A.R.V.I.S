@@ -13,8 +13,8 @@ bcrypt==4.0.1
 # AI/ML stack
 --extra-index-url https://download.pytorch.org/whl/cu118
 torch==2.2.1+cu118
-torchvision==0.17.1+cu118
-torchaudio==2.2.1+cu118
+# torchvision==0.17.1+cu118  # Removed, not needed for LLMs
+# torchaudio==2.2.1+cu118   # Remove if not needed
 
 # Core Data Science & NLP
 numpy>=1.26.0,<2.0.0
