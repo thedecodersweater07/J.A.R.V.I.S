@@ -1,0 +1,187 @@
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const path = require('path');
+const { spawn } = require('child_process');
+const isDev = require('electron-is-dev');
+
+// Global references
+/** @type {Electron.BrowserWindow | null} */
+let mainWindow = null;
+
+/** @type {import('child_process').ChildProcess | null} */
+let pythonProcess = null;
+
+// Path to the app directory
+const appDir = path.resolve(__dirname, '..');
+
+/**
+ * Create the browser window
+ * @returns {Promise<void>}
+ */
+async function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    minWidth: 1024,
+    minHeight: 768,
+    frame: false,
+    titleBarStyle: 'hidden',
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      webSecurity: !isDev,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+    icon: path.join(__dirname, '../public/icon.png'),
+  });
+
+  // Load the index.html file
+  const startUrl = isDev 
+    ? 'http://localhost:3000'
+    : `file://${path.join(appDir, 'dist/index.html')}`;
+
+  try {
+    await mainWindow.loadURL(startUrl);
+    if (isDev) {
+      mainWindow.webContents.openDevTools();
+    }
+  } catch (error) {
+    console.error('Failed to load app:', error);
+    app.quit();
+  }
+
+  // Handle window controls
+  ipcMain.on('minimize-window', () => {
+    if (mainWindow) mainWindow.minimize();
+  });
+
+  ipcMain.on('maximize-window', () => {
+    if (!mainWindow) return;
+    
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  });
+
+  ipcMain.on('close-window', () => {
+    if (mainWindow) mainWindow.close();
+  });
+
+  mainWindow.on('closed', () => {
+    if (pythonProcess) {
+      pythonProcess.kill();
+      pythonProcess = null;
+    }
+    mainWindow = null;
+  });
+
+  // Start Python services
+  try {
+    await startPythonServices();
+    console.log('Python services started successfully');
+  } catch (error) {
+    console.error('Failed to start Python services:', error);
+    // Continue even if Python services fail to start
+  }
+}
+
+/**
+ * Start Python backend services
+ * @returns {Promise<void>}
+ */
+function startPythonServices() {
+  return new Promise((resolve, reject) => {
+    if (isDev) {
+      console.log('Running in development mode, skipping Python services');
+      return resolve();
+    }
+
+    const pythonPath = path.join(process.resourcesPath || '', 'python', 'python.exe');
+    const scriptPath = path.join(process.resourcesPath || '', 'backend', 'main.py');
+
+    try {
+      pythonProcess = spawn(pythonPath, [scriptPath], {
+        stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+        shell: true
+      });
+
+      if (!pythonProcess) {
+        throw new Error('Failed to spawn Python process');
+      }
+
+      if (pythonProcess.stdout) {
+        pythonProcess.stdout.on('data', (/** @type {Buffer} */ data) => {
+          console.log(`Python: ${data.toString()}`);
+        });
+      }
+
+      if (pythonProcess.stderr) {
+        pythonProcess.stderr.on('data', (/** @type {Buffer} */ data) => {
+          console.error(`Python Error: ${data.toString()}`);
+        });
+      }
+
+      pythonProcess.on('error', (/** @type {Error} */ error) => {
+        console.error('Failed to start Python process:', error);
+        reject(error);
+      });
+
+      pythonProcess.on('close', (/** @type {number} */ code) => {
+        console.log(`Python process exited with code ${code}`);
+        if (code !== 0) {
+          reject(new Error(`Python process exited with code ${code}`));
+        }
+      });
+
+      // Consider the service started successfully if no error after a short delay
+      setTimeout(resolve, 1000);
+    } catch (error) {
+      console.error('Failed to start Python services:', error);
+      reject(error);
+    }
+  });
+}
+
+// When Electron has finished initialization
+app.whenReady().then(() => {
+  createWindow().catch(console.error);
+  
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow().catch(console.error);
+    }
+  });
+});
+
+// Quit when all windows are closed
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+// Clean up on quit
+app.on('will-quit', () => {
+  if (pythonProcess) {
+    pythonProcess.kill();
+  }
+});
+
+// Handle external links
+app.on('web-contents-created', (event, contents) => {
+  if (contents.getType() === 'window') {
+    contents.on('will-navigate', (event, url) => {
+      // Allow localhost and file protocols
+      if (url.startsWith('http://localhost:') || url.startsWith('file://')) {
+        return;
+      }
+      
+      // Open external links in default browser
+      event.preventDefault();
+      shell.openExternal(url).catch((/** @type {Error} */ error) => {
+        console.error('Failed to open external URL:', error);
+      });
+    });
+  }
+});

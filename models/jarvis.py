@@ -243,27 +243,14 @@ class JarvisModel:
     ) -> Dict[str, Any]:
         """
         Process user input and generate a response using the configured LLM and NLP components.
-        
-        Args:
-            text: The input text to process
-            user_id: The ID of the user making the request
-            **kwargs: Additional arguments for processing
-            
-        Returns:
-            Dictionary containing the response and metadata
+        Returns a dict with at least a 'response' key (string) and 'success' boolean.
         """
         start_time = datetime.utcnow()
         request_id = str(uuid.uuid4())
         metadata = kwargs.pop('metadata', {})
-        
         try:
-            # Log the request
             self.logger.info(f"Processing input from user {user_id}: {text[:100]}...")
-            
-            # Process text with NLP analyzer
             nlp_result = self.nlp_analyzer.analyze(text)
-            
-            # Generate response using LLM with NLP context
             response = self.llm.generate(
                 prompt=text,
                 context={
@@ -275,20 +262,19 @@ class JarvisModel:
                     **kwargs
                 }
             )
-            
-            # Log the interaction - ensure response is a string
-            response_str = str(response) if not isinstance(response, str) else response
-            
-            # Log the interaction
+            # --- Robust response extraction ---
+            if isinstance(response, dict):
+                # Prefer 'text' or 'response' key
+                response_str = response.get("text") or response.get("response") or str(response)
+            else:
+                response_str = str(response)
             self._log_interaction(
                 user_id=user_id,
                 input_text=text,
                 response=response_str,
-                confidence=0.9,  # Default confidence
+                confidence=0.9,
                 metadata=metadata
             )
-            
-            # Update conversation history
             self._update_conversation_history(
                 user_id=user_id,
                 user_input=text,
@@ -298,20 +284,16 @@ class JarvisModel:
                     **metadata
                 }
             )
-            
             return {
-                "response": response,
+                "response": response_str,
                 "success": True,
                 "request_id": request_id,
                 "timestamp": datetime.utcnow().isoformat(),
                 "processing_time": (datetime.utcnow() - start_time).total_seconds()
             }
-            
         except Exception as e:
             error_msg = str(e)
             self.logger.error(f"Error processing input: {error_msg}", exc_info=True)
-            
-            # Log the failed interaction
             self._log_interaction(
                 user_id=user_id,
                 input_text=text,
@@ -323,7 +305,6 @@ class JarvisModel:
                     **kwargs.get('metadata', {})
                 }
             )
-            
             return {
                 "response": "An error occurred while processing your request.",
                 "success": False,
@@ -525,7 +506,53 @@ class JarvisModel:
         Calls process_input and returns the response dict.
         """
         try:
-            return self.process_input(prompt, **kwargs)
+            result = self.process_input(prompt, **kwargs)
+            # Always return a dict with a 'response' key (string)
+            if isinstance(result, dict) and "response" in result:
+                return result
+            return {"response": str(result), "success": True}
         except Exception as e:
             self.logger.error(f"[generate] Fout bij AI: {e}", exc_info=True)
-            return {"text": f"[Fout bij AI: {e}]"}
+            return {"response": f"[Fout bij AI: {e}]", "success": False}
+
+# --- HyperAdvanced AI Integration ---
+# This is an optional integration and will be skipped if not available
+HYPERAI_AVAILABLE = False
+hyper_ai = None
+
+try:
+    import importlib
+    from pathlib import Path
+    import logging
+    import sys
+    
+    HYPERAI_PATH = Path(__file__).parent.parent / "hyperadvanced_ai"
+    if HYPERAI_PATH.exists() and str(HYPERAI_PATH) not in map(str, sys.path):
+        sys.path.insert(0, str(HYPERAI_PATH))
+    
+    try:
+        from hyperadvanced_ai.core.abstraction import HyperAIAbstraction
+        hyper_ai = HyperAIAbstraction()
+        
+        # Example: dynamically load all modules listed in config
+        try:
+            import yaml
+            config_path = HYPERAI_PATH / "config" / "default.yaml"
+            if config_path.exists():
+                with open(config_path) as f:
+                    config = yaml.safe_load(f)
+                    for mod_path in config.get("modules", []):
+                        try:
+                            hyper_ai.load_module(mod_path)
+                        except Exception as e:
+                            logging.getLogger("models.jarvis").debug(f"[Optional] Failed to load {mod_path}: {e}")
+            HYPERAI_AVAILABLE = True
+            logging.getLogger("models.jarvis").info("HyperAdvanced AI integration initialized")
+        except ImportError:
+            logging.getLogger("models.jarvis").debug("[Optional] PyYAML not available, skipping HyperAdvanced AI config loading")
+            
+    except ImportError as e:
+        logging.getLogger("models.jarvis").debug("[Optional] HyperAdvanced AI not available: " + str(e))
+        
+except Exception as e:
+    logging.getLogger("models.jarvis").debug(f"[Optional] Error initializing HyperAdvanced AI: {e}")

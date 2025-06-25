@@ -1,0 +1,3 @@
+# Default configuration for hyperadvanced_ai
+modules:
+  - hyperadvanced_ai.modules.example_module

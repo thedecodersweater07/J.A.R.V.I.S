@@ -3,10 +3,15 @@ import logging
 import gc
 from pathlib import Path
 import yaml
-from typing import Optional, Dict, Any, Union, List, Tuple
+from typing import Optional, Dict, Any, Union, List, Tuple, cast
 from functools import lru_cache
 import threading
 import psutil
+
+# Import required transformers components
+from transformers.modeling_utils import PreTrainedModel
+from transformers.tokenization_utils import PreTrainedTokenizer
+from transformers.generation.utils import GenerationMixin
 
 logger = logging.getLogger(__name__)
 
@@ -286,17 +291,41 @@ class LLMCore:
     def _cached_tokenize(self, text: str):
         """Cached tokenization to avoid repeated processing of the same text"""
         from transformers.tokenization_utils import PreTrainedTokenizer
+        
         if not self._model_initialized:
             self._initialize_model()
-
-        # HuggingFace transformer
-        if self.tokenizer is not None and isinstance(self.tokenizer, PreTrainedTokenizer):
-            return self.tokenizer(text, return_tensors="pt")
-        # spaCy model
-        elif self.model is not None and hasattr(self.model, 'tokenizer'):
-            return self.model(text)
-        else:
-            raise RuntimeError("Model or tokenizer not initialized correctly.")
+            
+        if not hasattr(self, 'tokenizer') or self.tokenizer is None:
+            raise RuntimeError("Tokenizer not initialized")
+            
+        try:
+            # Ensure text is a non-empty string
+            if not text or not isinstance(text, str):
+                text = ""
+                
+            # Tokenize with attention mask and return as dictionary
+            inputs = self.tokenizer(
+                text,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=self.config.get("max_length", 512),
+                return_attention_mask=True
+            )
+            
+            # Ensure we have input_ids in the output
+            if "input_ids" not in inputs:
+                raise ValueError("Tokenizer did not return input_ids")
+                
+            # Move tensors to device if needed
+            if self.device != "cpu":
+                inputs = {k: v.to(self.device) for k, v in inputs.items()}
+                
+            return inputs
+            
+        except Exception as e:
+            self.logger.error(f"Error in _cached_tokenize: {str(e)}", exc_info=True)
+            raise RuntimeError(f"Failed to tokenize input: {str(e)}")
 
     def generate_response(self, prompt: str, context: Optional[Dict] = None) -> str:
         """Generate response with optimized memory usage and improved type safety"""
@@ -304,56 +333,101 @@ class LLMCore:
         from transformers.tokenization_utils import PreTrainedTokenizer
         import torch
         
-        # Ensure model is loaded
-        if not self._model_initialized:
-            self._initialize_model()
-        if self.model is None:
-            return "Error: Model is not initialized."
-
-        # Get relevant context from memory
-        context_data = self.memory.get_context(prompt) if hasattr(self, 'memory') and context is None else context or {}
-        enhanced_prompt = self._prepare_prompt(prompt, context_data)
-
         try:
-            # HuggingFace transformer: check for generate/decode methods
-            if (
-                self.tokenizer is not None and
-                callable(getattr(self.model, "generate", None)) and
-                callable(getattr(self.tokenizer, "decode", None))
-            ):
+            # Ensure model is loaded
+            if not self._model_initialized:
+                self._initialize_model()
+                
+            if self.model is None:
+                self.logger.error("Model is not initialized")
+                return "Error: Model is not initialized."
+                
+            if self.tokenizer is None:
+                self.logger.error("Tokenizer is not initialized")
+                return "Error: Tokenizer is not initialized."
+
+            # Get relevant context from memory
+            context_data = context or {}
+            if hasattr(self, 'memory') and context is None:
+                try:
+                    context_data = self.memory.get_context(prompt) or {}
+                except Exception as e:
+                    self.logger.warning(f"Failed to get context from memory: {e}")
+                    context_data = {}
+                    
+            enhanced_prompt = self._prepare_prompt(prompt, context_data)
+            self.logger.debug(f"Enhanced prompt: {enhanced_prompt}")
+
+            # Ensure we have a valid prompt
+            if not enhanced_prompt or not isinstance(enhanced_prompt, str):
+                enhanced_prompt = str(enhanced_prompt or "")
+
+            # Tokenize the input
+            try:
                 inputs = self._cached_tokenize(enhanced_prompt)
-                if isinstance(inputs, dict) and self.device == "cuda":
+                if not isinstance(inputs, dict) or "input_ids" not in inputs:
+                    raise ValueError("Invalid tokenizer output format")
+                    
+                # Move inputs to the correct device
+                if self.device != "cpu":
                     inputs = {k: v.to(self.device) for k, v in inputs.items()}
-                if isinstance(inputs, dict) and "input_ids" in inputs:
-                    input_ids = inputs["input_ids"]
-                else:
-                    raise RuntimeError("Invalid input for HuggingFace model.")
-                
+                    
+            except Exception as e:
+                self.logger.error(f"Tokenization failed: {e}", exc_info=True)
+                return f"Error: Failed to tokenize input - {str(e)}"
+
+            # Generate response
+            try:
                 with torch.no_grad():
-                    generate_fn = getattr(self.model, "generate", None)
-                    if not callable(generate_fn):
-                        raise RuntimeError("Loaded model does not support text generation.")
-                    outputs = generate_fn(
-                        input_ids,  # type: ignore
-                        max_length=self.config.get("max_length", 100),
-                        num_return_sequences=1,
-                        pad_token_id=getattr(self.tokenizer, 'eos_token_id', None)
+                    # Get generation parameters from config or use defaults
+                    generation_config = {
+                        'max_length': min(self.config.get("max_length", 100), 512),  # Cap at 512 tokens
+                        'num_return_sequences': 1,
+                        'temperature': 0.7,
+                        'top_p': 0.9,
+                        'do_sample': True,
+                        'pad_token_id': getattr(self.tokenizer, 'eos_token_id', None) or 50256,  # Default to GPT2's eos
+                        'attention_mask': inputs.get('attention_mask')
+                    }
+                    
+                    # Generate the response - ensure input_ids is a tensor on the correct device
+                    input_tensor = inputs['input_ids']
+                    if not isinstance(input_tensor, torch.Tensor):
+                        input_tensor = torch.tensor(input_tensor, device=self.device)
+                    elif input_tensor.device != self.device:
+                        input_tensor = input_tensor.to(self.device)
+                    
+                    # Generate sequences - ensure model is a GenerationMixin
+                    if not hasattr(self.model, 'generate') or not callable(self.model.generate):
+                        raise RuntimeError("Model does not support text generation")
+                        
+                    # Cast to GenerationMixin to make type checker happy
+                    generation_model = cast(GenerationMixin, self.model)
+                    output_sequences = generation_model.generate(
+                        input_ids=input_tensor,
+                        **{k: v for k, v in generation_config.items() if v is not None}
                     )
-                
-                # Improved type-safe output handling
-                # Ensure outputs is of the correct type before decoding
-                if isinstance(outputs, (torch.Tensor, list, tuple)):
-                    response = self._decode_model_output(outputs)
-                else:
-                    response = f"Error: Unexpected output type from model: {type(outputs)}"
-                
-            # Custom fallback: if model is not supported, return error
-            else:
-                response = "Error: Model or tokenizer not initialized correctly."
+                    
+                    # Decode the generated text
+                    response = self.tokenizer.decode(
+                        output_sequences[0],
+                        skip_special_tokens=True,
+                        clean_up_tokenization_spaces=True
+                    )
+                    
+                    # Remove any duplicate newlines and strip whitespace
+                    response = ' '.join(response.split())
+                    
+                    self.logger.debug(f"Generated response: {response[:200]}...")
+                    return response
+                    
+            except Exception as e:
+                self.logger.error(f"Generation failed: {e}", exc_info=True)
+                return f"Error: Failed to generate response - {str(e)}"
                 
         except Exception as e:
-            logger.error(f"Error generating response: {e}")
-            response = f"Error generating response: {str(e)}"
+            self.logger.error(f"Unexpected error in generate_response: {e}", exc_info=True)
+            return f"Error: An unexpected error occurred - {str(e)}"
 
         if hasattr(self, 'memory'):
             self.memory.store_interaction(prompt, response, context_data)

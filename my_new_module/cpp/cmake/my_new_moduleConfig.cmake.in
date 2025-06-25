@@ -1,0 +1,69 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Find dependencies
+find_dependency(pybind11 REQUIRED)
+find_dependency(Python3 COMPONENTS Interpreter Development REQUIRED)
+
+# Import targets
+include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
+
+# Add module-specific include directories
+set_and_check(@PROJECT_NAME@_INCLUDE_DIRS "${PACKAGE_PREFIX_DIR}/include")
+
+# Add module-specific library directories
+set_and_check(@PROJECT_NAME@_LIBRARY_DIRS "${PACKAGE_PREFIX_DIR}/lib")
+
+# Add module libraries
+set(@PROJECT_NAME@_LIBRARIES @PROJECT_NAME@)
+
+# Add compile definitions if needed
+if(NOT @PROJECT_NAME@_COMPILE_DEFINITIONS)
+    set(@PROJECT_NAME@_COMPILE_DEFINITIONS "")
+endif()
+
+# Add compile options if needed
+if(NOT @PROJECT_NAME@_COMPILE_OPTIONS)
+    set(@PROJECT_NAME@_COMPILE_OPTIONS "")
+endif()
+
+# Add link options if needed
+if(NOT @PROJECT_NAME@_LINK_OPTIONS)
+    set(@PROJECT_NAME@_LINK_OPTIONS "")
+endif()
+
+# Add include directories
+set(@PROJECT_NAME@_INCLUDE_DIRS 
+    ${@PROJECT_NAME@_INCLUDE_DIRS}
+    ${PYTHON_INCLUDE_DIRS}
+)
+
+# Add link libraries
+set(@PROJECT_NAME@_LINK_LIBRARIES
+    ${@PROJECT_NAME@_LIBRARIES}
+    ${PYTHON_LIBRARIES}
+    pybind11::module
+)
+
+# Add dependencies
+set(@PROJECT_NAME@_DEPENDENCIES
+    pybind11::pybind11
+    Python3::Python
+)
+
+# Create an imported target for the module
+add_library(@PROJECT_NAME@::@PROJECT_NAME@ ALIAS @PROJECT_NAME@)
+
+# Export variables for find_package
+set(@PROJECT_NAME@_FOUND TRUE)
+set(@PROJECT_NAME@_VERSION 1.0.0)
+
+# Add module to the list of available modules
+set(JARVIS_MODULES ${JARVIS_MODULES} @PROJECT_NAME@ CACHE INTERNAL "List of available JARVIS modules")
+
+# Add module to the list of built modules
+set(JARVIS_BUILT_MODULES ${JARVIS_BUILT_MODULES} @PROJECT_NAME@ CACHE INTERNAL "List of built JARVIS modules")
+
+# Add module to the list of enabled modules
+set(JARVIS_ENABLED_MODULES ${JARVIS_ENABLED_MODULES} @PROJECT_NAME@ CACHE INTERNAL "List of enabled JARVIS modules")

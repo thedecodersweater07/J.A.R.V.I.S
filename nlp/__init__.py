@@ -3,10 +3,13 @@ Natural Language Processing (NLP) module for JARVIS.
 
 This module provides NLP capabilities such as text processing, entity recognition,
 sentiment analysis, and more.
+
+It includes both Python and optimized C++ implementations for better performance.
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(
@@ -14,6 +17,17 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Try to import the C++ engine, fall back to Python implementation
+cpp_available = False
+try:
+    from . import _nlp_engine  # type: ignore
+    cpp_available = True
+except ImportError:
+    logger.warning(
+        "C++ NLP engine not available. Falling back to Python implementation.\n"
+        "To build the C++ engine, run 'python -m nlp.build'"
+    )
 
 class NLPProcessor:
     """Main NLP processor class for handling natural language processing tasks."""

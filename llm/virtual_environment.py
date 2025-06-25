@@ -28,7 +28,7 @@ class VirtualEnvironment:
         
         # Create necessary directories
         for path in [self.data_path, self.env_path]:
-            if path:
+            if path is not None:
                 os.makedirs(path, exist_ok=True)
 
     async def step(self, action: Dict[str, Any]) -> Dict[str, Any]:
@@ -108,6 +108,8 @@ class VirtualEnvironment:
 
     def _store_results(self, topic: str, results: Dict[str, Any]):
         """Store validation results with proper JSON serialization"""
+        if not self.data_path:
+            return
         filepath = os.path.join(
             self.data_path, 
             topic, 

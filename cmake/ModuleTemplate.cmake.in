@@ -1,0 +1,46 @@
+# Template for JARVIS module CMakeLists.txt
+cmake_minimum_required(VERSION 3.14)
+project(@MODULE_NAME@ LANGUAGES CXX)
+
+# Include base configuration
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+include(JarvisCppConfig)
+
+# Set module sources
+set(MODULE_SOURCES
+    @MODULE_NAME@.cpp
+    # Add other source files here
+)
+
+# Set module headers
+set(MODULE_HEADERS
+    @MODULE_NAME@.hpp
+    # Add other header files here
+)
+
+# Create the module
+jarvis_add_module(_@MODULE_NAME@
+    SOURCES ${MODULE_SOURCES}
+    HEADERS ${MODULE_HEADERS}
+    LINK_LIBS pybind11::module
+)
+
+# Include directories
+target_include_directories(_@MODULE_NAME@ PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${PYTHON_INCLUDE_DIRS}
+)
+
+# Python module installation
+install(
+    FILES __init__.py
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/@MODULE_NAME@
+)
+
+# Copy built module to source directory for development
+add_custom_command(TARGET _@MODULE_NAME@ POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:_@MODULE_NAME@>
+        ${CMAKE_SOURCE_DIR}/@MODULE_NAME@
+    COMMENT "Copying _@MODULE_NAME@ to source directory"
+)

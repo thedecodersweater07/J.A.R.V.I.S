@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 from dataclasses import dataclass
 from typing import Dict, Any, List, Optional
+import numbers
 
 import numpy as np
 from rich.console import Console
@@ -41,7 +42,9 @@ class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
-        if isinstance(obj, (np.int64, np.int32, np.float32, np.float64)):
+        if isinstance(obj, (int, float)):
+            return float(obj)
+        if isinstance(obj, np.generic):
             return float(obj)
         if isinstance(obj, datetime):
             return obj.isoformat()
@@ -81,7 +84,7 @@ class ScenarioGenerator:
             "condition": ["time pressure", "limited budget", "legacy systems"]
         }
     
-    def generate_scenario(self, complexity: float = 0.5) -> Dict[str, any]:
+    def generate_scenario(self, complexity: float = 0.5) -> Dict[str, Any]:
         """Generate a test scenario based on complexity"""
         import random
         
@@ -225,12 +228,10 @@ class Sandbox:
 class VirtualEnvironmentSystem:
     """Main virtual environment system"""
     
-    def __init__(self, config: Dict[str, Any] = None):
-        self.config = config or {
-            "quantum_enabled": False,
-            "verbose_output": True,
-            "auto_optimize": True
-        }
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        if config is None:
+            config = {}
+        self.config = config
         self.data_collector = DataCollector()
         self.sandbox = Sandbox(SandboxConfig())
         self.progress_data = {}

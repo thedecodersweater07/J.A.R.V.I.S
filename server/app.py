@@ -13,19 +13,19 @@ USAGE (Windows/PowerShell):
 
 import logging
 import asyncio
-import subprocess
+# import subprocess  # Removed: unused import
 import shutil
 import json
 import os
 from pathlib import Path
 from contextlib import asynccontextmanager
-from typing import Dict, Any, Optional
+# from typing import Dict, Any, Optional  # Removed: unused imports
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse, FileResponse, Response, RedirectResponse, HTMLResponse
+from fastapi.responses import JSONResponse, FileResponse, Response, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -520,6 +520,9 @@ class FrontendBuilder:
             self.logger.info(f"✅ Deployed {deployed_files} files to {self.deploy_dir} (web/index.html never overwritten)")
             # Verify index.html exists in static
             index_file = self.deploy_dir / "index.html"
+            css_file = self.deploy_dir / "static" / "css" / "index.css"
+            if not index_file.exists() and css_file.exists():
+                shutil.copy2(css_file, index_file)
             if index_file.exists():
                 self.logger.info("✅ index.html successfully deployed to static")
                 return True
@@ -573,7 +576,7 @@ class JarvisServer:
         self.logger.info(f"Web directory: {self._web_dir}")
     
     @asynccontextmanager
-    async def _lifespan(self, app: FastAPI):
+    async def _lifespan(self, _):
         """Handle application startup and shutdown."""
         self.logger.info("🚀 J.A.R.V.I.S. server startup initiated")
         
@@ -625,6 +628,29 @@ class JarvisServer:
         """Configure application routes."""
         self.app.include_router(api_router, prefix="/api")
         self.app.include_router(websocket_router)
+
+        # Redirect /style.css to /web/style.css for compatibility
+        @self.app.get("/style.css")
+        async def style_css_redirect():
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(url="/web/style.css")
+
+        # Serve /script.js from /web/script.js for root-level requests
+        @self.app.get("/script.js")
+        async def script_js():
+            script_path = self._web_dir / "script.js"
+            if script_path.exists():
+                return FileResponse(script_path, media_type="application/javascript")
+            return JSONResponse({"detail": "script.js not found"}, status_code=404)
+
+        # Serve /favicon.png from /web/favicon.png for root-level requests
+        @self.app.get("/favicon.png")
+        async def favicon_png():
+            favicon_path = self._web_dir / "favicon.png"
+            if favicon_path.exists():
+                return FileResponse(favicon_path, media_type="image/png")
+            # Return 204 No Content if favicon is missing
+            return Response(status_code=204)
 
         # Root endpoint - serve index.html directly
         @self.app.get("/")
@@ -680,10 +706,13 @@ class JarvisServer:
         self.app.mount("/static", StaticFiles(directory=str(self._static_dir)), name="static")
         self.logger.info(f"📁 Mounted static directory: {self._static_dir}")
 
-        # Mount web directory for other assets if it has files
+        # Mount web directory for other assets and direct CSS access
         if self._directory_has_files(self._web_dir):
             self.app.mount("/assets", StaticFiles(directory=str(self._web_dir)), name="web-assets")
             self.logger.info(f"📁 Mounted web assets directory: {self._web_dir}")
+            # Also mount /web for direct access to style.css and others
+            self.app.mount("/web", StaticFiles(directory=str(self._web_dir)), name="web")
+            self.logger.info(f"📁 Mounted /web for direct access to style.css and other files")
     
     def _setup_exception_handlers(self):
         """Configure global exception handlers."""

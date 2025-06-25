@@ -1,0 +1,101 @@
+cmake_minimum_required(VERSION 3.14)
+project(my_new_module_cpp VERSION 1.0.0 LANGUAGES CXX)
+
+# Set module name and version
+set(MODULE_NAME my_new_module)
+set(MODULE_VERSION 1.0.0)
+
+# Add module source files
+set(SOURCES
+    src/${MODULE_NAME}.cpp
+    python/${MODULE_NAME}_bindings.cpp
+)
+
+# Add include directories
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${PYTHON_INCLUDE_DIRS}
+)
+
+# Create module library
+add_library(${MODULE_NAME} SHARED ${SOURCES})
+
+# Set target properties
+set_target_properties(${MODULE_NAME} PROPERTIES
+    VERSION ${MODULE_VERSION}
+    SOVERSION 1
+    OUTPUT_NAME _${MODULE_NAME}
+    PREFIX ""
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
+
+# Link dependencies
+target_link_libraries(${MODULE_NAME}
+    PRIVATE
+        pybind11::module
+        Python3::Python
+)
+
+# Set include directories for the target
+target_include_directories(${MODULE_NAME}
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# Install the library
+install(TARGETS ${MODULE_NAME}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+# Install headers
+install(DIRECTORY include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.hpp"
+)
+
+# Export the target
+install(TARGETS ${MODULE_NAME} EXPORT ${MODULE_NAME}Targets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+# Generate and install the config file
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ModuleConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/${MODULE_NAME}Config.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${MODULE_NAME}
+)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/${MODULE_NAME}ConfigVersion.cmake
+    VERSION ${MODULE_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/${MODULE_NAME}Config.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/${MODULE_NAME}ConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${MODULE_NAME}
+)
+
+# Export the target
+install(EXPORT ${MODULE_NAME}Targets
+    FILE ${MODULE_NAME}Targets.cmake
+    NAMESPACE ${PROJECT_NAME}::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${MODULE_NAME}
+)
+
+# Add tests if enabled
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
