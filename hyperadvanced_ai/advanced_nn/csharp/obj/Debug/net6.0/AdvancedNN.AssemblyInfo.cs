@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AdvancedNN")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a6fe8da2c6f86da2a2e4fb60871e08d74e401721")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d69a1df9c4ff6d2df4d2a28cc38d27f2793d9066")]
 [assembly: System.Reflection.AssemblyProductAttribute("AdvancedNN")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AdvancedNN")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

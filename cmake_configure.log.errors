@@ -1,0 +1,38 @@
+CMake Warning (dev) at CMakeLists.txt:295:
+  Syntax Warning in cmake code at column 46
+
+  Argument not separated from preceding token by whitespace.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at CMakeLists.txt:300:
+  Syntax Warning in cmake code at column 11
+
+  Argument not separated from preceding token by whitespace.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at CMakeLists.txt:300:
+  Syntax Warning in cmake code at column 17
+
+  Argument not separated from preceding token by whitespace.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at CMakeLists.txt:301:
+  Syntax Warning in cmake code at column 14
+
+  Argument not separated from preceding token by whitespace.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at CMakeLists.txt:301:
+  Syntax Warning in cmake code at column 31
+
+  Argument not separated from preceding token by whitespace.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at CMakeLists.txt:308:
+  Syntax Warning in cmake code at column 2
+
+  Argument not separated from preceding token by whitespace.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Error: CMake was unable to find a build program corresponding to "Ninja".  CMAKE_MAKE_PROGRAM is not set.  You probably need to select a different build tool.
+CMake Error: CMAKE_CXX_COMPILER not set, after EnableLanguage

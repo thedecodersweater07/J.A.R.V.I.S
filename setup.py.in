@@ -1,0 +1,35 @@
+from setuptools import setup, find_packages
+import os
+
+# Read the version from the project's VERSION file
+version = {}
+with open("VERSION") as f:
+    exec(f.read(), version)
+
+setup(
+    name="jarvis",
+    version=version.get("__version__", "0.1.0"),
+    packages=find_packages(where="@CMAKE_BINARY_DIR@/python"),
+    package_dir={"": "@CMAKE_BINARY_DIR@/python"},
+    install_requires=[
+        # Add your Python dependencies here
+        "pybind11>=2.11.1",
+    ],
+    # Include any non-Python files (e.g., compiled extensions)
+    package_data={
+        "": ["*.pyd", "*.so"],
+    },
+    # Metadata
+    author="Your Name",
+    author_email="your.email@example.com",
+    description="JARVIS - Just A Rather Very Intelligent System",
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
+    url="https://github.com/yourusername/jarvis",
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
+    python_requires=">=3.7",
+)

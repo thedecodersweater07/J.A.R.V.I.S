@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # Main JARVIS API service
+  api:
+    build:
+      context: ..
+      dockerfile: docker/development/Dockerfile
+      target: development
+    container_name: jarvis-api
+    volumes:
+      - ../:/home/appuser/app
+      - /home/appuser/app/__pycache__
+    ports:
+      - "8000:8000"
+    environment:
+      - JARVIS_ENV=development
+      - DATABASE_URL=postgresql://jarvis:jarvis@postgres:5432/jarvis
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+      - ml-service
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  # ML Service
+  ml-service:
+    build:
+      context: ..
+      dockerfile: docker/base/Dockerfile
+      target: production
+    container_name: jarvis-ml
+    volumes:
+      - ../ml:/home/appuser/app/ml
+      - ../data:/home/appuser/app/data
+      - ./cache:/home/appuser/.cache
+    environment:
+      - JARVIS_ENV=production
+      - ML_MODELS_DIR=/home/appuser/app/data/models
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: jarvis-postgres
+    environment:
+      - POSTGRES_USER=jarvis
+      - POSTGRES_PASSWORD=jarvis
+      - POSTGRES_DB=jarvis
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - jarvis-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jarvis -d jarvis"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis for caching and message brokering
+  redis:
+    image: redis:7-alpine
+    container_name: jarvis-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - jarvis-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # PGAdmin for database management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: jarvis-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@jarvis.local
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  # Redis Commander for Redis management (optional)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: jarvis-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+networks:
+  jarvis-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  ml_models:

@@ -1,0 +1,13 @@
+{
+  "OutputFoldersPerTargetSystem": {
+    "Local Machine": [
+      "out\\build\\enter",
+      "out\\install\\enter"
+    ]
+  },
+  "ExpandedNodes": [
+    ""
+  ],
+  "SelectedNode": "\\jarvis.sln",
+  "PreviewInSolutionExplorer": false
+}
