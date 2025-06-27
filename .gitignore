@@ -34,9 +34,31 @@ logs/*
 
 # Environment
 .env
+.env.local
+.env.development
+.env.test
+.env.production
 venv/
 env/
-.env.test
+node_modules/
+.pnp
+.pnp.js
+
+# Frontend build files
+/build
+/dist
+.next/
+out/
+.vercel
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Cache
+.cache/
+.eslintcache
 
 # Test artifacts
 .coverage

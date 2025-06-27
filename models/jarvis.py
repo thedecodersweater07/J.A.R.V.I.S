@@ -248,42 +248,71 @@ class JarvisModel:
         start_time = datetime.utcnow()
         request_id = str(uuid.uuid4())
         metadata = kwargs.pop('metadata', {})
+        
         try:
-            self.logger.info(f"Processing input from user {user_id}: {text[:100]}...")
-            nlp_result = self.nlp_analyzer.analyze(text)
+            # Clean input text by removing any known prefixes
+            cleaned_text = text.strip()
+            for prefix in ["Ik heb je bericht ontvangen:", "Ik heb je bericht ontvangen", "Bericht ontvangen:"]:
+                if cleaned_text.startswith(prefix):
+                    cleaned_text = cleaned_text[len(prefix):].strip(" :\"'")
+            
+            self.logger.info(f"Processing input from user {user_id}: {cleaned_text[:100]}...")
+            
+            # Get NLP analysis
+            nlp_result = self.nlp_analyzer.analyze(cleaned_text)
+            
+            # Create a clean prompt without any prefixes
+            prompt = f"{cleaned_text}\n\nAntwoord direct en beknopt:"
+            
+            # Generate response using LLM
             response = self.llm.generate(
-                prompt=text,
+                prompt=prompt,
                 context={
                     "user_id": user_id,
-                    "nlp_insights": {
-                        "sentiment": nlp_result.get("sentiment"),
-                        "entities": nlp_result.get("entities", [])
-                    },
+                    "nlp_insights": nlp_result,
                     **kwargs
                 }
             )
-            # --- Robust response extraction ---
+            
+            # Extract and clean the response text
             if isinstance(response, dict):
-                # Prefer 'text' or 'response' key
                 response_str = response.get("text") or response.get("response") or str(response)
             else:
                 response_str = str(response)
+            
+            # Clean common prefixes and suffixes
+            response_str = response_str.strip()
+            for prefix in ["Antwoord:", "Reactie:", "Bericht:", "-", "•"]:
+                if response_str.startswith(prefix):
+                    response_str = response_str[len(prefix):].strip()
+            
+            # Remove any surrounding quotes and whitespace
+            response_str = response_str.strip(" \t\n'\"")
+            
+            # Log the interaction
             self._log_interaction(
                 user_id=user_id,
-                input_text=text,
+                input_text=cleaned_text,
                 response=response_str,
-                confidence=0.9,
-                metadata=metadata
+                confidence=nlp_result.get("confidence", 0.9),
+                metadata={
+                    **metadata,
+                    "nlp_result": nlp_result,
+                    "processing_time": (datetime.utcnow() - start_time).total_seconds()
+                }
             )
+            
+            # Update conversation history with cleaned text
             self._update_conversation_history(
                 user_id=user_id,
-                user_input=text,
+                user_input=cleaned_text,
                 assistant_response=response_str,
                 metadata={
                     "request_id": request_id,
                     **metadata
                 }
             )
+            
             return {
                 "response": response_str,
                 "success": True,
@@ -506,14 +535,32 @@ class JarvisModel:
         Calls process_input and returns the response dict.
         """
         try:
+            # Process the input to get a response
             result = self.process_input(prompt, **kwargs)
-            # Always return a dict with a 'response' key (string)
-            if isinstance(result, dict) and "response" in result:
-                return result
-            return {"response": str(result), "success": True}
+            
+            # Ensure we have a dict with a 'response' key
+            if not isinstance(result, dict) or "response" not in result:
+                response_text = str(result)
+                result = {"response": response_text, "success": True}
+            
+            # Clean up the response to ensure it's direct and natural
+            response_text = result["response"]
+            
+            # Remove any meta-commentary about the question
+            if response_text.startswith("Interessante vraag over:"):
+                response_text = response_text.split(":", 1)[1].strip()
+            
+            # Remove any surrounding quotes and normalize whitespace
+            response_text = response_text.strip("'\" \t\n")
+            
+            # Update the response in the result
+            result["response"] = response_text
+            return result
+            
         except Exception as e:
-            self.logger.error(f"[generate] Fout bij AI: {e}", exc_info=True)
-            return {"response": f"[Fout bij AI: {e}]", "success": False}
+            error_msg = f"Error generating response: {str(e)}"
+            self.logger.error(f"[generate] {error_msg}", exc_info=True)
+            return {"response": error_msg, "success": False}
 
 # --- HyperAdvanced AI Integration ---
 # This is an optional integration and will be skipped if not available
