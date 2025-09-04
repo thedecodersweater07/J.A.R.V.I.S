@@ -1,2 +1,0 @@
-## jarvis 
-ik probeer een slimme ai te maken die claude en gpt overkomt en die kan leren en zichzelf verbeteren. en het moet me deels helpen in het dagelijkse leven. alle onodige files die de ai slimmer lijken te maken worden verwijderd of worden geoptimaliseerd. als ze echt het systeem slimmer maken worden ze behouden. 

@@ -1,1 +1,0 @@
-// Bestand is leeg, gebruik alleen main.jsx als entrypoint.

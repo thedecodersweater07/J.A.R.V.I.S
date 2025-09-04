@@ -1,3 +1,0 @@
-# NLP module configuration
-language: en
-model: bert-base-uncased

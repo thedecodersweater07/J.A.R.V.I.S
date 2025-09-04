@@ -1,9 +1,0 @@
-This is a sample text file for testing the J.A.R.V.I.S. NLP models.
-It contains multiple sentences to test text processing functionality.
-The quick brown fox jumps over the lazy dog.
-Testing 1, 2, 3...
-
-This is another paragraph with some special characters: !@#$%^&*()_+
-
-Let's test some contractions like don't, can't, and won't.
-Numbers: 1234567890

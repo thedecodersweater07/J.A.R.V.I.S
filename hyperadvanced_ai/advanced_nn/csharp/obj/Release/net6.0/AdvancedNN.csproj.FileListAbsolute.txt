@@ -1,5 +1,0 @@
-C:\nova_industrie\jarvis\hyperadvanced_ai\advanced_nn\csharp\obj\Release\net6.0\AdvancedNN.GeneratedMSBuildEditorConfig.editorconfig
-C:\nova_industrie\jarvis\hyperadvanced_ai\advanced_nn\csharp\obj\Release\net6.0\AdvancedNN.AssemblyInfoInputs.cache
-C:\nova_industrie\jarvis\hyperadvanced_ai\advanced_nn\csharp\obj\Release\net6.0\AdvancedNN.AssemblyInfo.cs
-C:\nova_industrie\jarvis\hyperadvanced_ai\advanced_nn\csharp\obj\Release\net6.0\AdvancedNN.csproj.CoreCompileInputs.cache
-C:\nova_industrie\jarvis\hyperadvanced_ai\advanced_nn\csharp\obj\Release\net6.0\AdvancedNN.sourcelink.json

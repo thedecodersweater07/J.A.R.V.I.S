@@ -1,8 +1,0 @@
-include README.md
-include requirements.txt
-include LICENSE
-include pyproject.toml
-include pyrightconfig.json
-recursive-include hyperadvanced_ai *.py *.pyi *.typed
-recursive-include hyperadvanced_ai/core *.py *.pyi
-recursive-include hyperadvanced_ai/modules *.py *.pyi

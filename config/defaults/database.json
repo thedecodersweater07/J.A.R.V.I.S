@@ -1,8 +1,0 @@
-{
-    "type": "sqlite",
-    "path": "data/jarvis.db",
-    "pool_size": 5,
-    "max_overflow": 10,
-    "echo": false,
-    "connection_timeout": 30
-}
