@@ -1,12 +1,11 @@
 # =====================================================================
-# Audio Dataset Builder
-# Converts raw audio files into a clean dataset (PowerShell + FFmpeg)
+# TTS Model File Handler
+# Moves only .pkl files to the model directory
 # =====================================================================
 
 param(
-    [string]$InputDir = "data\raw\audio",
-    [string]$OutputDir = "data\data_sets\speech_dataset",
-    [int]$SampleRate = 16000
+    [string]$InputDir = "data\data_sets\speech_dataset",
+    [string]$OutputDir = "data\models\speech"
 )
 
 function Write-Log {
@@ -18,41 +17,27 @@ function Write-Log {
 function New-RequiredDirectories {
     if (-not (Test-Path $OutputDir)) {
         New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
-        Write-Log "Created dataset directory: $OutputDir"
+        Write-Log "Created model directory: $OutputDir"
     }
 }
 
-function Start-AudioDatasetBuild {
-    Write-Log "Starting dataset conversion..."
-    $files = Get-ChildItem -Path $InputDir -Include *.wav, *.mp3, *.flac -Recurse
+function Move-PKLFiles {
+    $pklFiles = Get-ChildItem -Path $InputDir -Filter *.pkl -Recurse
 
-    if ($files.Count -eq 0) {
-        Write-Log "No audio files found in $InputDir"
-        exit 1
+    if ($pklFiles.Count -eq 0) {
+        Write-Log "No .pkl files found in $InputDir"
+        return
     }
 
-    $manifest = @()
-
-    foreach ($file in $files) {
-        $outFile = Join-Path $OutputDir ($file.BaseName + "_16k.wav")
-        & ffmpeg -y -i $file.FullName -ar $SampleRate -ac 1 $outFile 2>$null
-
-        if (Test-Path $outFile) {
-            $manifest += [PSCustomObject]@{
-                OriginalFile = $file.FullName
-                DatasetFile  = $outFile
-                SampleRate   = $SampleRate
-            }
-            Write-Log "Converted: $($file.Name) -> $($outFile)"
-        }
+    foreach ($file in $pklFiles) {
+        $destFile = Join-Path $OutputDir $file.Name
+        Copy-Item -Path $file.FullName -Destination $destFile -Force
+        Write-Log "Copied: $($file.Name) -> $destFile"
     }
-
-    # Save manifest to CSV
-    $manifestFile = Join-Path $OutputDir "dataset_manifest.csv"
-    $manifest | Export-Csv -Path $manifestFile -NoTypeInformation -Encoding UTF8
-    Write-Log "Dataset build complete. Manifest saved to $manifestFile"
 }
 
 # Run
 New-RequiredDirectories
-Start-AudioDatasetBuild
+Move-PKLFiles
+Write-Log "Only .pkl files have been moved successfully."
+Write-Log "TTS Model File Handler completed."

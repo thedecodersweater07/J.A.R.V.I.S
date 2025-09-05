@@ -23,3 +23,66 @@
 2025-09-05 20:08:19,097 [INFO] Dataset geladen: 6 samples van data\data_sets\speech_dataset\dataset_manifest.csv
 2025-09-05 20:08:20,316 [INFO] Training gestart
 2025-09-05 20:08:20,319 [WARNING] WAV bestand niet gevonden: data\data_sets\speech_dataset\wavs\killing_16k.wav
+2025-09-05 20:29:51,169 [WARNING] 'filename' kolom niet gevonden. Gebruik DatasetFile als filename.
+2025-09-05 20:29:51,169 [WARNING] 'label' kolom niet gevonden. Gebruik OriginalFile als label.
+2025-09-05 20:29:51,169 [INFO] Dataset geladen: 6 samples van data\data_sets\speech_dataset\dataset_manifest.csv
+2025-09-05 20:29:52,429 [INFO] Training gestart
+2025-09-05 20:29:52,431 [WARNING] WAV bestand niet gevonden: data\data_sets\speech_dataset\wavs\telephone_16k.wav
+2025-09-05 20:31:34,344 [WARNING] 'filename' kolom niet gevonden. Gebruik DatasetFile als filename.
+2025-09-05 20:31:34,344 [WARNING] 'label' kolom niet gevonden. Gebruik OriginalFile als label.
+2025-09-05 20:31:34,344 [INFO] Dataset geladen: 6 samples van data\data_sets\speech_dataset\dataset_manifest.csv
+2025-09-05 20:31:35,553 [INFO] Training gestart
+2025-09-05 20:31:35,556 [WARNING] WAV bestand niet gevonden: data\data_sets\speech_dataset\wavs\killing_16k.wav
+2025-09-05 20:32:55,851 [WARNING] 'filename' kolom niet gevonden. Gebruik DatasetFile als filename.
+2025-09-05 20:32:55,851 [WARNING] 'label' kolom niet gevonden. Gebruik OriginalFile als label.
+2025-09-05 20:32:55,851 [INFO] Dataset geladen: 6 samples van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\dataset_manifest.csv
+2025-09-05 20:32:57,042 [INFO] Training gestart
+2025-09-05 20:32:57,046 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\core_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\core_16k.wav': System error.
+2025-09-05 20:32:57,046 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\condition_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\condition_16k.wav': System error.
+2025-09-05 20:32:57,046 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\telephone_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\telephone_16k.wav': System error.
+2025-09-05 20:32:57,047 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\message_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\message_16k.wav': System error.
+2025-09-05 20:32:57,047 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\jarvismp3_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\jarvismp3_16k.wav': System error.
+2025-09-05 20:32:57,047 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\killing_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\killing_16k.wav': System error.
+2025-09-05 20:34:13,005 [WARNING] 'filename' kolom niet gevonden. Gebruik DatasetFile als filename.
+2025-09-05 20:34:13,005 [WARNING] 'label' kolom niet gevonden. Gebruik OriginalFile als label.
+2025-09-05 20:34:13,006 [INFO] Dataset geladen: 6 samples van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\dataset_manifest.csv
+2025-09-05 20:34:13,007 [INFO] Labels mapping: {'C:\\J.A.R.V.I.S\\data\\raw\\audio\\condition.mp3': 0, 'C:\\J.A.R.V.I.S\\data\\raw\\audio\\core.mp3': 1, 'C:\\J.A.R.V.I.S\\data\\raw\\audio\\jarvismp3.mp3': 2, 'C:\\J.A.R.V.I.S\\data\\raw\\audio\\killing.mp3': 3, 'C:\\J.A.R.V.I.S\\data\\raw\\audio\\message.mp3': 4, 'C:\\J.A.R.V.I.S\\data\\raw\\audio\\telephone.mp3': 5}
+2025-09-05 20:34:14,166 [INFO] Training gestart
+2025-09-05 20:34:14,169 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\message_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\message_16k.wav': System error.
+2025-09-05 20:34:14,169 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\killing_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\killing_16k.wav': System error.
+2025-09-05 20:34:14,170 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\telephone_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\telephone_16k.wav': System error.
+2025-09-05 20:34:14,170 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\condition_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\condition_16k.wav': System error.
+2025-09-05 20:34:14,170 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\jarvismp3_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\jarvismp3_16k.wav': System error.
+2025-09-05 20:34:14,171 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\core_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\core_16k.wav': System error.
+2025-09-05 20:34:14,192 [INFO] Epoch 1 avg loss: 1.7958
+2025-09-05 20:34:14,193 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\condition_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\condition_16k.wav': System error.
+2025-09-05 20:34:14,194 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\message_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\message_16k.wav': System error.
+2025-09-05 20:34:14,194 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\jarvismp3_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\jarvismp3_16k.wav': System error.
+2025-09-05 20:34:14,195 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\telephone_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\telephone_16k.wav': System error.
+2025-09-05 20:34:14,195 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\core_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\core_16k.wav': System error.
+2025-09-05 20:34:14,195 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\killing_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\killing_16k.wav': System error.
+2025-09-05 20:34:14,204 [INFO] Epoch 2 avg loss: 1.7952
+2025-09-05 20:34:14,206 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\jarvismp3_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\jarvismp3_16k.wav': System error.
+2025-09-05 20:34:14,206 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\condition_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\condition_16k.wav': System error.
+2025-09-05 20:34:14,206 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\core_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\core_16k.wav': System error.
+2025-09-05 20:34:14,207 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\telephone_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\telephone_16k.wav': System error.
+2025-09-05 20:34:14,207 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\killing_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\killing_16k.wav': System error.
+2025-09-05 20:34:14,207 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\message_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\message_16k.wav': System error.
+2025-09-05 20:34:14,218 [INFO] Epoch 3 avg loss: 1.7947
+2025-09-05 20:34:14,219 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\core_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\core_16k.wav': System error.
+2025-09-05 20:34:14,220 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\jarvismp3_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\jarvismp3_16k.wav': System error.
+2025-09-05 20:34:14,220 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\telephone_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\telephone_16k.wav': System error.
+2025-09-05 20:34:14,220 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\killing_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\killing_16k.wav': System error.
+2025-09-05 20:34:14,221 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\message_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\message_16k.wav': System error.
+2025-09-05 20:34:14,221 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\condition_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\condition_16k.wav': System error.
+2025-09-05 20:34:14,231 [INFO] Epoch 4 avg loss: 1.7943
+2025-09-05 20:34:14,232 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\core_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\core_16k.wav': System error.
+2025-09-05 20:34:14,233 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\condition_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\condition_16k.wav': System error.
+2025-09-05 20:34:14,233 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\jarvismp3_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\jarvismp3_16k.wav': System error.
+2025-09-05 20:34:14,234 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\message_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\message_16k.wav': System error.
+2025-09-05 20:34:14,234 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\telephone_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\telephone_16k.wav': System error.
+2025-09-05 20:34:14,234 [ERROR] Fout bij laden van C:\J.A.R.V.I.S\data\data_sets\speech_dataset\wavs\killing_16k.wav: Error opening 'C:\\J.A.R.V.I.S\\data\\data_sets\\speech_dataset\\wavs\\killing_16k.wav': System error.
+2025-09-05 20:34:14,245 [INFO] Epoch 5 avg loss: 1.7939
+2025-09-05 20:34:14,249 [INFO] Model opgeslagen in: data/models/speech\tts_model.pkl
+2025-09-05 20:34:14,249 [INFO] Voice ID labels opgeslagen in: data/models/speech\voice_id.pkl
+2025-09-05 20:34:14,249 [INFO] Training afgerond

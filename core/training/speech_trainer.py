@@ -2,95 +2,93 @@ import os
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader, Dataset
-from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
 import torchaudio
+import torchaudio.functional as F
 import pandas as pd
 import pickle
-import logging
+from tqdm import tqdm
 
 # =====================================================================
-# Logging setup
-# =====================================================================
-os.makedirs("logs", exist_ok=True)
-logging.basicConfig(
-    filename="logs/speech_trainer.log",
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
-)
-
-# =====================================================================
-# Dataset loader
+# Dataset loader met audio preprocessing
 # =====================================================================
 class SpeechDataset(Dataset):
-    def __init__(self, csv_file, data_dir, transform=None, filename_column=None, label_column=None):
-        csv_file = os.path.normpath(csv_file)
+    def __init__(self, csv_file, data_dir, idx2label, max_len=16000):
+        self.csv_file = csv_file
+        self.data_dir = data_dir
+        self.max_len = max_len
+        self.idx2label = idx2label
+        self.label2idx = {v: k for k, v in idx2label.items()}
+
         if not os.path.exists(csv_file):
-            logging.error(f"CSV bestand niet gevonden: {csv_file}")
             raise FileNotFoundError(f"CSV bestand niet gevonden: {csv_file}")
 
         self.data = pd.read_csv(csv_file)
-        self.data_dir = data_dir
-        self.transform = transform
 
-        # detecteer filename kolom
-        if filename_column and filename_column in self.data.columns:
-            self.filename_col = filename_column
-        elif "filename" in self.data.columns:
-            self.filename_col = "filename"
-        else:
-            # fallback: eerste kolom met string waarden eindigend op .wav
-            candidates = [c for c in self.data.columns if self.data[c].apply(lambda x: isinstance(x, str) and x.lower().endswith(".wav")).any()]
-            if candidates:
-                self.filename_col = candidates[0]
-                logging.warning(f"'filename' kolom niet gevonden. Gebruik {self.filename_col} als filename.")
-            else:
-                raise KeyError("Geen kolom gevonden voor audiobestanden (.wav) in CSV")
+        # Detecteer kolom voor audio-bestanden
+        file_candidates = [c for c in self.data.columns
+                           if self.data[c].apply(lambda x: isinstance(x, str) and x.lower().endswith(('.wav', '.mp3', '.flac'))).any()]
+        if not file_candidates:
+            raise KeyError("Geen audio-bestand kolom gevonden in CSV")
+        self.file_col = file_candidates[0]
 
-        # detecteer label kolom
-        if label_column and label_column in self.data.columns:
-            self.label_col = label_column
-        elif "label" in self.data.columns:
-            self.label_col = "label"
-        else:
-            # fallback: eerste kolom die niet filename is
-            self.label_col = [c for c in self.data.columns if c != self.filename_col][0]
-            logging.warning(f"'label' kolom niet gevonden. Gebruik {self.label_col} als label.")
+        # Detecteer kolom voor labels
+        label_candidates = [c for c in self.data.columns if c != self.file_col]
+        if not label_candidates:
+            raise KeyError("Geen label kolom gevonden in CSV")
+        self.label_col = label_candidates[0]
 
-        # sla labels op
-        self.labels = self.data[self.label_col].tolist()
-        logging.info(f"Dataset geladen: {len(self.data)} samples van {csv_file}")
+        # Voeg label_idx toe
+        self.data['label_idx'] = self.data[self.label_col].map(self.label2idx)
 
     def __len__(self):
         return len(self.data)
 
+    def preprocess_audio(self, waveform):
+        # Mono
+        if waveform.ndim > 1:
+            waveform = waveform.mean(dim=0, keepdim=True)
+
+        # Pad/truncate
+        if waveform.shape[1] < self.max_len:
+            pad = self.max_len - waveform.shape[1]
+            waveform = torch.nn.functional.pad(waveform, (0, pad))
+        else:
+            waveform = waveform[:, :self.max_len]
+
+        # Normalize volume
+        max_val = waveform.abs().max()
+        if max_val > 0:
+            waveform = waveform / max_val
+
+        # Eenvoudige denoise: high-pass filter 80Hz
+        waveform = F.highpass_biquad(waveform, 80, 16000)
+        return waveform
+
     def __getitem__(self, idx):
         row = self.data.iloc[idx]
-        # gebruik alleen basename om paden niet dubbel te maken
-        filename = os.path.basename(str(row[self.filename_col]))
-        wav_path = os.path.normpath(os.path.join(self.data_dir, filename))
+        wav_path = os.path.join(self.data_dir, os.path.basename(row[self.file_col]))
 
-        if not os.path.exists(wav_path):
-            logging.warning(f"WAV bestand niet gevonden: {wav_path}")
+        waveform = torch.zeros(1, self.max_len)
+        try:
+            torchaudio.set_audio_backend("sox_io")  # beter voor MP3
+            wave, sr = torchaudio.load(wav_path)
+            waveform = self.preprocess_audio(wave)
+        except Exception as e:
+            print(f"Fout bij laden van {wav_path}: {e}")
 
-        waveform, sr = torchaudio.load(wav_path)
-        label = row[self.label_col]
-
-        if self.transform:
-            waveform = self.transform(waveform)
-
-        return waveform, label
+        label_idx = int(row['label_idx'])
+        return waveform, torch.tensor(label_idx, dtype=torch.long)
 
 # =====================================================================
-# Simpel CNN speech model
+# CNN speech model
 # =====================================================================
 class SpeechModel(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
         self.network = nn.Sequential(
-            nn.Conv1d(1, 16, kernel_size=5, stride=2),
+            nn.Conv1d(1, 16, 5, stride=2),
             nn.ReLU(),
-            nn.Conv1d(16, 32, kernel_size=5, stride=2),
+            nn.Conv1d(16, 32, 5, stride=2),
             nn.ReLU(),
             nn.AdaptiveAvgPool1d(1),
             nn.Flatten(),
@@ -98,79 +96,72 @@ class SpeechModel(nn.Module):
         )
 
     def forward(self, x):
-        if x.ndim == 2:  # (batch, time)
-            x = x.unsqueeze(1)  # (batch, 1, time)
+        if x.ndim == 2:
+            x = x.unsqueeze(1)
         return self.network(x)
 
 # =====================================================================
 # Trainer
 # =====================================================================
 class SpeechTrainer:
-    def __init__(self, dataset, num_classes, batch_size=32, lr=1e-3,
-                 log_dir="logs", model_dir="data/models/speech"):
+    def __init__(self, model_pkl, voice_id_pkl, csv_file, data_dir, batch_size=16, lr=1e-3):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = SpeechModel(num_classes).to(self.device)
-        self.loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+        # Laad voice mapping
+        if os.path.exists(voice_id_pkl):
+            with open(voice_id_pkl, "rb") as f:
+                idx2label = pickle.load(f)
+        else:
+            raise FileNotFoundError(f"voice_id.pkl niet gevonden: {voice_id_pkl}")
+
+        self.dataset = SpeechDataset(csv_file, data_dir, idx2label)
+        self.num_classes = len(idx2label)
+        self.loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=True)
+
+        # Laad bestaand model of nieuw model
+        if os.path.exists(model_pkl):
+            with open(model_pkl, "rb") as f:
+                self.model = pickle.load(f).to(self.device)
+                print(f"Bestaand model geladen: {model_pkl}")
+        else:
+            self.model = SpeechModel(self.num_classes).to(self.device)
+            print("Nieuw model aangemaakt.")
+
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
+        self.model_pkl = model_pkl
 
-        os.makedirs(log_dir, exist_ok=True)
-        os.makedirs(model_dir, exist_ok=True)
-        self.log_dir = log_dir
-        self.model_dir = model_dir
-        self.writer = SummaryWriter(log_dir=log_dir)
-        self.dataset = dataset
-
-    def train(self, epochs=10):
-        logging.info("Training gestart")
+    def train(self, epochs=5):
         for epoch in range(epochs):
             running_loss = 0.0
             loop = tqdm(self.loader, desc=f"Epoch {epoch+1}/{epochs}")
             for waveforms, labels in loop:
-                # convert labels naar tensor indien nodig
-                if not torch.is_tensor(labels):
-                    labels = torch.tensor(labels, dtype=torch.long)
                 waveforms, labels = waveforms.to(self.device), labels.to(self.device)
-
                 self.optimizer.zero_grad()
                 outputs = self.model(waveforms)
                 loss = self.criterion(outputs, labels)
                 loss.backward()
                 self.optimizer.step()
-
                 running_loss += loss.item()
                 loop.set_postfix(loss=loss.item())
-
             avg_loss = running_loss / len(self.loader)
-            self.writer.add_scalar("Loss/train", avg_loss, epoch)
-            logging.info(f"Epoch {epoch+1} avg loss: {avg_loss:.4f}")
             print(f"Epoch {epoch+1} avg loss: {avg_loss:.4f}")
 
-        # Opslaan als .pkl
-        tts_model_path = os.path.join(self.model_dir, "tts_model.pkl")
-        voice_id_path = os.path.join(self.model_dir, "voice_id.pkl")
-
-        with open(tts_model_path, "wb") as f:
+        # Opslaan
+        with open(self.model_pkl, "wb") as f:
             pickle.dump(self.model, f)
-        with open(voice_id_path, "wb") as f:
-            pickle.dump(self.dataset.labels, f)
-
-        logging.info(f"Model opgeslagen in: {tts_model_path}")
-        logging.info(f"Voice ID labels opgeslagen in: {voice_id_path}")
-        print(f"Model opgeslagen in: {tts_model_path}")
-        print(f"Voice ID labels opgeslagen in: {voice_id_path}")
-
-        self.writer.close()
-        logging.info("Training afgerond")
+        print(f"Model opgeslagen in {self.model_pkl}")
 
 # =====================================================================
 # Main
 # =====================================================================
 if __name__ == "__main__":
-    dataset = SpeechDataset(
-        csv_file=r"data/data_sets/speech_dataset/dataset_manifest.csv",
-        data_dir=r"data/data_sets/speech_dataset/wavs"
+    trainer = SpeechTrainer(
+        model_pkl="data/models/speech/tts_model.pkl",
+        voice_id_pkl="data/models/speech/voice_id.pkl",
+        csv_file="data/data_sets/speech_dataset/dataset_manifest.csv",
+        data_dir="data/data_sets/speech_dataset/wavs",
+        batch_size=16,
+        lr=1e-3
     )
-    trainer = SpeechTrainer(dataset, num_classes=10, batch_size=16)
     trainer.train(epochs=5)
-    logging.info("Script voltooid")

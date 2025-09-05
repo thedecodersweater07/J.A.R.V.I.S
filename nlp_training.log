@@ -1,0 +1,31 @@
+[2025-09-05 21:50:56] === NLP Model Processing Started ===
+[2025-09-05 21:50:56] Creating required directories...
+[2025-09-05 21:50:56] Validating training data...
+[2025-09-05 21:50:56] Found 1 training data files
+[2025-09-05 21:50:56] Starting NLP model processing...
+[2025-09-05 21:50:56] Creating model file: C:\J.A.R.V.I.S\data\models\nlp\chat_model.pkl
+[2025-09-05 21:50:57] Creating model file: C:\J.A.R.V.I.S\data\models\nlp\embeddings.pkl
+[2025-09-05 21:50:57] Creating model file: C:\J.A.R.V.I.S\data\models\nlp\entity_model.pkl
+[2025-09-05 21:50:58] Creating model file: C:\J.A.R.V.I.S\data\models\nlp\intent_model.pkl
+[2025-09-05 21:50:58] NLP model processing completed
+[2025-09-05 21:50:58] Models saved to: C:\J.A.R.V.I.S\data\models\nlp
+[2025-09-05 21:50:58] === NLP Model Processing Finished ===
+[2025-09-05 21:50:58] Logs available at: C:\J.A.R.V.I.S\nlp_training.log
+[2025-09-05 21:53:14] Loading dataset...
+[2025-09-05 21:53:14] Loaded 231 rows from dataset.
+[2025-09-05 21:53:14] Models created with data from C:\J.A.R.V.I.S\data\data_sets\text\text_dataset.csv
+[2025-09-05 21:55:58] Loaded 231 rows from dataset
+[2025-09-05 21:55:58] Loading existing model: chat_model.pkl
+[2025-09-05 21:55:58] Failed to load chat_model.pkl (invalid load key, '\xff'.), creating new model
+[2025-09-05 21:55:58] Loading existing model: embeddings.pkl
+[2025-09-05 21:55:58] Failed to load embeddings.pkl (invalid load key, '\xff'.), creating new model
+[2025-09-05 21:55:58] Loading existing model: entity_model.pkl
+[2025-09-05 21:55:58] Failed to load entity_model.pkl (invalid load key, '\xff'.), creating new model
+[2025-09-05 21:55:58] Loading existing model: intent_model.pkl
+[2025-09-05 21:55:58] Failed to load intent_model.pkl (invalid load key, '\xff'.), creating new model
+[2025-09-05 21:55:58] Updating models with dataset...
+[2025-09-05 21:55:58] Saved model: chat_model.pkl
+[2025-09-05 21:55:58] Saved model: embeddings.pkl
+[2025-09-05 21:55:58] Saved model: entity_model.pkl
+[2025-09-05 21:55:58] Saved model: intent_model.pkl
+[2025-09-05 21:55:58] All models updated successfully!
