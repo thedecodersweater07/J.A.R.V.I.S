@@ -1,0 +1,25 @@
+2025-09-05 19:56:00,912 [ERROR] CSV bestand niet gevonden: data/data_sets/speech_dataset/metadata.csv
+2025-09-05 19:57:42,527 [ERROR] CSV bestand niet gevonden: data/data_sets/speech_datases/dataset_manifest.csv
+2025-09-05 20:00:07,533 [WARNING] 'label' kolom niet gevonden. Gebruik OriginalFile als label.
+2025-09-05 20:00:07,533 [INFO] Dataset geladen: 6 samples van data\data_sets\speech_dataset\dataset_manifest.csv
+2025-09-05 20:00:11,513 [INFO] Training gestart
+2025-09-05 20:02:57,034 [WARNING] 'filename' kolom niet gevonden. Gebruik DatasetFile als filename.
+2025-09-05 20:02:57,034 [WARNING] 'label' kolom niet gevonden. Gebruik OriginalFile als label.
+2025-09-05 20:02:57,034 [INFO] Dataset geladen: 6 samples van data\data_sets\speech_dataset\dataset_manifest.csv
+2025-09-05 20:02:58,192 [INFO] Training gestart
+2025-09-05 20:02:58,195 [WARNING] WAV bestand niet gevonden: data/data_sets/speech_dataset/wavs\data\data_sets\speech_dataset\message_16k.wav
+2025-09-05 20:05:14,063 [WARNING] 'filename' kolom niet gevonden. Gebruik DatasetFile als filename.
+2025-09-05 20:05:14,063 [WARNING] 'label' kolom niet gevonden. Gebruik OriginalFile als label.
+2025-09-05 20:05:14,063 [INFO] Dataset geladen: 6 samples van data\data_sets\speech_dataset\dataset_manifest.csv
+2025-09-05 20:05:15,318 [INFO] Training gestart
+2025-09-05 20:05:15,321 [WARNING] WAV bestand niet gevonden: data\data_sets\speech_dataset\wavs\core_16k.wav
+2025-09-05 20:07:52,465 [WARNING] 'filename' kolom niet gevonden. Gebruik DatasetFile als filename.
+2025-09-05 20:07:52,465 [WARNING] 'label' kolom niet gevonden. Gebruik OriginalFile als label.
+2025-09-05 20:07:52,466 [INFO] Dataset geladen: 6 samples van data\data_sets\speech_dataset\dataset_manifest.csv
+2025-09-05 20:07:53,797 [INFO] Training gestart
+2025-09-05 20:07:53,800 [WARNING] WAV bestand niet gevonden: data\data_sets\speech_dataset\wavs\message_16k.wav
+2025-09-05 20:08:19,096 [WARNING] 'filename' kolom niet gevonden. Gebruik DatasetFile als filename.
+2025-09-05 20:08:19,096 [WARNING] 'label' kolom niet gevonden. Gebruik OriginalFile als label.
+2025-09-05 20:08:19,097 [INFO] Dataset geladen: 6 samples van data\data_sets\speech_dataset\dataset_manifest.csv
+2025-09-05 20:08:20,316 [INFO] Training gestart
+2025-09-05 20:08:20,319 [WARNING] WAV bestand niet gevonden: data\data_sets\speech_dataset\wavs\killing_16k.wav
